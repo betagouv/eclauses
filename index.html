@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Eclause - Ministère de la Culture</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    iframe { width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+  <!-- Mets ici l’URL de base à afficher dans l’iframe -->
+  <iframe id="embed" data-src="https://grist.numerique.gouv.fr/o/docs/kmFxH2HJiL3E/DEV-Eclause/p/32" title="Eclause"></iframe>
+  <script>
+    (function () {
+      const iframe = document.getElementById('embed');
+      const baseSrc = iframe.getAttribute('data-src');
+      if (!baseSrc) return;
+
+      // URL absolue à partir du src de base (gère aussi les chemins relatifs)
+      const target = new URL(baseSrc, window.location.href);
+
+      // Récupère les paramètres de la page parente
+      const parentParams = new URLSearchParams(window.location.search);
+
+     const whitelist = ['Token_'];
+     for (const key of whitelist) {
+         if (parentParams.has(key)) target.searchParams.set(key, parentParams.get(key));
+     }
+
+     target.searchParams.set("style", "singlePage");
+
+      // Applique l’URL finale à l’iframe
+      iframe.src = target.toString();
+    })();
+  </script>
+</body>
+</html>
