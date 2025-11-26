@@ -1,0 +1,205 @@
+const Component = () => {
+  const [authed, setAuthed] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      setAuthed(!!(gristAPI?.isAuthenticated && gristAPI.isAuthenticated()));
+      document.title = 'Eclauses — À propos';
+    } catch (_) {}
+  }, []);
+
+  function go(id) {
+    try { if (gristAPI?.navigate) gristAPI.navigate(id); } catch (e) { console.warn(e); }
+  }
+
+  return (
+    <main className="fr-container fr-my-6w">
+      {/* Hero */}
+      <header className="fr-mb-6w">
+        <div className="fr-grid-row fr-grid-row--gutters fr-grid-row--middle">
+          <div className="fr-col-12 fr-col-md-7">
+            <h1 className="fr-h2 fr-mb-2w">À propos d’<span className="fr-text--lead">Eclauses</span></h1>
+            <p className="fr-text--lg">
+              Eclauses accompagne les jeunes diplômés en conservation-restauration d’œuvres d’art
+              dans leur insertion professionnelle&nbsp;: mise à jour de profil, accès aux marchés
+              publics intégrant des <strong>clauses sociales</strong>, et annuaire des professionnels.
+            </p>
+            <div className="fr-btns-group fr-btns-group--inline fr-btns-group--icon-left fr-mt-3w">
+              {authed ? (
+                <button className="fr-btn fr-icon-account-line" onClick={() => go('espace-beneficiaire')}>
+                  Accéder à mon espace
+                </button>
+              ) : (
+                <button className="fr-btn fr-icon-lock-line" onClick={() => go('login')}>
+                  Se connecter / Obtenir mon lien
+                </button>
+              )}
+              <button className="fr-btn fr-btn--secondary fr-icon-question-line" onClick={() => go('faq')}>
+                FAQ
+              </button>
+            </div>
+          </div>
+          <div className="fr-col-12 fr-col-md-5">
+            <div className="fr-callout">
+              <h2 className="fr-callout__title fr-h6">Objectifs</h2>
+              <ul className="fr-callout__text fr-list">
+                <li>Faciliter l’accès aux marchés compatibles avec votre profil.</li>
+                <li>Valoriser les compétences via un profil complet (CV, spécialités, mobilité).</li>
+                <li>Mettre en relation les acteurs du secteur grâce à l’annuaire.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Fonctionnalités clés */}
+      <section className="fr-mb-6w">
+        <h2 className="fr-h4 fr-mb-3w">Fonctionnalités clés</h2>
+        <div className="fr-grid-row fr-grid-row--gutters">
+          <div className="fr-col-12 fr-col-md-4">
+            <article className="fr-card fr-enlarge-link">
+              <div className="fr-card__body">
+                <h3 className="fr-card__title fr-text--md">
+                  <a href="#" onClick={(e) => { e.preventDefault(); go('profil'); }}>
+                    Mon profil
+                  </a>
+                </h3>
+                <p className="fr-card__desc fr-text--sm">
+                  Coordonnées, formation, spécialités, zones de mobilité, CV. Mettez à jour votre fiche à tout moment.
+                </p>
+              </div>
+            </article>
+          </div>
+          <div className="fr-col-12 fr-col-md-4">
+            <article className="fr-card fr-enlarge-link">
+              <div className="fr-card__body">
+                <h3 className="fr-card__title fr-text--md">
+                  <a href="#" onClick={(e) => { e.preventDefault(); go('marches'); }}>
+                    Marchés actifs
+                  </a>
+                </h3>
+                <p className="fr-card__desc fr-text--sm">
+                  Liste et carte des marchés encore réalisables et filtrés par vos clauses sociales.
+                </p>
+              </div>
+            </article>
+          </div>
+          <div className="fr-col-12 fr-col-md-4">
+            <article className="fr-card fr-enlarge-link">
+              <div className="fr-card__body">
+                <h3 className="fr-card__title fr-text--md">
+                  <a href="#" onClick={(e) => { e.preventDefault(); go('annuaire'); }}>
+                    Annuaire
+                  </a>
+                </h3>
+                <p className="fr-card__desc fr-text--sm">
+                  Recherchez des pairs partageant des clauses communes (selon consentement).
+                </p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* Comment ça marche */}
+      <section className="fr-mb-6w">
+        <h2 className="fr-h4 fr-mb-2w">Comment ça marche&nbsp;?</h2>
+        <ol className="fr-tiles-group fr-tiles-group--sm">
+          <li className="fr-tile">
+            <div className="fr-tile__body">
+              <h3 className="fr-tile__title fr-text--md">1. Connexion par lien</h3>
+              <p className="fr-tile__desc">Saisissez votre e-mail, recevez un <strong>lien unique</strong> (temporaire), et accédez à votre espace.</p>
+              {!authed && (
+                <button className="fr-link fr-icon-arrow-right-line fr-link--icon-right" onClick={() => go('login')}>
+                  Aller à la page de connexion
+                </button>
+              )}
+            </div>
+          </li>
+          <li className="fr-tile">
+            <div className="fr-tile__body">
+              <h3 className="fr-tile__title fr-text--md">2. Mettez à jour votre profil</h3>
+              <p className="fr-tile__desc">Complétez vos informations et téléversez votre CV pour être facilement identifié.</p>
+            </div>
+          </li>
+          <li className="fr-tile">
+            <div className="fr-tile__body">
+              <h3 className="fr-tile__title fr-text--md">3. Explorez les marchés</h3>
+              <p className="fr-tile__desc">Consultez les marchés compatibles, la carte et les échéances clés.</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      {/* Publics concernés */}
+      <section className="fr-mb-6w">
+        <h2 className="fr-h4 fr-mb-2w">Pour qui&nbsp;?</h2>
+        <div className="fr-badge-group">
+          <span className="fr-badge fr-badge--success">Bénéficiaires</span>
+          <span className="fr-badge fr-badge--info">Acheteurs publics</span>
+          <span className="fr-badge fr-badge--new">Répondants / partenaires</span>
+        </div>
+        <p className="fr-text--sm fr-text-mention--grey fr-mt-1w">
+          Des espaces dédiés existent pour chaque profil (filtrage par rôles à venir).
+        </p>
+      </section>
+
+      {/* Données personnelles & infos légales */}
+      <section className="fr-mb-6w">
+        <h2 className="fr-h4 fr-mb-2w">Données personnelles & informations légales</h2>
+        <div className="fr-grid-row fr-grid-row--gutters">
+          <div className="fr-col-12 fr-col-md-6">
+            <div className="fr-callout">
+              <h3 className="fr-callout__title fr-h6">Protection des données (RGPD)</h3>
+              <p className="fr-callout__text fr-text--sm">
+                Base légale, droits d’accès/rectification/opposition, durée de conservation et contact DPO.
+              </p>
+              <button className="fr-btn fr-btn--secondary fr-icon-information-line" onClick={() => go('donnees-personnelles')}>
+                Consulter la page RGPD
+              </button>
+            </div>
+          </div>
+          <div className="fr-col-12 fr-col-md-6">
+            <div className="fr-callout">
+              <h3 className="fr-callout__title fr-h6">Mentions légales</h3>
+              <p className="fr-callout__text fr-text--sm">
+                Éditeur, hébergement, propriété intellectuelle, accessibilité, réutilisation des contenus.
+              </p>
+              <button className="fr-btn fr-btn--secondary fr-icon-file-list-2-line" onClick={() => go('mentions-legales')}>
+                Lire les mentions légales
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Support & accessibilité */}
+      <section className="fr-mb-6w">
+        <h2 className="fr-h4 fr-mb-2w">Support & accessibilité</h2>
+        <ul className="fr-list fr-text--sm">
+          <li>Consultez la <button className="fr-link" onClick={() => go('faq')}>FAQ</button> pour les questions courantes.</li>
+          <li>En cas de problème de connexion, redemandez un lien puis vérifiez vos indésirables.</li>
+          <li>Nous visons une conformité élevée au RGAA ; vos retours sont bienvenus.</li>
+        </ul>
+      </section>
+
+      {/* Licence / réutilisation */}
+      <section className="fr-mb-3w">
+        <div className="fr-highlight">
+          <p className="fr-text--sm">
+            Sauf mention contraire, les contenus sont proposés sous licence <strong>Etalab-2.0</strong>.
+          </p>
+          {authed ? (
+            <button className="fr-btn fr-icon-arrow-right-line fr-btn--icon-right" onClick={() => go('espace-beneficiaire')}>
+              Ouvrir mon espace
+            </button>
+          ) : (
+            <button className="fr-btn fr-icon-lock-line" onClick={() => go('login')}>
+              Se connecter / Recevoir mon lien
+            </button>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+};

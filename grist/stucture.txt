@@ -1,0 +1,624 @@
+@grist.UserTable
+class Acces_Coordonnees:
+
+  def _default_Repondant(rec, table, value, user):
+    return user.Auth.Repondant
+  Repondant = grist.Reference('Repondants')
+  Marche = grist.Reference('Marches')
+  Beneficiaire = grist.Reference('Beneficiaires')
+  Affiche_email = grist.Bool()
+  Affiche_telephone = grist.Bool()
+
+  def _default_Cree_a(rec, table, value, user):
+    return NOW()
+  Cree_a = grist.DateTime('Europe/Paris')
+
+
+@grist.UserTable
+class Acheteurs:
+  Nom = grist.Text()
+  Ministere = grist.Choice()
+
+  @grist.formulaType(grist.ReferenceList('Clauses_sociales'))
+  def Marches_Clauses_sociales(rec, table):
+    return [rec.Marches.Clauses_sociales]
+
+  @grist.formulaType(grist.ReferenceList('Beneficiaires'))
+  def Marches_Clauses_sociales_Beneficiaires(rec, table):
+    return rec.Marches_Clauses_sociales.Beneficiaires
+
+  @grist.formulaType(grist.ReferenceList('Marches'))
+  def Marches(rec, table):
+    return Marches.lookupRecords(Acheteur=rec.id)
+
+
+@grist.UserTable
+class Application_AI_Conversations:
+  component = grist.Reference('Application_Composants')
+  title = grist.Text()
+  model = grist.Text()
+
+  def _default_active(rec, table, value, user):
+    return True
+  active = grist.Bool()
+
+  def _default_session_id(rec, table, value, user):
+    return UUID()
+  session_id = grist.Text()
+
+  def _default_started_at(rec, table, value, user):
+    return NOW()
+  started_at = grist.DateTime('Europe/Paris')
+
+
+@grist.UserTable
+class Application_AI_Messages:
+  conversation = grist.Reference('Application_AI_Conversations')
+  turn_index = grist.Int()
+  role = grist.Choice()
+  content_md = grist.Text()
+  proposal_type = grist.Choice()
+  proposed_code = grist.Text()
+  tokens_output = grist.Int()
+
+  def _default_created_at(rec, table, value, user):
+    return NOW()
+  created_at = grist.DateTime('Europe/Paris')
+
+  @grist.formulaType(grist.Bool())
+  def applied(rec, table):
+    return False
+
+  @grist.formulaType(grist.DateTime('Europe/Paris'))
+  def applied_at(rec, table):
+    return None
+
+  @grist.formulaType(grist.Int())
+  def tokens_input(rec, table):
+    return 0
+
+
+@grist.UserTable
+class Application_AuthUser:
+  Email = grist.Text()
+
+  def _default_Derniere_mise_a_jour(rec, table, value, user):
+    return NOW()
+  Derniere_mise_a_jour = grist.DateTime('Europe/Paris')
+  Hash_Password = grist.Text()
+
+
+@grist.UserTable
+class Application_Composants:
+  template_id = grist.Text()
+  template_name = grist.Text()
+  component_code = grist.Text()
+  component_type = grist.Text()
+  show_in_nav = grist.Bool()
+  nav_order = grist.Int()
+  default_component = grist.Bool()
+  requires_auth = grist.Bool()
+
+
+@grist.UserTable
+class Application_FAQ_Categories:
+  Title = grist.Text()
+  Order = grist.Numeric()
+  Published = grist.Bool()
+  Description = grist.Text()
+
+  @grist.formulaType(grist.Text())
+  def Slug(rec, table):
+    return LOWER(SUBSTITUTE(SUBSTITUTE(rec.Title, ' ', '-'), '_', '-'))
+
+  @grist.formulaType(grist.Reference('Clauses_sociales'))
+  def Clause(rec, table):
+    return 0
+
+
+@grist.UserTable
+class Application_FAQ_Questions:
+  Question = grist.Text()
+  Answer = grist.Text()
+  Category = grist.Reference('Application_FAQ_Categories')
+  Keywords = grist.Text()
+  Order = grist.Numeric()
+  Published = grist.Bool()
+
+  def _default_Updated_at(rec, table, value, user):
+    return NOW()
+  Updated_at = grist.DateTime('Europe/Paris')
+  Audience = grist.Choice()
+  Vrai_audience = grist.Choice()
+  Auteur = grist.Text()
+  Clause2 = grist.Reference('Clauses_sociales')
+
+
+@grist.UserTable
+class AuthLink:
+  Email = grist.Text()
+
+  def _default_Beneficiaire(rec, table, value, user):
+    return Beneficiaires.lookupOne(Courriel=rec.Email)
+  Beneficiaire = grist.Reference('Beneficiaires')
+
+  def _default_Repondant(rec, table, value, user):
+    return Repondants.lookupOne(Email=rec.Email)
+  Repondant = grist.Reference('Repondants')
+
+  def _default_Token(rec, table, value, user):
+    return UUID()
+  Token = grist.Text()
+
+  def _default_Cree_a(rec, table, value, user):
+    return NOW()
+  Cree_a = grist.DateTime('Europe/Paris')
+
+  def _default_Expire_le(rec, table, value, user):
+    return DTIME(datetime.datetime.now() + datetime.timedelta(hours=24),'Europe/Paris')
+  Expire_le = grist.DateTime('Europe/Paris')
+
+  def _default_Acheteur(rec, table, value, user):
+    return Utilisateurs_Acheteurs.lookupOne(Email=rec.Email)
+  Acheteur = grist.Reference('Utilisateurs_Acheteurs')
+
+  def _default_Direct_Lien(rec, table, value, user):
+    return f"{SELF_HYPERLINK(LinkKey_Token=rec.Token,page=32)}&style=singlePage"
+  Direct_Lien = grist.Text()
+
+  @grist.formulaType(grist.Bool())
+  def Expire(rec, table):
+    return rec.Expire_le < NOW()
+
+  @grist.formulaType(grist.ChoiceList())
+  def Roles(rec, table):
+    roles = []
+    if rec.Beneficiaire:
+        roles.append('beneficiaire')
+    if rec.Repondant:
+        roles.append('repondant')
+    if rec.Acheteur:
+        roles.append('acheteur')
+    return tuple(roles)
+
+  @grist.formulaType(grist.Reference('Acheteurs'))
+  def Acheteur_Entite(rec, table):
+    return rec.Acheteur.Entite_de_rattachement
+
+  @grist.formulaType(grist.Text())
+  def Lien(rec, table):
+    return f"https://eclauses.beta.gouv.fr?Token_={rec.Token}"
+
+  def A(rec, table):
+    return bool(rec.Acheteur)
+
+
+@grist.UserTable
+class Beneficiaires:
+  NOM = grist.Text()
+  Prenom = grist.Text()
+  Formation = grist.Reference('T0_Referentiel_Formations')
+  Annee_de_diplome = grist.Choice()
+  Specialite_ecole = grist.Text()
+  Specialite = grist.ReferenceList('T0_Referentiel_Specialites')
+  Sous_specialite = grist.Text()
+  Intitule_du_memoire = grist.Text()
+  Courriel = grist.Text()
+  Telephone = grist.Text()
+  Departement_de_residence = grist.ReferenceList('T0_Referentiel_Departements')
+  Regions_ou_vous_etes_mobile = grist.ReferenceList('T0_Referentiel_Regions')
+  curriculum_vitae = grist.Attachments()
+  Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur = grist.Bool()
+  Je_consens_a_etre_contacte_pour_rejoindre_des_groupements = grist.Bool()
+  Autres_informations = grist.Text()
+
+  def _default_Clef_secrete(rec, table, value, user):
+    return UUID()
+  Clef_secrete = grist.Text()
+  Missions_proposees = grist.ReferenceList('Recherches', reverse_of='JD_proposes')
+  Commentaire = grist.Text()
+
+  def _default_Derniere_modification(rec, table, value, user):
+    return NOW()
+  Derniere_modification = grist.Text()
+  alumni = grist.Bool()
+  Clauses_sociales_de_rattachement = grist.ReferenceList('Clauses_sociales', reverse_of='Beneficiaires')
+
+  def Courriel_ecole_eclauses(rec, table):
+    courriels = [v for v in [rec.Courriel, rec.Courriel_Eclauses] if v]
+    return ";".join(courriels)
+
+  def Email_2(rec, table):
+    return None
+
+  @grist.formulaType(grist.Bool())
+  def Fiche_MAJ(rec, table):
+    return rec.Derniere_modification != ""
+
+  def NOM_Prenom(rec, table):
+    return f"{rec.NOM.upper()} {rec.Prenom}"
+
+  @grist.formulaType(grist.Text())
+  def Email_1(rec, table):
+    fill_template = Z_Libs.lookupOne().fill_template
+
+    gabarit = Z_Gabarits.lookupOne(Nom="Email1")
+    corps = fill_template(gabarit.Corps,rec)
+
+    lien_envoyer_mail = Z_Libs.lookupOne().lien_envoyer_mail
+
+    return lien_envoyer_mail("📧", subject=gabarit.Objet, to=rec.Courriel, cc=["contact@eclauses.beta.gouv.fr"],body=corps)
+
+  def html_annuaire_clause(rec, table):
+    fill_template = Z_Libs.lookupOne().fill_template
+
+    gabarit = rec.Clauses_sociales_de_rattachement[0].html_gabarit_annuaire_clause
+    return fill_template(gabarit,Beneficiaires.lookupOne(id=rec.id))
+
+  def Departement_de_residence_Adresse_geocodee(rec, table):
+    return rec.Departement_de_residence.Adresse_geocodee
+
+  def Regions_ou_vous_etes_mobile_Adresse_geocodee(rec, table):
+    return rec.Regions_ou_vous_etes_mobile.Adresse_geocodee
+
+  @grist.formulaType(grist.ReferenceList('Beneficiaires'))
+  def Annuaire(rec, table):
+    if rec.Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur:
+      res = set()
+      for c in rec.Clauses_sociales_de_rattachement:
+        for b in c.Beneficiaires:
+          if b.id != rec.id and b.Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur:
+            res.add(b)
+      return list(res)
+
+  class _Summary:
+
+    @grist.formulaType(grist.ReferenceList('Beneficiaires'))
+    def group(rec, table):
+      return table.getSummarySourceGroup(rec)
+
+    @grist.formulaType(grist.Int())
+    def count(rec, table):
+      return len(rec.group)
+
+    @grist.formulaType(grist.Numeric())
+    def Annee_de_diplome(rec, table):
+      return SUM(rec.group.Annee_de_diplome)
+
+    def gristHelper_Display(rec, table):
+      return rec.Regions_ou_vous_etes_mobile.Intitule
+
+    def Longitude(rec, table):
+      return rec.Regions_ou_vous_etes_mobile.Longitude
+
+    def Latitude(rec, table):
+      return rec.Regions_ou_vous_etes_mobile.Latitude
+
+    @grist.formulaType(grist.Numeric())
+    def Departement_Latitude(rec, table):
+      return rec.Departement_de_residence.Latitude
+
+    @grist.formulaType(grist.Numeric())
+    def Longitude2(rec, table):
+      return rec.Departement_de_residence.Longitude
+
+    @grist.formulaType(grist.Numeric())
+    def Latitude2(rec, table):
+      return rec.Departement_de_residence.Latitude
+
+
+@grist.UserTable
+class Clauses_sociales:
+  Nom_de_la_clause = grist.Text()
+  Gabarit_d_article_de_marche = grist.Text()
+  Beneficiaires = grist.ReferenceList('Beneficiaires', reverse_of='Clauses_sociales_de_rattachement')
+  html_gabarit_annuaire_clause = grist.Text()
+
+  def Nb_de_marches_totals(rec, table):
+    return len(rec.Marches)
+
+  def Nb_de_beneficiaires_potentiels(rec, table):
+    return len(Beneficiaires.lookupRecords(Clauses_sociales_de_rattachement=CONTAINS(rec.id)))
+
+  @grist.formulaType(grist.Text())
+  def Nb_de_beneficiaires_consentants(rec, table):
+    return len(Beneficiaires.lookupRecords(Clauses_sociales_de_rattachement=CONTAINS(rec.id),Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur=True))
+
+  def Nb_de_beneficiaires_contactables(rec, table):
+    return len(Beneficiaires.lookupRecords(Clauses_sociales_de_rattachement=CONTAINS(rec.id), Je_consens_a_etre_contacte_pour_rejoindre_des_groupements=True))
+
+  @grist.formulaType(grist.Text())
+  def html_statistique(rec, table):
+    fill_template = Z_Libs.lookupOne().fill_template
+
+    gabarit = Z_HTML_Page.lookupOne().Clause_Statistiques
+    return fill_template(gabarit,Clauses_sociales.lookupOne(id=rec.id))
+
+  def Nb_de_marches_actifs(rec, table):
+    return len([marche for marche in rec.Marches if marche.Date_Limite_de_Realisation_de_l_Operation and marche.Date_Limite_de_Realisation_de_l_Operation > TODAY()])
+
+  @grist.formulaType(grist.Attachments())
+  def Documents(rec, table):
+    return None
+
+  @grist.formulaType(grist.ReferenceList('Marches'))
+  def Marches(rec, table):
+    return Marches.lookupRecords(Clauses_sociales=rec.id)
+
+
+@grist.UserTable
+class Declarations_Beneficiaires:
+
+  def _default_Repondant(rec, table, value, user):
+    return user.Auth.Repondant
+  Repondant = grist.Reference('Repondants')
+  Marche = grist.Reference('Marches')
+  Est_beneficiaire_eclauses = grist.Bool()
+  Beneficiaire = grist.Reference('Beneficiaires')
+  Nom = grist.Text()
+  Prenom = grist.Text()
+  Email = grist.Text()
+  Statut = grist.Choice()
+  Cree_le = grist.DateTime('Europe/Paris')
+
+
+@grist.UserTable
+class Invitation_Titulaire:
+  Marche = grist.Reference('Marches')
+  Email = grist.Text()
+
+  def _default_Status(rec, table, value, user):
+    return "pending"
+  Status = grist.Choice()
+
+  def _default_Cree_a(rec, table, value, user):
+    return NOW()
+  Cree_a = grist.DateTime('Europe/Paris')
+
+  def _default_Token(rec, table, value, user):
+    return UUID()
+  Token = grist.Text()
+
+  @grist.formulaType(grist.DateTime('Europe/Paris'))
+  def Processed_At(rec, table):
+    return None
+
+
+@grist.UserTable
+class Marches:
+  Intitule = grist.Text()
+
+  def _default_Acheteur(rec, table, value, user):
+    return user.Auth.Acheteur_Entite
+  Acheteur = grist.Reference('Acheteurs')
+  Date_de_publication = grist.Date()
+  Date_limite_de_candidature = grist.Date()
+  Date_Limite_de_Realisation_de_l_Operation = grist.Date()
+  Clauses_sociales = grist.Reference('Clauses_sociales')
+  Adresse_d_execution = grist.Text()
+  Latitude = grist.Numeric()
+  Longitude = grist.Numeric()
+  Adresse_geocodee = grist.Text()
+  Suivi = grist.ChoiceList()
+  Numero_de_lot = grist.Text()
+  Specialites_du_marche = grist.ReferenceList('T0_Referentiel_Specialites')
+  Date_de_fin_d_execution = grist.Date()
+
+  def Lien_vers_les_documents_d_appel_d_offres(rec, table):
+    return None
+
+  def Intitule_propre(rec, table):
+    return f"{rec.Acheteur.Nom} ({rec.Intitule} - Lot {rec.Numero_de_lot})"
+
+  def html_statistiques(rec, table):
+    fill_template = Z_Libs.lookupOne().fill_template
+
+    gabarit = Z_HTML_Page.lookupOne().Marche_Statistiques
+    return fill_template(gabarit,Marches.lookupOne(id=rec.id))
+
+  def Doit_Geocoder(rec, table):
+    return rec.Adresse_geocodee == ''
+
+  def Beneficiaires(rec, table):
+    return Declarations_Beneficiaires.lookupRecords(Marche=rec.id, Statut="validé").Beneficiaire
+
+  @grist.formulaType(grist.Reference('Repondants'))
+  def Titulaire(rec, table):
+    return Repondants.lookupOne(Titulaire_aux_marches=CONTAINS(rec.id))
+
+  @grist.formulaType(grist.ReferenceList('Repondants'))
+  def Candidats(rec, table):
+    return Repondants.lookupRecords(Candidat_aux_marches=CONTAINS(rec.id))
+
+  def Intitule_Lot(rec, table):
+    return f"{rec.Intitule} - Lot {rec.Numero_de_lot}"
+
+
+@grist.UserTable
+class Marches_Interets:
+  Marche = grist.Reference('Marches')
+  Beneficiaire = grist.Reference('Beneficiaires')
+
+  def _default_Cree_a(rec, table, value, user):
+    return NOW()
+  Cree_a = grist.DateTime('Europe/Paris')
+
+
+@grist.UserTable
+class Recherches:
+  NOM = grist.Text()
+  Prenom = grist.Text()
+  Localisation_departement_ = grist.Reference('T0_Referentiel_Informations')
+  Localisation_ville_ = grist.Text()
+  Description_de_la_mission_proposee = grist.Text()
+  Date_de_debut = grist.Date()
+  Date_de_fin = grist.Date()
+  Taux_journalier_indicatif = grist.Numeric()
+  Habilitations_specifiques = grist.Text()
+  Volume_propose_jours_ = grist.Numeric()
+  Specialite_recherchee = grist.ReferenceList('T0_Referentiel_Informations')
+  Email = grist.Text()
+  Telephone = grist.Text()
+  Liens_vers_les_documents_d_appels_d_offres = grist.Text()
+  JD_proposes = grist.ReferenceList('Beneficiaires', reverse_of='Missions_proposees')
+  Denomination_sociale = grist.Text()
+  Nombre_de_neo_diplomes = grist.Numeric()
+  Marche_ref = grist.Reference('Marches')
+
+
+@grist.UserTable
+class Repondants:
+  Nom = grist.Text()
+  Email = grist.Text()
+  Telephone = grist.Text()
+  Raison_sociale = grist.Text()
+  Candidat_aux_marches = grist.ReferenceList('Marches')
+  Titulaire_aux_marches = grist.ReferenceList('Marches')
+  Siret = grist.Text()
+
+  @grist.formulaType(grist.ReferenceList('Clauses_sociales'))
+  def Clauses_Sociales(rec, table):
+    return IF(rec.Candidat_aux_marches,lambda: (rec.Candidat_aux_marches.Clauses_sociales.id),lambda: ([])) + IF(rec.Titulaire_aux_marches,lambda: (rec.Titulaire_aux_marches.Clauses_sociales.id),lambda: ([]))
+
+
+@grist.UserTable
+class T0_Referentiel_Departements:
+  Departement_Numero = grist.Text()
+  Departement_Nom = grist.Text()
+  Region = grist.Text()
+  Affichage = grist.Text()
+  Chef_lieu = grist.Text()
+  Villes_Principales = grist.Text()
+  Superficie_km2_ = grist.Numeric()
+  Population_2023_ = grist.Numeric()
+  Densite_hab_km2_ = grist.Numeric()
+  Latitude = grist.Numeric()
+  Longitude = grist.Numeric()
+  Adresse_geocodee = grist.Text()
+  Geocode = grist.Bool()
+
+
+@grist.UserTable
+class T0_Referentiel_Formations:
+  Intitule = grist.Text()
+
+
+@grist.UserTable
+class T0_Referentiel_Informations:
+  Mentions_RGPD = grist.Text()
+
+
+@grist.UserTable
+class T0_Referentiel_Regions:
+  Intitule = grist.Text()
+  Chef_lieux = grist.Text()
+  Latitude = grist.Numeric()
+  Longitude = grist.Numeric()
+  Adresse_geocodee = grist.Text()
+
+  def Doit_Geocoder(rec, table):
+    return rec.Adresse_geocodee == ''
+
+
+@grist.UserTable
+class T0_Referentiel_Specialites:
+  Intitule = grist.Text()
+  Clause_sociale = grist.Reference('Clauses_sociales')
+
+
+@grist.UserTable
+class Utilisateurs_Acheteurs:
+  Nom = grist.Text()
+  Prenom = grist.Text()
+  Email = grist.Text()
+  Entite_de_rattachement = grist.Reference('Acheteurs')
+
+
+@grist.UserTable
+class Z_Documents_de_l_equipe:
+  Nom = grist.Text()
+  Description = grist.Text()
+  Document = grist.Attachments()
+  Derniere_mise_a_jour = grist.Date()
+
+
+@grist.UserTable
+class Z_Gabarits:
+  Nom = grist.Text()
+  Corps = grist.Text()
+  Objet = grist.Text()
+
+  def Test_annuaire(rec, table):
+    fill_template = Z_Libs.lookupOne().fill_template
+
+    gabarit = rec.Corps
+    return fill_template(gabarit,Beneficiaires.lookupOne())
+
+  @grist.formulaType(grist.Text())
+  def Test_candidat(rec, table):
+    fill_template = Z_Libs.lookupOne().fill_template
+
+    gabarit = rec.Corps
+    return fill_template(gabarit,Beneficiaires.lookupOne())
+
+
+
+@grist.UserTable
+class Z_HTML_Page:
+  Clause_Statistiques = grist.Text()
+  Beneficiaire_Dashboard = grist.Text()
+  Marche_Statistiques = grist.Text()
+
+
+@grist.UserTable
+class Z_Libs:
+
+  def fill_template(rec, table):
+    def find_data(record):
+        class FindData(dict):
+            def __missing__(self,key):
+                value = getattr(record, key, None)
+                if value is None and '.' in key:
+                    table_name, field = key.split('.',1)
+                    print(table_name,field)
+                    related_record = getattr(record, table_name, None)
+                    if related_record:
+                        value = getattr(related_record, field, None)
+                return value if value is not None else f"{{{key}}}"
+        return FindData()
+
+    def fill_template(template,data):
+     return template.format_map(find_data(data))
+
+    return fill_template
+
+  def lien_envoyer_mail(rec, table):
+    from urllib.parse import quote
+    def lien_envoyer_mail(titre, subject=None,to=None,cc=None,bcc=None,body=None):
+      params = {}
+      if subject:
+        params["subject"] = subject
+      if cc:
+        params["cc"] = ",".join(cc)
+      if bcc:
+        params["bcc"] = ",".join(bcc)
+      if body:
+        params["body"] = body
+      quotedparams = "&".join([f"{key}={quote(value)}" for key,value in params.items()])
+  
+      prefix = 'mailto:'
+  
+      return f"{titre} {prefix}{to.strip()}?{quotedparams}"
+    return lien_envoyer_mail
+
+  def C(rec, table):
+    return None
+
+
+@grist.UserTable
+class Z_Tests:
+  Statut = grist.Text()
+  Contexte = grist.Text()
+  Lien_a_cliquer = grist.Text()
+  Verification = grist.Text()
+  Type_de_test = grist.Text()

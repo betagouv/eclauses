@@ -1,0 +1,210 @@
+const Component = () => {
+  // --- Config webhooks n8n ---
+  const N8N_LOGIN_URL = 'https://n8n.incubateur.anct.gouv.fr/webhook/auth/login';
+  const N8N_MAGIC_URL = 'https://votre-n8n/webhook/auth/magic-request';
+
+  // --- UI state ---
+  const [tab, setTab] = React.useState('password'); // 'password' | 'magic'
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const [info, setInfo] = React.useState(null);
+  const [sentLink, setSentLink] = React.useState(null); // pour sandbox/préprod
+
+  function emailLooksOk(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||'').trim());
+  }
+
+  async function doPasswordLogin(e) {
+    e.preventDefault();
+    setErr(null); setInfo(null); setSentLink(null);
+    if (!emailLooksOk(email)) { setErr('Adresse e-mail invalide.'); return; }
+    if (!password) { setErr('Mot de passe requis.'); return; }
+
+    try {
+      setLoading(true);
+      const res = await fetch(N8N_LOGIN_URL, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email: email, password })
+      });
+      console.log(res);
+      const json = await res.json().catch(()=>({}));
+      if (!res.status || !json.status) {
+        setErr(json.error || 'Échec de la connexion.');
+        return;
+      }
+      window.top.location.href = json.url; // redirection vers ?token=...
+    } catch {
+      setErr('Erreur réseau ou serveur.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function requestMagicLink(e) {
+    e.preventDefault();
+    setErr(null); setInfo(null); setSentLink(null);
+    if (!emailLooksOk(email)) { setErr('Adresse e-mail invalide.'); return; }
+
+    try {
+      setLoading(true);
+      const res = await fetch(N8N_MAGIC_URL, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email: email.trim(), targetUrl: docBaseUrl() })
+      });
+      const json = await res.json().catch(()=>({}));
+      if (!res.ok || !json.ok) {
+        setErr(json.error || 'Impossible d’envoyer le lien.');
+        return;
+      }
+      setInfo('Un lien de connexion a été envoyé si l’adresse est reconnue.');
+      if (json.link) setSentLink(json.link); // pratique pour tester
+    } catch {
+      setErr('Erreur réseau ou serveur.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <section className="fr-container fr-my-6w" style={{maxWidth:'720px'}}>
+      <header className="fr-mb-4w">
+        <h1 className="fr-h3 fr-mb-1w">Connexion à Eclauses</h1>
+        <p className="fr-text--sm fr-text-mention--grey">
+          Choisissez un mode de connexion&nbsp;: <strong>mot de passe</strong> ou <strong>lien d'identification</strong>.
+        </p>
+      </header>
+
+      {/* Onglets contrôlés par React (pas besoin d'init JS DSFR) */}
+      <div className="fr-tabs">
+        <ul className="fr-tabs__list" role="tablist" aria-label="Modes de connexion">
+          <li role="presentation">
+            <button
+              id="tab-password"
+              type="button"
+              role="tab"
+              aria-selected={tab === 'password'}
+              aria-controls="panel-password"
+              className={`fr-tabs__tab ${tab==='password' ? 'fr-tabs__tab--selected' : ''}`}
+              onClick={() => setTab('password')}
+            >
+              Mot de passe
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              id="tab-magic"
+              type="button"
+              role="tab"
+              aria-selected={tab === 'magic'}
+              aria-controls="panel-magic"
+              className={`fr-tabs__tab ${tab==='magic' ? 'fr-tabs__tab--selected' : ''}`}
+              onClick={() => setTab('magic')}
+            >
+              Lien d'identification
+            </button>
+          </li>
+        </ul>
+
+        {/* Panneau : Mot de passe */}
+        <div
+          id="panel-password"
+          role="tabpanel"
+          aria-labelledby="tab-password"
+          className="fr-tabs__panel"
+          hidden={tab !== 'password'}
+        >
+          <form onSubmit={doPasswordLogin} className="fr-card fr-p-3w fr-mt-3w">
+            {err && tab==='password' && <div className="fr-alert fr-alert--error fr-mb-3w"><p>{err}</p></div>}
+            {info && tab==='password' && <div className="fr-alert fr-alert--info fr-mb-3w"><p>{info}</p></div>}
+
+            <div className="fr-input-group">
+              <label className="fr-label" htmlFor="email-pwd">E-mail</label>
+              <input
+                id="email-pwd"
+                className="fr-input"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e)=>setEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="fr-input-group">
+              <label className="fr-label" htmlFor="pwd">Mot de passe</label>
+              <input
+                id="pwd"
+                className="fr-input"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e)=>setPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="fr-btns-group fr-btns-group--right fr-mt-3w">
+              <button className="fr-btn" type="submit" disabled={loading}>
+                {loading ? 'Connexion…' : 'Se connecter'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Panneau : Lien magique */}
+        <div
+          id="panel-magic"
+          role="tabpanel"
+          aria-labelledby="tab-magic"
+          className="fr-tabs__panel"
+          hidden={tab !== 'magic'}
+        >
+          <form onSubmit={requestMagicLink} className="fr-card fr-p-3w fr-mt-3w">
+            {err && tab==='magic' && <div className="fr-alert fr-alert--error fr-mb-3w"><p>{err}</p></div>}
+            {info && tab==='magic' && <div className="fr-alert fr-alert--success fr-mb-3w"><p>{info}</p></div>}
+
+            <div className="fr-input-group">
+              <label className="fr-label" htmlFor="email-magic">E-mail</label>
+              <input
+                id="email-magic"
+                className="fr-input"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e)=>setEmail(e.target.value)}
+              />
+            </div>
+
+            <p className="fr-hint-text">
+              Nous vous envoyons un lien valable 24&nbsp;heures. Aucun mot de passe n’est requis.
+            </p>
+
+            <div className="fr-btns-group fr-btns-group--right fr-mt-3w">
+              <button className="fr-btn" type="submit" disabled={loading}>
+                {loading ? 'Envoi…' : 'Envoyer le lien'}
+              </button>
+            </div>
+
+            {sentLink && (
+              <div className="fr-alert fr-alert--info fr-mt-3w">
+                <p>Lien de test : <a href={sentLink}>ouvrir la session</a></p>
+              </div>
+            )}
+          </form>
+        </div>
+      </div>
+
+      <div className="fr-mt-3w">
+        <button
+          className="fr-link"
+          type="button"
+          onClick={() => gristAPI?.navigate && gristAPI.navigate('mot-de-passe-oublie')}
+        >
+          Mot de passe oublié ?
+        </button>
+      </div>
+    </section>
+  );
+};

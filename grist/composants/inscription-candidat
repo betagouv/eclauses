@@ -1,0 +1,165 @@
+const Component = () => {
+  // ===== Tables & colonnes =====
+  const TABLE = 'Repondants';
+  const COL = {
+    NOM: 'Nom',
+    PRENOM: 'Prenom',
+    EMAIL: 'Email',
+    TEL: 'Telephone',
+    RAISOC: 'Raison_sociale',
+    CAND: 'Candidat_aux_marches',    // RefList('Marches')
+    TIT:  'Titulaire_aux_marches',   // RefList('Marches')
+  };
+
+  // ===== Utils =====
+  const emailLooksOk = (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
+  const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
+
+  // ===== State =====
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr]       = React.useState(null);
+  const [msg, setMsg]       = React.useState(null);
+
+  const [rows, setRows]     = React.useState([]);
+  const [currentId, setCurrentId] = React.useState(null);
+
+  const [form, setForm] = React.useState({
+    [COL.NOM]: '',
+    [COL.PRENOM]: '',
+    [COL.EMAIL]: '',
+    [COL.TEL]: '',
+    [COL.RAISOC]: '',
+  });
+
+  // ===== Load =====
+
+  function seedForm(rec) {
+    setForm({
+      [COL.NOM]:    rec[COL.NOM]    || '',
+      [COL.PRENOM]: rec[COL.PRENOM] || '',
+      [COL.EMAIL]:  rec[COL.EMAIL]  || '',
+      [COL.TEL]:    rec[COL.TEL]    || '',
+      [COL.RAISOC]: rec[COL.RAISOC] || '',
+    });
+  }
+
+  function setField(name, value) { setMsg(null); setErr(null); setForm(prev => ({ ...prev, [name]: value })); }
+
+  async function save() {
+    if (!currentId) return;
+    setErr(null); setMsg(null);
+
+    if (!emailLooksOk(form[COL.EMAIL])) {
+      setErr("Adresse e-mail invalide.");
+      return;
+    }
+
+    const updates = {
+      [COL.NOM]:    form[COL.NOM]    || null,
+      [COL.PRENOM]: form[COL.PRENOM] || null,
+      [COL.EMAIL]:  form[COL.EMAIL]  || null,
+      [COL.TEL]:    form[COL.TEL]    || null,
+      [COL.RAISOC]: form[COL.RAISOC] || null,
+    };
+
+    try {
+      await gristAPI.updateRecord(TABLE, currentId, updates);
+      setMsg("Informations enregistrées avec succès.");
+    } catch (e) {
+      setErr(e.message || "Échec de l’enregistrement.");
+    }
+  }
+
+  // ===== Computed =====
+  const rec = React.useMemo(
+    () => (rows || []).find(r => r.id === currentId) || null,
+    [rows, currentId]
+  );
+  const nbCandidats = asArray(rec?.[COL.CAND]).length;
+  const nbTitulaires = asArray(rec?.[COL.TIT]).length;
+
+  // ===== UI =====
+  if (loading) {
+    return (
+      <section className="fr-container fr-my-6w">
+        <div className="fr-loader" aria-label="Chargement" />
+        <p className="fr-text--sm fr-mt-1w">Chargement…</p>
+      </section>
+    );
+  }
+  if (err) {
+    return (
+      <section className="fr-container fr-my-6w">
+        <div className="fr-alert fr-alert--error"><p><strong>Erreur :</strong> {err}</p></div>
+      </section>
+    );
+  }
+
+  return (
+    <main className="fr-container fr-my-6w">
+      <section className="fr-container fr-my-6w">
+      <header className="fr-mb-4w">
+        <h1 className="fr-h3 fr-mb-1w">Inscription à Eclauses pour un marché</h1>
+      </header>
+
+      {msg && <div className="fr-alert fr-alert--success fr-mb-3w"><p>{msg}</p></div>}
+
+      <div className="fr-grid-row fr-grid-row--gutters">
+        {/* Formulaire principal */}
+        <div className="fr-col-12">
+        <div class="fr-callout">
+        <p class="fr-callout__text">Cette inscription vous donnera accès à votre espace, dans lequel vous pourrez :</p>
+        <ul className="fr-list fr-callout__text">
+              <li>Effectuer une recherche de bénéficiaires en filtrant l’annuaire selon vos critères</li>
+              <li>Accéder au profil détaillé des bénéficiaires</li>
+              <li>Entrer en contact avec des bénéficiaires pour répondre aux obligations sociales du marché</li>
+              <li>Déclarer le bénéficiaire retenu</li>
+            </ul>
+        </div>
+          <div className="fr-fieldset">
+            <div className="fr-fieldset__content">
+
+              <div className="fr-input-group">
+                <label className="fr-label" htmlFor="rs">Raison sociale</label>
+                <input id="rs" className="fr-input" type="text"
+                  value={form[COL.RAISOC]} onChange={(e)=>setField(COL.RAISOC, e.target.value)} />
+              </div>
+
+              <div className="fr-input-group">
+                <label className="fr-label" htmlFor="rs">SIRET</label>
+                <input id="siret" className="fr-input" type="text"
+                  value={form[COL.SIRET]} onChange={(e)=>setField(COL.SIRET, e.target.value)} />
+              </div>
+
+              <div className="fr-input-group">
+                <label className="fr-label" htmlFor="nom">Prénom NOM</label>
+                <input id="nom" className="fr-input" type="text"
+                  value={form[COL.NOM]} onChange={(e)=>setField(COL.NOM, e.target.value)} />
+              </div>
+
+              <div className="fr-input-group">
+                <label className="fr-label" htmlFor="email">E-mail</label>
+                <input id="email" className="fr-input" type="email"
+                  value={form[COL.EMAIL]} onChange={(e)=>setField(COL.EMAIL, e.target.value)} />
+                {form[COL.EMAIL] && !emailLooksOk(form[COL.EMAIL]) && (
+                  <p className="fr-error-text">Format d’e-mail invalide.</p>
+                )}
+              </div>
+
+              <div className="fr-input-group">
+                <label className="fr-label" htmlFor="tel">Téléphone</label>
+                <input id="tel" className="fr-input" type="text"
+                  value={form[COL.TEL]} onChange={(e)=>setField(COL.TEL, e.target.value)} />
+              </div>
+
+              <div className="fr-mt-4w">
+                <button className="fr-btn" onClick={save}>Enregistrer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    </main>
+  );
+};

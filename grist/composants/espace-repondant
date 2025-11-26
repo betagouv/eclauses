@@ -1,0 +1,182 @@
+const Component = () => {
+  // =========================
+  // CONFIG DE L’ESPACE (à adapter)
+  // =========================
+  const CFG = {
+    prefix: 'repondant-',                 
+    title: 'Espace répondant',
+    defaultKey: 'home',
+    requiredRoles: ['repondant'],
+    menu: [
+      { key: 'infos',    label: 'Mes informations',  icon: 'user-setting-line' },
+      { key: 'marches',   label: 'Mes marchés',    icon: 'folder-2-line' },
+      { key: 'recherches',  label: 'Rechercher un bénéficiaire',          icon: 'user-search-line' },
+    ],
+  };
+
+  // =========================
+  // Helpers locaux
+  // =========================
+  const fullId   = (key) => `${CFG.prefix}${key}`;
+  const isLocalId = (id) => typeof id === 'string' && id.startsWith(CFG.prefix);
+  const keyFromId = (id) => id.slice(CFG.prefix.length);
+
+  // =========================
+  // Garde d’accès par rôle (si configuré)
+  // =========================
+  const auth  = gristAPI.getAuth ? gristAPI.getAuth() : null;
+  const roles = (auth && Array.isArray(auth.roles)) ? auth.roles : [];
+  const hasRole =
+    !CFG.requiredRoles?.length ||
+    CFG.requiredRoles.every(r => roles.includes(r));
+
+  if (!hasRole) {
+    return (
+      <section className="fr-container fr-my-6w">
+        <div className="fr-alert fr-alert--warning">
+          <p>
+            <strong>Accès restreint.</strong> Cette section requiert le rôle&nbsp;
+            {CFG.requiredRoles.join(', ')}.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // =========================
+  // État & refs
+  // =========================
+  const rootRef = React.useRef(null);
+
+  const [activeKey, setActiveKey] = React.useState(CFG.defaultKey);
+  const [Child, setChild]         = React.useState(null);
+  const [loading, setLoading]     = React.useState(true);
+  const [err, setErr]             = React.useState(null);
+
+  // =========================
+  // Interception locale de data-nav (phase capture)
+  // =========================
+  React.useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const onClickCapture = (e) => {
+      const el = e.target.closest('[data-nav]');
+      if (!el) return;
+      if (!root.contains(el)) return;
+
+      const id = el.getAttribute('data-nav');
+      if (!id) return;
+
+      if (isLocalId(id)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveKey(keyFromId(id));
+      }
+      // Sinon: laisser passer pour la nav globale du widget
+    };
+
+    root.addEventListener('click', onClickCapture, { capture: true });
+    return () => root.removeEventListener('click', onClickCapture, { capture: true });
+  }, []);
+
+  // =========================
+  // Chargement du sous-composant actif
+  // =========================
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const subId = fullId(activeKey);
+
+        // Override de navigate pour NAV LOCALE uniquement
+        const overrides = {
+          navigate: (id) => {
+            if (isLocalId(id)) {
+              setActiveKey(keyFromId(id));
+            } else {
+              // navigation globale explicite
+              if (window?.react_app?.loadComponent) {
+                window.react_app.loadComponent(id);
+              }
+            }
+          }
+        };
+
+        const C = await gristAPI.getChildComponent(subId, overrides);
+        if (!alive) return;
+        if (!C) throw new Error(`Sous-composant introuvable: ${subId}`);
+        setChild(() => C);
+      } catch (e) {
+        if (!alive) return;
+        setErr(e.message || 'Erreur de chargement du sous-composant.');
+        setChild(null);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; setChild(null); };
+  }, [activeKey]);
+
+  // =========================
+  // UI
+  // =========================
+  const Item = ({entry}) => {
+    const id   = fullId(entry.key);
+    const curr = activeKey === entry.key;
+    return (
+      <li>
+        <a
+          href="#"
+          data-nav={id}
+          className={`fr-nav__link ${curr ? 'fr-nav__link--active' : ''}`}
+          aria-current={curr ? 'page' : 'false'}
+          onClick={(e) => e.preventDefault()}
+        >
+          {entry.icon ? (
+            <span className={`fr-icon-${entry.icon} fr-mr-1w`} aria-hidden="true"></span>
+          ) : null}
+          {entry.label}
+        </a>
+      </li>
+    );
+  };
+
+  return (
+    <section ref={rootRef} className="fr-container--fluid fr-m-4w">
+      <div className="fr-grid-row">
+        {/* Sidebar */}
+        <aside className="fr-col-12 fr-col-lg-2 fr-col-md-3">
+          <nav className="fr-sidemenu fr-sidemenu--sticky" aria-label={CFG.title}>
+            <div className="fr-sidemenu__inner">
+              <div className="fr-sidemenu__title">{CFG.title}</div>
+              <ul className="fr-sidemenu__list">
+                {CFG.menu.map((entry) => <Item key={entry.key} entry={entry} />)}
+              </ul>
+            </div>
+          </nav>
+        </aside>
+
+        {/* Contenu */}
+        <div className="fr-col-12 fr-col-lg-10 fr-col-md-9">
+          {loading && (
+            <div className="fr-mt-3w">
+              <div className="fr-loader" aria-label="Chargement" />
+              <p className="fr-text--sm fr-mt-1w">Chargement…</p>
+            </div>
+          )}
+
+          {!loading && err && (
+            <div className="fr-alert fr-alert--error fr-mb-2w">
+              <p><strong>Erreur :</strong> {err}</p>
+            </div>
+          )}
+
+          {!loading && !err && Child ? <Child/> : null}
+        </div>
+      </div>
+    </section>
+  );
+};

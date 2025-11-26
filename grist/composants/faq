@@ -1,0 +1,276 @@
+const Component = () => {
+  // --- Tables / colonnes (structure proposée plus bas) ---
+  const T = {
+    CATS: 'Application_FAQ_Categories',
+    QAS:  'Application_FAQ_Questions',
+  };
+  const CAT = { TITLE:'Title', SLUG:'Slug', ORDER:'Order', PUBLISHED:'Published' };
+  const QA  = {
+    QUESTION:'Question',
+    ANSWER:'Answer',           // texte (multi-lignes) – rendu en <p> + <br>
+    CATEGORY:'Category',       // Reference -> FAQ_Categories
+    KEYWORDS:'Keywords',       // texte libre (mots clefs séparés par virgules)
+    ORDER:'Order',
+    PUBLISHED:'Published',
+    AUDIENCE:'Audience'        // (ChoiceList futur : 'beneficiaire','repondant','acheteur','public')
+  };
+
+  // --- Utils ---
+  const asArray = v => Array.isArray(v) ? v : (v == null ? [] : [v]);
+  const toBool = v => v === true || v === 1 || v === '1' || (typeof v === 'string' && v.toLowerCase() === 'true');
+  const norm = s => String(s||'').toLowerCase();
+  const incI = (h, n) => norm(h).includes(norm(n));
+  const escapeHTML = (s) => String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  const nl2br = (s) => escapeHTML(s).replace(/\n/g, '<br/>');
+  const pickLabelField = (rows) => {
+    if (!rows || !rows.length) return 'id';
+    const s = rows[0] || {};
+    for (const k of ['Title','title','label','name','Nom','nom']) if (typeof s[k] === 'string') return k;
+    for (const k of Object.keys(s)) if (typeof s[k] === 'string') return k;
+    return 'id';
+  };
+  const toOptions = (rows) => {
+    const key = pickLabelField(rows);
+    return (rows||[]).map(r => ({ value:r.id, label:String(r[key] ?? r.id)}));
+  };
+
+  // --- State ---
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr]       = React.useState(null);
+
+  const [cats, setCats]     = React.useState([]);
+  const [qas, setQAs]       = React.useState([]);
+
+  const [search, setSearch] = React.useState('');
+  const [activeCat, setActiveCat] = React.useState('all'); // 'all' | catSlug
+  const [openIds, setOpenIds] = React.useState(new Set());
+
+  const auth = gristAPI?.getAuth ? gristAPI.getAuth() : null; // pour le futur filtrage par rôles
+
+  // --- Load ---
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true); setErr(null);
+        const [c, q] = await Promise.all([
+          gristAPI.getData(T.CATS).catch(() => []),
+          gristAPI.getData(T.QAS).catch(() => []),
+        ]);
+        if (!mounted) return;
+        setCats(Array.isArray(c) ? c : []);
+        setQAs(Array.isArray(q) ? q : []);
+
+        // hash → cat & q
+        try {
+          const url = new URL(window.location.href);
+          const hCat = url.hash.match(/cat=([^&]+)/)?.[1];
+          const hQ = url.hash.match(/q=([^&]+)/)?.[1];
+          if (hCat) setActiveCat(decodeURIComponent(hCat));
+          if (hQ) setSearch(decodeURIComponent(hQ));
+        } catch(_) {}
+      } catch (e) {
+        if (!mounted) return;
+        setErr(e?.message || 'Erreur de chargement');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // --- Options catégories (publiques) ---
+  const catOptions = React.useMemo(() => {
+    const published = (cats||[]).filter(c => toBool(c[CAT.PUBLISHED]));
+    const withSlug = published.map(c => ({
+      id: c.id,
+      slug: c[CAT.SLUG] || String(c.id),
+      title: c[CAT.TITLE] || `Catégorie #${c.id}`,
+      order: Number(c[CAT.ORDER]) || 9999
+    })).sort((a,b) => a.order - b.order || a.title.localeCompare(b.title));
+    return withSlug;
+  }, [cats]);
+
+  // --- Filtrage Q/A ---
+  const filteredQAs = React.useMemo(() => {
+    const isCatAll = activeCat === 'all';
+    const catById = new Map(catOptions.map(c => [c.id, c]));
+    const roles = auth?.roles || null;
+
+    const qasPub = (qas||[]).filter(q => toBool(q[QA.PUBLISHED]));
+
+    // (futur) audience par rôle
+    const roleOk = (row) => {
+      const audience = asArray(row[QA.AUDIENCE]);
+      if (!audience.length) return true;   // vide = public
+      if (!roles) return audience.includes('public'); // si non connecté, on limite à "public"
+      return audience.includes('public') || audience.some(role => roles.includes(role));
+    };
+
+    const byCat = (row) => {
+      if (isCatAll) return true;
+      const catId = row[QA.CATEGORY];
+      const cat = catById.get(catId);
+      return cat ? (cat.slug === activeCat) : false;
+    };
+
+    const bySearch = (row) => {
+      if (!search) return true;
+      const cat = catById.get(row[QA.CATEGORY]);
+      const hay = [
+        row[QA.QUESTION] || '',
+        row[QA.ANSWER] || '',
+        row[QA.KEYWORDS] || '',
+        cat?.title || '',
+      ].join(' • ');
+      return incI(hay, search);
+    };
+
+    const prepared = qasPub
+      .filter(roleOk)
+      .filter(byCat)
+      .filter(bySearch)
+      .map(row => ({
+        id: row.id,
+        question: row[QA.QUESTION] || 'Sans titre',
+        answer: row[QA.ANSWER] || '',
+        catId: row[QA.CATEGORY] || null,
+        order: Number(row[QA.ORDER]) || 9999
+      }))
+      .sort((a,b) => (a.order - b.order) || a.question.localeCompare(b.question));
+
+    return prepared;
+  }, [qas, catOptions, activeCat, search, auth]);
+
+  // --- UI helpers ---
+  const setCatAndHash = (slug) => {
+    setActiveCat(slug);
+    try {
+      const url = new URL(window.location.href);
+      const params = new URLSearchParams((url.hash || '').replace(/^#/, ''));
+      params.set('cat', slug);
+      if (search) params.set('q', search); else params.delete('q');
+      url.hash = params.toString();
+      history.replaceState(null, '', url.toString());
+    } catch(_) {}
+  };
+  const setSearchAndHash = (v) => {
+    setSearch(v);
+    try {
+      const url = new URL(window.location.href);
+      const params = new URLSearchParams((url.hash || '').replace(/^#/, ''));
+      if (v) params.set('q', v); else params.delete('q');
+      if (activeCat) params.set('cat', activeCat);
+      url.hash = params.toString();
+      history.replaceState(null, '', url.toString());
+    } catch(_) {}
+  };
+
+  const toggleOpen = (id) => {
+    setOpenIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  // --- Render ---
+  if (loading) {
+    return (
+      <section className="fr-container fr-my-6w">
+        <div className="fr-loader" aria-label="Chargement" />
+        <p className="fr-text--sm fr-mt-1w">Chargement de la FAQ…</p>
+      </section>
+    );
+  }
+
+  if (err) {
+    return (
+      <section className="fr-container fr-my-6w">
+        <div className="fr-alert fr-alert--error"><p><strong>Erreur :</strong> {err}</p></div>
+      </section>
+    );
+  }
+
+  const count = filteredQAs.length;
+
+  return (
+    <main className="fr-container fr-my-6w">
+      <header className="fr-mb-4w">
+        <h1 className="fr-h3 fr-mb-1w">Foire aux questions</h1>
+        <p className="fr-text--sm fr-text-mention--grey">
+          Recherchez une réponse par mot-clé ou filtrez par catégorie.
+        </p>
+      </header>
+
+      {/* Filtres */}
+      <div className="fr-grid-row fr-grid-row--gutters fr-mb-3w">
+        <div className="fr-col-12 fr-col-md-6">
+          <div className="fr-input-group">
+            <label className="fr-label" htmlFor="faq-search">Rechercher</label>
+            <input
+              id="faq-search"
+              className="fr-input"
+              type="search"
+              placeholder="Mots-clés, question…"
+              value={search}
+              onChange={(e) => setSearchAndHash(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="fr-col-12 fr-col-md-6">
+          <div className="fr-select-group">
+            <label className="fr-label" htmlFor="faq-cat">Catégorie</label>
+            <select
+              id="faq-cat"
+              className="fr-select"
+              value={activeCat}
+              onChange={(e) => setCatAndHash(e.target.value)}
+            >
+              <option value="all">Toutes les catégories</option>
+              {catOptions.map(c => (
+                <option key={c.slug} value={c.slug}>{c.title}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="fr-alert fr-alert--info fr-mb-3w">
+        <p><strong>{count}</strong> résultat(s).</p>
+      </div>
+
+      {/* Résultats */}
+      {count === 0 ? (
+        <div className="fr-callout">
+          <p className="fr-callout__text">
+            Aucun résultat. Essayez d’autres mots-clés ou changez de catégorie.
+          </p>
+        </div>
+      ) : (
+        <div className="fr-accordions-group">
+          {filteredQAs.map(item => (
+            <section className="fr-accordion" key={item.id}>
+              <h3 className="fr-accordion__title">
+                <button
+                  className="fr-accordion__btn"
+                  aria-expanded={openIds.has(item.id) ? 'true' : 'false'}
+                  aria-controls={`panel-${item.id}`}
+                  onClick={() => toggleOpen(item.id)}
+                >
+                  {item.question}
+                </button>
+              </h3>
+              <div className="fr-collapse" id={`panel-${item.id}`} style={{ display: openIds.has(item.id) ? 'block' : 'none' }}>
+                <p dangerouslySetInnerHTML={{ __html: nl2br(item.answer) }} />
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </main>
+  );
+};
