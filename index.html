@@ -5,34 +5,91 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Eclause - Ministère de la Culture</title>
   <style>
+    :root {
+      /* Valeurs par défaut */
+      --zoom: 1;     /* ex: 1.5 pour zoomer 150% */
+      --offset-x: 0; /* px, coord X à rogner (avant zoom) */
+      --offset-y: 0; /* px, coord Y à rogner (avant zoom) */
+    }
     html, body { height: 100%; margin: 0; }
-    iframe { width: 100%; height: 100%; border: 0; }
+    /* Le cadre visible qui "masque" l'iframe */
+    .frame-wrap {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden; /* on ne montre que la zone recadrée */
+      position: relative;
+      background: #fff;
+    }
+    /* On applique le zoom et le décalage à l'iframe elle-même */
+    #embed {
+      width: 100vw;   /* base : occuper tout l'écran */
+      height: 103vh;
+      border: 0;
+      transform-origin: 0 0; /* important : top-left comme origine */
+      /* ordre: translate puis scale (droite→gauche dans CSS) */
+      transform: translate(calc(-1px * var(--offset-x)), calc(-1px * var(--offset-y))) scale(var(--zoom));
+    }
   </style>
 </head>
 <body>
-  <!-- Mets ici l’URL de base à afficher dans l’iframe -->
-  <iframe id="embed" data-src="https://grist.numerique.gouv.fr/o/docs/kmFxH2HJiL3E/DEV-Eclause/p/32" title="Eclause"></iframe>
+  <div class="frame-wrap">
+    <iframe
+      id="embed"
+      title="Eclause"
+      data-src="https://grist.numerique.gouv.fr/o/docs/kmFxH2HJiL3E/DEV-Eclause/p/32">
+    </iframe>
+  </div>
+
   <script>
     (function () {
       const iframe = document.getElementById('embed');
       const baseSrc = iframe.getAttribute('data-src');
       if (!baseSrc) return;
 
-      // URL absolue à partir du src de base (gère aussi les chemins relatifs)
-      const target = new URL(baseSrc, window.location.href);
-
-      // Récupère les paramètres de la page parente
       const parentParams = new URLSearchParams(window.location.search);
 
-     const whitelist = ['Token_'];
-     for (const key of whitelist) {
-         if (parentParams.has(key)) target.searchParams.set(key, parentParams.get(key));
-     }
-
-     target.searchParams.set("style", "singlePage");
-
-      // Applique l’URL finale à l’iframe
+      // --- 1) Propager uniquement ce qui doit aller à Grist ---
+      const target = new URL(baseSrc, window.location.href);
+      const whitelistToChild = ['Token_']; // à transmettre à l'iframe
+      for (const key of whitelistToChild) {
+        if (parentParams.has(key)) target.searchParams.set(key, parentParams.get(key));
+      }
+      target.searchParams.set('style', 'singlePage');
       iframe.src = target.toString();
+
+       // --- 2) Tableau de configuration responsive (à éditer) ---
+      // max = largeur max (px) du viewport pour laquelle appliquer la config
+      // zoom = facteur (>0). x/y = offsets (accepte 'px', 'vw', 'vh'). Sans unité => px.
+      const CONFIG = [
+        { name: 'sm',  max: 576,   zoom: 1, x: '0',  y: '38' },
+        { name: 'md',  max: 768,   zoom: 1, x: '0',  y: '38' },
+        { name: 'lg',  max: 992,   zoom: 1, x: '0',   y: '54'  }, // 80px/260px
+        { name: 'xl',  max: 1200,  zoom: 1, x: '0',  y: '54'  },
+        { name: 'xxl', max: Infinity, zoom: 1, x: '0', y: '54' }
+      ];
+
+      function pickConfig(width) {
+        return CONFIG.find(c => width < c.max) || CONFIG[CONFIG.length - 1];
+      }
+
+      function applyConfig() {
+        const cfg = pickConfig(window.innerWidth);
+        const r = document.documentElement.style;
+        r.setProperty('--zoom',    cfg.zoom);
+        r.setProperty('--offset-x', cfg.x);
+        r.setProperty('--offset-y', cfg.y);
+        // Optionnel : pour debug
+        console.log(`Applied ${cfg.name}`, cfg);
+      }
+
+      // Debounce léger pour les resize
+      let t;
+      window.addEventListener('resize', () => {
+        clearTimeout(t);
+        t = setTimeout(applyConfig, 120);
+      });
+
+      applyConfig();
     })();
   </script>
 </body>
