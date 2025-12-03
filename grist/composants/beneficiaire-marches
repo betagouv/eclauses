@@ -18,11 +18,13 @@ const Component = () => {
     DL_REAL: 'Date_Limite_de_Realisation_de_l_Operation',
     CLAUSE: 'Clauses_sociales',
     ADR: 'Adresse_de_realisation',
+    ADR_EXEC: 'Adresse_d_execution',
     LAT: 'Latitude',
     LNG: 'Longitude',
     ADR_GEO: 'Adresse_geocodee',
     SUIVI: 'Suivi',
     SPECS: 'Specialites_du_marche',     // ReferenceList
+    DOCS: 'Lien_vers_les_documents_d_appel_d_offres',
   };
 
   const BENEF_CLAUSES_COL = 'Clauses_sociales_de_rattachement';
@@ -131,6 +133,7 @@ const Component = () => {
   const [specOpen, setSpecOpen] = React.useState(false);
   const [specPos, setSpecPos] = React.useState({top:0, left:0, width:0});
   const specBoxRef = React.useRef(null);
+  const [tab, setTab] = React.useState('liste'); // 'liste' | 'carte'
 
   const optsAcheteurs = React.useMemo(() => toOptions(acheteurs), [acheteurs]);
   const optsClauses   = React.useMemo(() => toOptions(clauses),   [clauses]);
@@ -369,7 +372,8 @@ const Component = () => {
         </div>
       `;
 
-      L.marker([lat, lng]).bindPopup(html).addTo(layer);
+      const marker = L.marker([lat, lng]).bindPopup(html).addTo(layer);
+      marker.on('click', () => openModal(row));
       bounds.push([lat, lng]);
     });
 
@@ -379,6 +383,13 @@ const Component = () => {
 
     requestAnimationFrame(() => { try { map.invalidateSize(true); } catch(_) {} });
   }, [sorted, optsAcheteurs, interestedSet]);
+
+  // Recalcule la carte quand on revient sur l’onglet carte
+  React.useEffect(() => {
+    if (tab === 'carte' && mapRef.current) {
+      requestAnimationFrame(() => { try { mapRef.current.invalidateSize(true); } catch(_) {} });
+    }
+  }, [tab]);
 
   // Modale marché
   function openModal(row) { setModalRow(row); setModalOpen(true); }
@@ -487,7 +498,7 @@ const Component = () => {
           <div
             className="fr-input-group"
             ref={specBoxRef}
-            style={{position:'relative', overflow:'visible', zIndex:10000}}
+            style={{position:'relative', overflow:'visible'}}
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
           >
@@ -573,10 +584,43 @@ const Component = () => {
         <p><strong>{count}</strong> marché(s) actif(s) correspondant à vos critères.</p>
       </div>
 
-      {/* Liste + Carte */}
-      <div className="fr-grid-row fr-grid-row--gutters">
-        {/* Liste */}
-        <div className="fr-col-12 fr-col-lg-6">
+      {/* Liste + Carte via onglets */}
+      <div className="fr-tabs">
+        <ul className="fr-tabs__list" role="tablist">
+          <li role="presentation">
+            <button
+              className={`fr-tabs__tab ${tab === 'liste' ? 'fr-tabs__tab--selected' : ''}`}
+              id="tab-btn-liste"
+              role="tab"
+              aria-selected={tab === 'liste'}
+              aria-controls="tab-panel-liste"
+              onClick={() => setTab('liste')}
+            >
+              Liste
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              className={`fr-tabs__tab ${tab === 'carte' ? 'fr-tabs__tab--selected' : ''}`}
+              id="tab-btn-carte"
+              role="tab"
+              aria-selected={tab === 'carte'}
+              aria-controls="tab-panel-carte"
+              onClick={() => setTab('carte')}
+            >
+              Carte
+            </button>
+          </li>
+        </ul>
+
+        <div
+          id="tab-panel-liste"
+          role="tabpanel"
+          aria-labelledby="tab-btn-liste"
+          className={`fr-tabs__panel ${tab === 'liste' ? 'fr-tabs__panel--selected' : ''}`}
+          hidden={tab !== 'liste'}
+          style={{display: tab === 'liste' ? 'block' : 'none'}}
+        >
           {count === 0 ? (
             <div className="fr-callout">
               <p className="fr-callout__text">Aucun marché actif ne correspond à vos critères.</p>
@@ -597,9 +641,9 @@ const Component = () => {
                   .filter(Boolean);
 
                 return (
-          <div key={id} className="fr-col-12" onClick={(e)=>e.stopPropagation()}>
-            <article className="fr-card" onClick={(e)=>e.stopPropagation()}>
-              <div className="fr-card__body">
+                  <div key={id} className="fr-col-12" onClick={(e)=>e.stopPropagation()}>
+                    <article className="fr-card" onClick={(e)=>e.stopPropagation()}>
+                      <div className="fr-card__body">
                         <div className="fr-grid-row">
                           <div className="fr-col">
                             <h2 className="fr-card__title fr-text--md fr-mt-2w">
@@ -650,8 +694,14 @@ const Component = () => {
           )}
         </div>
 
-        {/* Carte */}
-        <div className="fr-col-12 fr-col-lg-6">
+        <div
+          id="tab-panel-carte"
+          role="tabpanel"
+          aria-labelledby="tab-btn-carte"
+          className={`fr-tabs__panel ${tab === 'carte' ? 'fr-tabs__panel--selected' : ''}`}
+          hidden={tab !== 'carte'}
+          style={{display: tab === 'carte' ? 'block' : 'none'}}
+        >
           <div style={{height: '520px', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border-default-grey)'}}>
             <div ref={mapHostRef} style={{height: '100%', width: '100%'}} />
           </div>
@@ -690,10 +740,17 @@ const Component = () => {
               <dl className="fr-description-list fr-mb-2w">
                 <dt>Pouvoir adjudicateur</dt><dd>{labelFrom(optsAcheteurs, modalRow[C.AA])}</dd>
                 <dt>Adresse</dt><dd>{modalRow[C.ADR] || '—'}</dd>
+                <dt>Adresse d'exécution</dt><dd>{modalRow[C.ADR_EXEC] || '—'}</dd>
                 <dt>Clause sociale</dt><dd>{labelFrom(optsClauses, modalRow[C.CLAUSE])}</dd>
                 <dt>Publication</dt><dd>{formatDate(parseDate(modalRow[C.PUB]))}</dd>
                 <dt>Limite candidature</dt><dd>{formatDate(parseDate(modalRow[C.DL_CANDID]))}</dd>
                 <dt>Fin d’exécution prévisionnelle</dt><dd>{formatDate(parseDate(modalRow[C.DL_REAL]))}</dd>
+                {modalRow[C.DOCS] ? (
+                  <>
+                    <dt>Documents d'appel d'offres</dt>
+                    <dd><a href={modalRow[C.DOCS]} target="_blank" rel="noopener noreferrer">{modalRow[C.DOCS]}</a></dd>
+                  </>
+                ) : null}
                 <dt>Spécialités</dt>
                 <dd>{asArray(modalRow[C.SPECS]).filter(isNum).map(id => labelFrom(optsSpecs, id)).filter(Boolean).join(', ') || '—'}</dd>
               </dl>
