@@ -139,7 +139,14 @@ const Component = () => {
         catId: row[QA.CATEGORY] || null,
         order: Number(row[QA.ORDER]) || 9999
       }))
-      .sort((a,b) => (a.order - b.order) || a.question.localeCompare(b.question));
+      .sort((a,b) => {
+        const catA = a.catId || 0;
+        const catB = b.catId || 0;
+        if (catA !== catB) return catA - catB;
+        const o = a.order - b.order;
+        if (o !== 0) return o;
+        return a.question.localeCompare(b.question);
+      });
 
     return prepared;
   }, [qas, catOptions, activeCat, search, auth]);
@@ -176,6 +183,19 @@ const Component = () => {
     });
   };
 
+  const count = filteredQAs.length;
+  const groupedByCat = React.useMemo(() => {
+    const by = new Map();
+    filteredQAs.forEach(q => {
+      const cat = catOptions.find(c => c.id === q.catId);
+      const key = cat ? cat.slug : 'sans-cat';
+      const title = cat ? cat.title : 'Autres';
+      if (!by.has(key)) by.set(key, { title, items: [] });
+      by.get(key).items.push(q);
+    });
+    return Array.from(by.values());
+  }, [filteredQAs, catOptions]);
+
   // --- Render ---
   if (loading) {
     return (
@@ -193,8 +213,6 @@ const Component = () => {
       </section>
     );
   }
-
-  const count = filteredQAs.length;
 
   return (
     <main className="fr-container fr-my-6w">
@@ -243,7 +261,7 @@ const Component = () => {
         <p><strong>{count}</strong> résultat(s).</p>
       </div>
 
-      {/* Résultats */}
+      {/* Résultats regroupés par catégorie */}
       {count === 0 ? (
         <div className="fr-callout">
           <p className="fr-callout__text">
@@ -251,25 +269,30 @@ const Component = () => {
           </p>
         </div>
       ) : (
-        <div className="fr-accordions-group">
-          {filteredQAs.map(item => (
-            <section className="fr-accordion" key={item.id}>
-              <h3 className="fr-accordion__title">
-                <button
-                  className="fr-accordion__btn"
-                  aria-expanded={openIds.has(item.id) ? 'true' : 'false'}
-                  aria-controls={`panel-${item.id}`}
-                  onClick={() => toggleOpen(item.id)}
-                >
-                  {item.question}
-                </button>
-              </h3>
-              <div className="fr-collapse" id={`panel-${item.id}`} style={{ display: openIds.has(item.id) ? 'block' : 'none' }}>
-                <p dangerouslySetInnerHTML={{ __html: nl2br(item.answer) }} />
-              </div>
-            </section>
-          ))}
-        </div>
+        groupedByCat.map(group => (
+          <div key={group.title} className="fr-mb-4w">
+            <h2 className="fr-h6 fr-mb-2w">{group.title}</h2>
+            <div className="fr-accordions-group">
+              {group.items.map(item => (
+                <section className="fr-accordion" key={item.id}>
+                  <h3 className="fr-accordion__title">
+                    <button
+                      className="fr-accordion__btn"
+                      aria-expanded={openIds.has(item.id) ? 'true' : 'false'}
+                      aria-controls={`panel-${item.id}`}
+                      onClick={() => toggleOpen(item.id)}
+                    >
+                      {item.question}
+                    </button>
+                  </h3>
+                  <div className="fr-collapse" id={`panel-${item.id}`} style={{ display: openIds.has(item.id) ? 'block' : 'none' }}>
+                    <p dangerouslySetInnerHTML={{ __html: nl2br(item.answer) }} />
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
+        ))
       )}
     </main>
   );
