@@ -103,7 +103,11 @@ def fetch_component_record(env_cfg: Dict[str, Any], template_id: str) -> Optiona
   params = {f"filter[template_id]": template_id}
   headers = {"Authorization": f"Bearer {env_cfg['_api_key']}"}
   r = requests.get(url, headers=headers, params=params)
-  r.raise_for_status()
+  try:
+    r.raise_for_status()
+  except requests.HTTPError as e:
+    msg = f"HTTP {r.status_code} on GET {url}: {r.text}"
+    raise requests.HTTPError(msg) from e
   data = r.json()
   recs = data.get("records") or []
   if not recs:
@@ -126,12 +130,20 @@ def push_component(env_cfg: Dict[str, Any], file_path: Path) -> None:
     row_id = rec["id"]
     payload = {"records": [{"id": row_id, "fields": {"component_code": code}}]}
     r = requests.patch(f"{url_base}/records", headers=headers, data=json.dumps(payload))
-    r.raise_for_status()
+    try:
+      r.raise_for_status()
+    except requests.HTTPError as e:
+      msg = f"HTTP {r.status_code} on PATCH {url_base}/records: {r.text}"
+      raise requests.HTTPError(msg) from e
     print(f"✓ Update {template_id} (row {row_id})")
   else:
     payload = {"records": [{"fields": {"template_id": template_id, "component_code": code}}]}
     r = requests.post(f"{url_base}/records", headers=headers, data=json.dumps(payload))
-    r.raise_for_status()
+    try:
+      r.raise_for_status()
+    except requests.HTTPError as e:
+      msg = f"HTTP {r.status_code} on POST {url_base}/records: {r.text}"
+      raise requests.HTTPError(msg) from e
     recs = r.json().get("records") or []
     new_id = recs[0]["id"] if recs else "?"
     print(f"✓ Create {template_id} (row {new_id})")

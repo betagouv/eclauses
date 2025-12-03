@@ -1,0 +1,16 @@
+[27-Nov-2025 14:38:22 UTC] PHP Warning:  require(/home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/../ralouphie/getallheaders/src/getallheaders.php): Failed to open stream: No such file or directory in /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php on line 41
+[27-Nov-2025 14:38:22 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/../ralouphie/getallheaders/src/getallheaders.php' (include_path='.:/opt/alt/php83/usr/share/pear:/opt/alt/php83/usr/share/php:/usr/share/pear:/usr/share/php') in /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php:41
+Stack trace:
+#0 /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php(45): {closure}()
+#1 /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/autoload.php(22): ComposerAutoloaderInit045658d81f6d9d3243e731dda7bf04d1::getLoader()
+#2 /home/sqod9764/eclauses-ia.oriatec-host.fr/api/upload_cv.php(7): require('/home/sqod9764/...')
+#3 {main}
+  thrown in /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php on line 41
+[27-Nov-2025 14:38:59 UTC] PHP Warning:  require(/home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/../ralouphie/getallheaders/src/getallheaders.php): Failed to open stream: No such file or directory in /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php on line 41
+[27-Nov-2025 14:38:59 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/../ralouphie/getallheaders/src/getallheaders.php' (include_path='.:/opt/alt/php83/usr/share/pear:/opt/alt/php83/usr/share/php:/usr/share/pear:/usr/share/php') in /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php:41
+Stack trace:
+#0 /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php(45): {closure}()
+#1 /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/autoload.php(22): ComposerAutoloaderInit045658d81f6d9d3243e731dda7bf04d1::getLoader()
+#2 /home/sqod9764/eclauses-ia.oriatec-host.fr/api/upload_cv.php(7): require('/home/sqod9764/...')
+#3 {main}
+  thrown in /home/sqod9764/eclauses-ia.oriatec-host.fr/api/vendor/composer/autoload_real.php on line 41

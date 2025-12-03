@@ -1,1 +1,3 @@
 n8n/
+.env
+__pycache__

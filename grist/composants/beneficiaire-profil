@@ -1,7 +1,7 @@
 const Component = () => {
   const { useState, useEffect, useRef } = React;
   // === Constantes ===
-  const N8N_CV_UPLOAD_URL = 'https://n8n.incubateur.anct.gouv.fr/webhook/eclauses/beneficiaires/cv'; // ← à adapter
+  const N8N_CV_UPLOAD_URL = 'https://eclauses-ia.oriatec-host.fr/api/upload_cv.php'; // Webhook n8n
   const MAX_CV_BYTES = 5 * 1024 * 1024; // 5 Mo
   const ACCEPTED_CV_TYPES = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
   const TABLE = 'Beneficiaires'; // table principale
@@ -83,6 +83,8 @@ const Component = () => {
   // Fichier CV en attente d’upload
   const [fileCV, setFileCV] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState(null);
+  const [cvUrl, setCvUrl] = useState(null);
 
   // Formulaire (état éditable)
   const [form, setForm] = useState({
@@ -189,6 +191,7 @@ const Component = () => {
       'Regions_ou_vous_etes_mobile': asArray(rec['Regions_ou_vous_etes_mobile']),
       [COL_CV]: asArray(rec[COL_CV])
     });
+    refreshCvUrl(asArray(rec[COL_CV]));
     setFileCV(null);
   }
 
@@ -201,6 +204,17 @@ const Component = () => {
   function setSelectMulti(name, e) {
     const values = Array.from(e.target.selectedOptions).map(o => Number(o.value)).filter(v => Number.isFinite(v));
     setField(name, cleanListIds(values));
+  }
+
+  async function refreshRow() {
+    if (!currentId) return;
+    try {
+      const data = await gristAPI.getData(TABLE);
+      const rec = (data || []).find(r => r.id === currentId);
+      if (rec) seedForm(rec);
+    } catch (e) {
+      setErr(e.message || 'Impossible de rafraîchir la fiche.');
+    }
   }
 
   // Combobox multi (options, sélection, recherche)
@@ -286,6 +300,7 @@ const Component = () => {
   async function uploadCV() {
     if (!currentId || !fileCV) return;
     setErr(null); setMsg(null);
+    setUploadErr(null);
     try {
       if (fileCV.size > MAX_CV_BYTES) {
         throw new Error('Fichier trop volumineux (max 5 Mo).');
@@ -297,28 +312,52 @@ const Component = () => {
       setUploading(true);
 
       const formData = new FormData();
-      formData.append('file', fileCV);               // le fichier
+      formData.append('cv', fileCV);               // le fichier
       formData.append('benef_id', String(currentId)); // pour que n8n sache quelle ligne mettre à jour
 
-      const res = await fetch(N8N_CV_UPLOAD_URL, {
-        method: 'POST',
-        body: formData,
-      });
+      const controller = new AbortController();
+      const to = setTimeout(() => controller.abort(), 20000);
+      let res;
+      try {
+        res = await fetch(N8N_CV_UPLOAD_URL, { method: 'POST', body: formData, signal: controller.signal });
+      } finally {
+        clearTimeout(to);
+      }
 
       // Attendu: { ok: true, message?: string }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        throw new Error(data.message || 'Échec du téléversement via n8n.');
+        throw new Error(data.message || 'Échec du téléversement.');
       }
 
       // Rafraîchit la fiche (n8n a déjà mis à jour la colonne côté Grist)
       await refreshRow();
+      refreshCvUrl([data.attachment_id || data.id || data.attachmentId].filter(Boolean));
       setFileCV(null);
       setMsg('CV téléversé et attaché au profil.');
     } catch (e) {
-      setErr(e.message || 'Échec du téléversement du CV.');
+      const msg = e?.name === 'AbortError'
+        ? 'Téléversement trop long. Réessayez ou réduisez la taille du fichier.'
+        : (e.message || 'Échec du téléversement du CV (upload indisponible).');
+      setUploadErr(msg);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function refreshCvUrl(list) {
+    const cvListLocal = list || form[COL_CV] || [];
+    const cvId = asArray(cvListLocal).filter(x => x !== 'L')[0];
+    if (!cvId) { setCvUrl(null); return; }
+    try {
+      const tokenInfo = await grist.docApi.getAccessToken({ readOnly: true });
+      const baseUrl = tokenInfo?.baseUrl;
+      const token = tokenInfo?.token;
+      if (!baseUrl || !token) { setCvUrl(null); return; }
+      const url = `${baseUrl}/attachments/${cvId}/download?auth=${token}`;
+      setCvUrl(url);
+    } catch (_) {
+      setCvUrl(null);
     }
   }
 
@@ -335,8 +374,8 @@ function sortByLabelFr(options) {
     if (!currentId) return;
     setErr(null); setMsg(null);
     try {
-      await gristAPI.updateRecord(TABLE, currentId, { [COL_CV]: [] });
-      setField(COL_CV, []);
+      await gristAPI.updateRecord(TABLE, currentId, { [COL_CV]: ["L"] });
+      await refreshRow();
       setMsg('CV supprimé de la fiche.');
     } catch (e) {
       setErr(e.message || 'Impossible de supprimer le CV.');
@@ -353,13 +392,10 @@ function sortByLabelFr(options) {
     );
   }
 
-  if (err) {
-    return (
-      <section className="fr-container fr-my-6w">
-        <div className="fr-alert fr-alert--error"><p><strong>Erreur :</strong> {err}</p></div>
-      </section>
-    );
-  }
+  // On n'interrompt plus l'affichage en cas d'erreur : on affiche juste une alerte
+  const renderError = err ? (
+    <div className="fr-alert fr-alert--error fr-mb-3w"><p><strong>Erreur :</strong> {err}</p></div>
+  ) : null;
 
   if (!currentId) {
     return (
@@ -374,7 +410,14 @@ function sortByLabelFr(options) {
     );
   }
 
-  const cvCount = (form[COL_CV] || []).length;
+  const cvList = form[COL_CV] || [];
+
+  const buildCvLink = (att) => {
+    if (!att) return null;
+    if (typeof att === 'string') return att;
+    if (typeof att === 'number') return null;
+    return att.url || att.link || att.downloadUrl || null;
+  };
 
   return (
     <section className="fr-container fr-my-6w">
@@ -383,7 +426,7 @@ function sortByLabelFr(options) {
       </header>
 
       {msg && <div className="fr-alert fr-alert--success fr-mb-3w"><p>{msg}</p></div>}
-      {err && <div className="fr-alert fr-alert--error fr-mb-3w"><p>{err}</p></div>}
+      {renderError}
 
       <div className="fr-card fr-p-3w fr-mb-3w">
         <div className="fr-grid-row fr-grid-row--gutters">
@@ -701,7 +744,17 @@ function sortByLabelFr(options) {
 
       <div className="fr-card fr-p-3w fr-mb-3w">
         <h2 className="fr-h6 fr-mb-2w">Curriculum Vitae</h2>
-        <p className="fr-mb-1w">Fichier actuel : <strong>{cvCount ? `${cvCount} fichier(s)` : 'Aucun'}</strong></p>
+        {uploadErr && <div className="fr-alert fr-alert--error fr-mb-2w"><p>{uploadErr}</p></div>}
+        <p className="fr-mb-1w">
+          Fichier actuel :{' '}
+          {cvUrl ? (
+            <a href={cvUrl} target="_blank" rel="noopener noreferrer" className="fr-link">
+              Voir le CV
+            </a>
+          ) : (
+            <strong>Aucun</strong>
+          )}
+        </p>
         <div className="fr-upload-group fr-my-2w">
           <label className="fr-label" htmlFor="cvfile">Sélectionner un fichier</label>
           <input id="cvfile" className="fr-upload" type="file"

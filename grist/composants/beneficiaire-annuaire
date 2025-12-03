@@ -340,7 +340,29 @@ const Component = () => {
   }, [specOpen]);
 
   // ===== Modale fiche =====
-  function openModal(row) { setModalRow(row); setModalOpen(true); }
+  async function openModal(row) { 
+    
+    let token = "";
+    let baseUrl = "";
+
+    await grist.docApi.getAccessToken({ readOnly: true }).then(response => {
+      token = response.token;
+      baseUrl = response.baseUrl;
+    });
+
+    let cv = row[COL.CV]?.filter((x)=>x!=='L')[0]
+
+    if(cv == undefined){
+        row.cv_url = undefined
+    }
+    else{
+        const url = `${baseUrl}/attachments/${cv}/download?auth=${token}`;
+
+        row.cv_url = url
+    }
+
+    setModalRow(row); setModalOpen(true);
+     }
   function closeModal()    { setModalOpen(false); setModalRow(null); }
 
   // ===== UI =====
@@ -404,14 +426,11 @@ const Component = () => {
                    value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
-      </div>
-
-      <div className="fr-grid-row fr-grid-row--gutters fr-mb-3w">
         <div className="fr-col-12 fr-col-md-6">
           <div
             className="fr-input-group"
             ref={specBoxRef}
-            style={{position:'relative', overflow:'visible', zIndex:10000}}
+            style={{position:'relative', overflow:'visible'}}
             onClick={(e)=>e.stopPropagation()}
             onMouseDown={(e)=>e.stopPropagation()}
           >
@@ -537,9 +556,9 @@ const Component = () => {
                           <h2 className="fr-card__title fr-text--md">
                             <a href="#" onClick={(e) => { e.preventDefault(); openModal(r); }}>{nomComplet}</a>
                           </h2>
-                          <p className="fr-card__desc"><strong>E-mail :</strong> {mail}</p>
-                        <p className="fr-card__desc"><strong>Spécialité :</strong>{asArray(r["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ') || '—'}</p>
-                        {sous_spec && (<p className="fr-card__desc"><strong>Sous-spécialité :</strong>{sous_spec}</p>)}
+                          <p className="fr-card__desc"><strong>E-mail : </strong>{mail}</p>
+                        <p className="fr-card__desc"><strong>Spécialité : </strong>{asArray(r["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ') || '—'}</p>
+                        {sous_spec && (<p className="fr-card__desc"><strong>Sous-spécialité : </strong>{sous_spec}</p>)}
                         </div>
                       </article>
                     </div>
@@ -602,13 +621,53 @@ const Component = () => {
               <div className="fr-grid-row fr-grid-row--gutters">
                 <div className="fr-col-12 fr-col-lg-7">
                   <dl className="fr-description-list fr-mb-2w">
-                    <dt><strong>E-mail</strong></dt><dd><a href={`mailto:${modalRow[COL.COURRIEL]}`}>{modalRow[COL.COURRIEL] || '—'}</a></dd>
-                    <dt className="fr-mt-2w"><strong>Téléphone</strong></dt><dd>{modalRow[COL.TEL] || '—'}</dd>
-                    <dt className="fr-mt-2w"><strong>Formation</strong></dt><dd>{modalRow['gristHelper_Display2'] || '—'}</dd>
-                    <dt className="fr-mt-2w"><strong>Année de diplôme</strong></dt><dd>{modalRow[COL.ANNEE_DIP] || '—'}</dd>
-                    <dt className="fr-mt-2w"><strong>Spécialité</strong></dt><dd>{asArray(modalRow["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ') || '—'}</dd>
-                    <dt className="fr-mt-2w"><strong>Sous-spécialité</strong></dt><dd>{modalRow[COL.SOUS_SPEC] || '—'}</dd>
-                    <dt className="fr-mt-2w"><strong>Mémoire</strong></dt><dd>{modalRow[COL.MEMOIRE] || '—'}</dd>
+                    {modalRow[COL.COURRIEL] && (
+                      <>
+                        <dt><strong>E-mail</strong></dt><dd><a href={`mailto:${modalRow[COL.COURRIEL]}`}>{modalRow[COL.COURRIEL]}</a></dd>
+                      </>
+                    )}
+                    {modalRow[COL.TEL] && (
+                      <>
+                        <dt className="fr-mt-2w"><strong>Téléphone</strong></dt><dd>{modalRow[COL.TEL]}</dd>
+                      </>
+                    )}
+                    {modalRow['gristHelper_Display2'] && (
+                      <>
+                        <dt className="fr-mt-2w"><strong>Formation</strong></dt><dd>{modalRow['gristHelper_Display2']}</dd>
+                      </>
+                    )}
+                    {modalRow[COL.ANNEE_DIP] && (
+                      <>
+                        <dt className="fr-mt-2w"><strong>Année de diplôme</strong></dt><dd>{modalRow[COL.ANNEE_DIP]}</dd>
+                      </>
+                    )}
+                    {asArray(modalRow["gristHelper_Display3"]).filter((x)=>x!=='L').length > 0 && (
+                      <>
+                        <dt className="fr-mt-2w"><strong>Spécialité</strong></dt>
+                        <dd>{asArray(modalRow["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ')}</dd>
+                      </>
+                    )}
+                    {modalRow[COL.SOUS_SPEC] && (
+                      <>
+                        <dt className="fr-mt-2w"><strong>Sous-spécialité</strong></dt><dd>{modalRow[COL.SOUS_SPEC]}</dd>
+                      </>
+                    )}
+                    {modalRow[COL.MEMOIRE] && (
+                      <>
+                        <dt className="fr-mt-2w"><strong>Mémoire</strong></dt><dd>{modalRow[COL.MEMOIRE]}</dd>
+                      </>
+                    )}
+                    {modalRow[COL.AUTRES_INFOS] && (
+                      <>
+                        <dt className="fr-mt-2w"><strong>Autres informations</strong></dt><dd>{modalRow[COL.AUTRES_INFOS]}</dd>
+                      </>
+                    )}
+                    <dt className="fr-mt-2w"><strong>CV</strong></dt>
+                    {modalRow.cv_url ? (
+                      <dd><a href={modalRow.cv_url} target="_blank">Voir le fichier</a></dd>
+                    ) : (
+                      <dd>Aucun fichier.</dd>
+                    )}
                   </dl>
                 </div>
                 <div className="fr-col-12 fr-col-lg-5">
