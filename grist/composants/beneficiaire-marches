@@ -17,7 +17,6 @@ const Component = () => {
     DL_CANDID: 'Date_limite_de_candidature',
     DL_REAL: 'Date_Limite_de_Realisation_de_l_Operation',
     CLAUSE: 'Clauses_sociales',
-    ADR: 'Adresse_de_realisation',
     ADR_EXEC: 'Adresse_d_execution',
     LAT: 'Latitude',
     LNG: 'Longitude',
@@ -295,7 +294,7 @@ const Component = () => {
       if (!search) return true;
       const aa = labelFrom(optsAcheteurs, row[C.AA]);
       const propre = row[C.INTITULE_PROPRE] || '';
-      const adr = row[C.ADR] || '';
+      const adr = row[C.ADR_EXEC] || '';
       const base = row[C.INTITULE] || '';
       return includesI(base, search) || includesI(aa, search) || includesI(propre, search) || includesI(adr, search);
     }
@@ -362,17 +361,7 @@ const Component = () => {
       const dCand = parseDate(row[C.DL_CANDID]);
       const isFav = interestedSet.has(row.id);
 
-      const html = `
-        <div style="min-width:220px">
-          <strong>${titre}</strong><br/>
-          ${row[C.ADR] ? `<span>${row[C.ADR]}<br/></span>` : ''}
-          <small>Autorité : ${aaLabel}</small><br/>
-          ${dCand ? `<small>Candidature : ${formatDate(dCand)}</small>` : ''}
-          ${isFav ? `<div style="margin-top:4px;"><span style="font-size:12px;">★ Intéressé</span></div>` : ''}
-        </div>
-      `;
-
-      const marker = L.marker([lat, lng]).bindPopup(html).addTo(layer);
+      const marker = L.marker([lat, lng]).addTo(layer);
       marker.on('click', () => openModal(row));
       bounds.push([lat, lng]);
     });
@@ -541,7 +530,6 @@ const Component = () => {
                   pointerEvents:'auto'
                 }}
                 onClick={(e)=>e.stopPropagation()}
-                onMouseDown={(e)=>e.stopPropagation()}
               >
                 <div style={{padding:'0.75rem', borderBottom:'1px solid var(--border-default-grey)'}}>
                   <input
@@ -739,11 +727,10 @@ const Component = () => {
 
               <dl className="fr-description-list fr-mb-2w">
                 <dt>Pouvoir adjudicateur</dt><dd>{labelFrom(optsAcheteurs, modalRow[C.AA])}</dd>
-                <dt>Adresse</dt><dd>{modalRow[C.ADR] || '—'}</dd>
                 <dt>Adresse d'exécution</dt><dd>{modalRow[C.ADR_EXEC] || '—'}</dd>
                 <dt>Clause sociale</dt><dd>{labelFrom(optsClauses, modalRow[C.CLAUSE])}</dd>
                 <dt>Publication</dt><dd>{formatDate(parseDate(modalRow[C.PUB]))}</dd>
-                <dt>Limite candidature</dt><dd>{formatDate(parseDate(modalRow[C.DL_CANDID]))}</dd>
+                <dt>Date limite de remise des offres</dt><dd>{formatDate(parseDate(modalRow[C.DL_CANDID]))}</dd>
                 <dt>Fin d’exécution prévisionnelle</dt><dd>{formatDate(parseDate(modalRow[C.DL_REAL]))}</dd>
                 {modalRow[C.DOCS] ? (
                   <>
