@@ -280,10 +280,9 @@ const Component = () => {
       'Specialite': form['Specialite'] || [],
       'Departement_de_residence': form['Departement_de_residence'] || [],
       'Regions_ou_vous_etes_mobile': form['Regions_ou_vous_etes_mobile'] || [],
-      [COL_CV]: form[COL_CV] || []
+      [COL_CV]: form[COL_CV] || [],
+      'Fiche_MAJ':1
     };
-
-    console.log(updates);
 
     try {
       setSaving(true);

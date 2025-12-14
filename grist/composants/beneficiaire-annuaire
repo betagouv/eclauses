@@ -203,7 +203,7 @@ const Component = () => {
   const filtered = React.useMemo(() => {
     const clauseFilterId = selectedClauseId || null;
     const res = (benefRows || []).filter(r => {
-      if (!r || r.id === currentBenefId) return false;
+      if (!r) return false;
       const rClauses = sanitizeIds(r[CLAUSE_COL], validClauseIdSet);
       if (clauseFilterId == null || !rClauses.includes(clauseFilterId)) return false;
 
