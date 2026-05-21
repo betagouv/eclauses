@@ -2,3 +2,10 @@ n8n/
 .env
 __pycache__
 grist-dsfr-react-app/
+dev-bug.csv
+.DS_Store
+plan-local.md
+.codex/
+.vscode/
+AGENTS.md
+deploiement/

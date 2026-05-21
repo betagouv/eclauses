@@ -18,6 +18,7 @@ class Acces_Coordonnees:
 class Acheteurs:
   Nom = grist.Text()
   Ministere = grist.Choice()
+  Utilisateurs_Acheteurs = grist.ReferenceList('Utilisateurs_Acheteurs', reverse_of='Entite_de_rattachement')
 
   @grist.formulaType(grist.ReferenceList('Clauses_sociales'))
   def Marches_Clauses_sociales(rec, table):
@@ -99,6 +100,14 @@ class Application_Composants:
   default_component = grist.Bool()
   requires_auth = grist.Bool()
 
+  def role(rec, table):
+    return None
+
+
+@grist.UserTable
+class Application_Env:
+  public_url = grist.Text()
+
 
 @grist.UserTable
 class Application_FAQ_Categories:
@@ -129,9 +138,79 @@ class Application_FAQ_Questions:
     return NOW()
   Updated_at = grist.DateTime('Europe/Paris')
   Audience = grist.Choice()
-  Vrai_audience = grist.Choice()
   Auteur = grist.Text()
   Clause2 = grist.Reference('Clauses_sociales')
+
+
+@grist.UserTable
+class Application_Footer:
+  Description = grist.Text()
+  Links = grist.ReferenceList('Application_Liens')
+  Bottom_Links = grist.ReferenceList('Application_Liens')
+  Copy = grist.Text()
+  Entity_Logo = grist.Text()
+
+
+@grist.UserTable
+class Application_Header:
+  Title = grist.Text()
+  Badge_Label = grist.Text()
+  Badge_Variant = grist.Text()
+  Links = grist.ReferenceList('Application_Liens')
+  Entity_Logo = grist.Text()
+
+  def Tagline(rec, table):
+    return None
+
+
+@grist.UserTable
+class Application_Liens:
+  Label = grist.Text()
+  Url = grist.Text()
+  Nav = grist.Text()
+  Variant = grist.Text()
+  External = grist.Bool()
+  Ordre = grist.Numeric()
+
+  def Target(rec, table):
+    return None
+
+
+@grist.UserTable
+class Application_Password_Reset:
+  Email = grist.Text()
+
+  def _default_Token(rec, table, value, user):
+    return UUID()
+  Token = grist.Text()
+
+  def _default_Cree_a(rec, table, value, user):
+    return NOW()
+  Cree_a = grist.DateTime('Europe/Paris')
+
+  def _default_Expire_le(rec, table, value, user):
+    return DTIME(datetime.datetime.now() + datetime.timedelta(hours=24),'Europe/Paris')
+  Expire_le = grist.DateTime('Europe/Paris')
+
+  def _default_Direct_Lien(rec, table, value, user):
+    return f"{SELF_HYPERLINK(LinkKey_Token=rec.Token,page=32)}&style=singlePage"
+  Direct_Lien = grist.Text()
+  Is_Reset = grist.Bool()
+  create_send = grist.Bool()
+  error_create_send = grist.Text()
+  Used = grist.Bool()
+
+  @grist.formulaType(grist.Bool())
+  def Expire(rec, table):
+    return OR(rec.Expire_le < NOW(), rec.Used)
+
+  @grist.formulaType(grist.Text())
+  def Lien(rec, table):
+    url = Application_Env.all[0].public_url
+    return f"{url}?Token_={rec.Token}&page=reset-password"
+
+  def Type(rec, table):
+    return IF(rec.Is_Reset, lambda: ('reset'), lambda: ('creat'))
 
 
 @grist.UserTable
@@ -187,7 +266,8 @@ class AuthLink:
 
   @grist.formulaType(grist.Text())
   def Lien(rec, table):
-    return f"https://eclauses.beta.gouv.fr?Token_={rec.Token}"
+    url = Application_Env.all[0].public_url
+    return f"{url}?Token_={rec.Token}"
 
   def A(rec, table):
     return bool(rec.Acheteur)
@@ -197,6 +277,7 @@ class AuthLink:
 class Beneficiaires:
   NOM = grist.Text()
   Prenom = grist.Text()
+  Autre_Formation = grist.Text()
   Formation = grist.Reference('T0_Referentiel_Formations')
   Annee_de_diplome = grist.Choice()
   Specialite_ecole = grist.Text()
@@ -352,7 +433,7 @@ class Declarations_Beneficiaires:
   def _default_Repondant(rec, table, value, user):
     return user.Auth.Repondant
   Repondant = grist.Reference('Repondants')
-  Marche = grist.Reference('Marches')
+  Marche = grist.Reference('Marches', reverse_of='Beneficiaires')
   Est_beneficiaire_eclauses = grist.Bool()
   Beneficiaire = grist.Reference('Beneficiaires')
   Nom = grist.Text()
@@ -391,11 +472,12 @@ class Marches:
   def _default_Acheteur(rec, table, value, user):
     return user.Auth.Acheteur_Entite
   Acheteur = grist.Reference('Acheteurs')
+  Lien_vers_les_documents_de_consultation = grist.Text()
   Date_de_publication = grist.Date()
   Date_limite_de_candidature = grist.Date()
   Date_Limite_de_Realisation_de_l_Operation = grist.Date()
   Clauses_sociales = grist.Reference('Clauses_sociales')
-  Adresse_d_execution = grist.Text()
+  Lieu_d_execution = grist.Text()
   Latitude = grist.Numeric()
   Longitude = grist.Numeric()
   Adresse_geocodee = grist.Text()
@@ -404,8 +486,11 @@ class Marches:
   Specialites_du_marche = grist.ReferenceList('T0_Referentiel_Specialites')
   Date_de_fin_d_execution = grist.Date()
 
-  def Lien_vers_les_documents_d_appel_d_offres(rec, table):
-    return None
+  def _default_Statut(rec, table, value, user):
+    return "En attente de publication"
+  Statut = grist.Choice()
+  Beneficiaires = grist.ReferenceList('Declarations_Beneficiaires', reverse_of='Marche')
+  Titulaire2 = grist.Reference('Repondants', reverse_of='Titulaire_aux_marches')
 
   def Intitule_propre(rec, table):
     return f"{rec.Acheteur.Nom} ({rec.Intitule} - Lot {rec.Numero_de_lot})"
@@ -419,9 +504,6 @@ class Marches:
   def Doit_Geocoder(rec, table):
     return rec.Adresse_geocodee == ''
 
-  def Beneficiaires(rec, table):
-    return Declarations_Beneficiaires.lookupRecords(Marche=rec.id, Statut="validé").Beneficiaire
-
   @grist.formulaType(grist.Reference('Repondants'))
   def Titulaire(rec, table):
     return Repondants.lookupOne(Titulaire_aux_marches=CONTAINS(rec.id))
@@ -432,6 +514,29 @@ class Marches:
 
   def Intitule_Lot(rec, table):
     return f"{rec.Intitule} - Lot {rec.Numero_de_lot}"
+
+  def Lien_Inscription_Candidat(rec, table):
+    url = Application_Env.all[0].public_url
+    return f"{url}?page=inscription-candidat&marche={rec.id}"
+
+  @grist.formulaType(grist.Reference('Invitation_Titulaire'))
+  def Invitation_Titulaire_Marche(rec, table):
+    return Invitation_Titulaire.lookupOne(Marche=rec.id)
+
+  @grist.formulaType(grist.Bool())
+  def A_valider(rec, table):
+    return AND(rec.Statut == "En attente de déclaration des bénéficiaires", len(rec.Beneficiaires) > 0)
+
+  @grist.formulaType(grist.Bool())
+  def Clause_validee(rec, table):
+    return rec.Statut == "Clause validée"
+
+  @grist.formulaType(grist.ReferenceList('Utilisateurs_Acheteurs'))
+  def Acheteur_Utilisateurs_Acheteurs(rec, table):
+    return rec.Acheteur.Utilisateurs_Acheteurs
+
+  def Acheteur_Utilisateurs_Acheteurs_Email(rec, table):
+    return rec.Acheteur_Utilisateurs_Acheteurs.Email
 
 
 @grist.UserTable
@@ -473,7 +578,7 @@ class Repondants:
   Telephone = grist.Text()
   Raison_sociale = grist.Text()
   Candidat_aux_marches = grist.ReferenceList('Marches')
-  Titulaire_aux_marches = grist.ReferenceList('Marches')
+  Titulaire_aux_marches = grist.ReferenceList('Marches', reverse_of='Titulaire2')
   Siret = grist.Text()
 
   @grist.formulaType(grist.ReferenceList('Clauses_sociales'))
@@ -531,7 +636,7 @@ class Utilisateurs_Acheteurs:
   Nom = grist.Text()
   Prenom = grist.Text()
   Email = grist.Text()
-  Entite_de_rattachement = grist.Reference('Acheteurs')
+  Entite_de_rattachement = grist.Reference('Acheteurs', reverse_of='Utilisateurs_Acheteurs')
 
 
 @grist.UserTable

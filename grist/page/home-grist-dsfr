@@ -1,0 +1,104 @@
+const Component = () => {
+  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
+
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState(null);
+  const [regions, setRegions] = React.useState([]);
+  const [selected, setSelected] = React.useState([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+        const rows = await gristAPI.getData('Regions').catch(() => []);
+        if (!mounted) return;
+        setRegions(Array.isArray(rows) ? rows : []);
+      } catch (e) {
+        if (!mounted) return;
+        setErr(e.message || 'Erreur de chargement');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const options = React.useMemo(
+    () => (regions || []).map(r => ({ value: r.id, label: String(r.Label ?? r.label ?? r.id) })),
+    [regions]
+  );
+
+  return (
+    <section className="fr-container fr-my-6w">
+      <header className="fr-mb-4w">
+        <h1 className="fr-h3 fr-mb-1w">Démo du custom widget DSFR</h1>
+        <p className="fr-text--sm fr-text-mention--grey">
+          Cette page présente une instance de démonstration du custom widget Grist + DSFR. Elle illustre le chargement
+          de composants externes et leur utilisation dans une page Grist.
+        </p>
+      </header>
+
+      <div className="fr-card fr-p-3w fr-mb-3w">
+        <h2 className="fr-h5 fr-mb-2w">Exemple de chargement de composant</h2>
+        <p className="fr-text--sm fr-mb-2w">
+          Le composant <strong>ComboBox</strong> est chargé via <code>gristAPI.getComponent('ComboBox')</code>.
+          Les options sont alimentées par la table <code>Regions</code> et la colonne <code>Label</code>.
+        </p>
+
+        {loading && (
+          <div className="fr-callout">
+            <p className="fr-callout__text">Chargement des régions…</p>
+          </div>
+        )}
+
+        {err && (
+          <div className="fr-alert fr-alert--error fr-mb-2w"><p><strong>Erreur :</strong> {err}</p></div>
+        )}
+
+        {!loading && !err && (
+          <div className="fr-grid-row fr-grid-row--gutters">
+            <div className="fr-col-12 fr-col-md-6">
+              {ComboBox ? (
+                <ComboBox
+                  id="regions-combobox"
+                  label="Régions"
+                  options={options}
+                  multiple
+                  value={selected}
+                  onChange={(vals) => setSelected((vals || []).filter(v => v != null))}
+                  placeholder="Choisir une ou plusieurs régions"
+                  searchPlaceholder="Rechercher une région"
+                  summaryMode="list"
+                />
+              ) : (
+                <div className="fr-alert fr-alert--error"><p>ComboBox indisponible.</p></div>
+              )}
+            </div>
+            <div className="fr-col-12 fr-col-md-6">
+              <div className="fr-card fr-card--sm fr-p-2w">
+                <p className="fr-text--sm fr-mb-1w"><strong>Sélection actuelle</strong></p>
+                <p className="fr-text--sm fr-mb-0">
+                  {selected.length
+                    ? selected
+                        .map(id => options.find(o => o.value === id)?.label || String(id))
+                        .join(', ')
+                    : 'Aucune région sélectionnée'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="fr-card fr-p-3w">
+        <h2 className="fr-h6 fr-mb-2w">Structure attendue</h2>
+        <p className="fr-text--sm fr-mb-0">
+          Créez une table <code>Regions</code> avec une colonne <code>Label</code>. Chaque ligne sera affichée dans le
+          ComboBox avec ce libellé.
+        </p>
+      </div>
+    </section>
+  );
+};

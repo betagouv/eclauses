@@ -3,7 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Eclause - Ministère de la Culture</title>
+  <title>Eclauses - Ministère de la Culture</title>
+  <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+<link rel="shortcut icon" href="/favicon/favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+<link rel="manifest" href="/favicon/site.webmanifest" />
+<!-- Modifier les chemins relatifs des favicons en fonction de la structure du projet -->
+<!-- Dans le fichier manifest.webmanifest aussi, modifier les chemins vers les images -->
   <style>
     :root {
       /* Valeurs par défaut */
@@ -20,14 +27,14 @@
       position: relative;
       background: #fff;
     }
-    /* On applique le zoom et le décalage à l'iframe elle-même */
+    /* Recadrage sans transform pour préserver le positionnement des popovers */
     #embed {
+      position: absolute;
+      left: calc(-1px * var(--offset-x));
+      top: calc(-1px * var(--offset-y));
       width: 100vw;   /* base : occuper tout l'écran */
       height: 103vh;
       border: 0;
-      transform-origin: 0 0; /* important : top-left comme origine */
-      /* ordre: translate puis scale (droite→gauche dans CSS) */
-      transform: translate(calc(-1px * var(--offset-x)), calc(-1px * var(--offset-y))) scale(var(--zoom));
     }
   </style>
 </head>
@@ -36,7 +43,8 @@
     <iframe
       id="embed"
       title="Eclause"
-      data-src="https://grist.numerique.gouv.fr/o/docs/kmFxH2HJiL3E/DEV-Eclause/p/32">
+      data-src="https://grist.numerique.gouv.fr/o/eclauses-culture/b4DA3nGJwznv/Eclauses/p/32" 
+      allow="clipboard-read; clipboard-write">
     </iframe>
   </div>
 
@@ -47,13 +55,43 @@
       if (!baseSrc) return;
 
       const parentParams = new URLSearchParams(window.location.search);
+      const TOKEN_KEY = 'Token_';
+
+      function setCookie(name, value, days) {
+        const maxAge = (days || 7) * 24 * 60 * 60;
+        document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+      }
+      function getCookie(name) {
+        const n = `${encodeURIComponent(name)}=`;
+        const parts = document.cookie.split(';');
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i].trim();
+          if (p.indexOf(n) === 0) return decodeURIComponent(p.slice(n.length));
+        }
+        return '';
+      }
+      function removeParamFromUrl(param) {
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has(param)) return;
+        url.searchParams.delete(param);
+        window.history.replaceState({}, document.title, url.toString());
+      }
+
+      // --- 0) Token session : URL -> cookie, puis nettoyage de l'URL ---
+      if (parentParams.has(TOKEN_KEY)) {
+        const token = parentParams.get(TOKEN_KEY);
+        if (token) setCookie(TOKEN_KEY, token, 7);
+        removeParamFromUrl(TOKEN_KEY);
+      }
+      const tokenCookie = getCookie(TOKEN_KEY);
 
       // --- 1) Propager uniquement ce qui doit aller à Grist ---
       const target = new URL(baseSrc, window.location.href);
-      const whitelistToChild = ['Token_']; // à transmettre à l'iframe
+      const whitelistToChild = ['page_', 'marche_']; // à transmettre à l'iframe
       for (const key of whitelistToChild) {
         if (parentParams.has(key)) target.searchParams.set(key, parentParams.get(key));
       }
+      if (tokenCookie) target.searchParams.set(TOKEN_KEY, tokenCookie);
       target.searchParams.set('style', 'singlePage');
       iframe.src = target.toString();
 

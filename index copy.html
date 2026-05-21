@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Démo Grist DSFR - Ministère de la Culture</title>
+  <style>
+    :root {
+      /* Valeurs par défaut */
+      --zoom: 1;     /* ex: 1.5 pour zoomer 150% */
+      --offset-x: 0; /* px, coord X à rogner (avant zoom) */
+      --offset-y: 0; /* px, coord Y à rogner (avant zoom) */
+    }
+    html, body { height: 100%; margin: 0; }
+    /* Le cadre visible qui "masque" l'iframe */
+    .frame-wrap {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden; /* on ne montre que la zone recadrée */
+      position: relative;
+      background: #fff;
+    }
+    /* Recadrage sans transform pour préserver le positionnement des popovers */
+    #embed {
+      position: absolute;
+      left: calc(-1px * var(--offset-x));
+      top: calc(-1px * var(--offset-y));
+      width: 100vw;   /* base : occuper tout l'écran */
+      height: 103vh;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="frame-wrap">
+    <iframe
+      id="embed"
+      title="Grist Demo DSFR"
+      data-src="https://grist.numerique.gouv.fr/o/docs/jzJhAvmwkEYB/Demo-Grist-DSFR/p/32" 
+      allow="clipboard-read; clipboard-write">
+    </iframe>
+  </div>
+
+  <script>
+    (function () {
+      const iframe = document.getElementById('embed');
+      const baseSrc = iframe.getAttribute('data-src');
+      if (!baseSrc) return;
+
+      const parentParams = new URLSearchParams(window.location.search);
+      const TOKEN_KEY = 'Token_';
+
+      function setCookie(name, value, days) {
+        const maxAge = (days || 7) * 24 * 60 * 60;
+        document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+      }
+      function getCookie(name) {
+        const n = `${encodeURIComponent(name)}=`;
+        const parts = document.cookie.split(';');
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i].trim();
+          if (p.indexOf(n) === 0) return decodeURIComponent(p.slice(n.length));
+        }
+        return '';
+      }
+      function removeParamFromUrl(param) {
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has(param)) return;
+        url.searchParams.delete(param);
+        window.history.replaceState({}, document.title, url.toString());
+      }
+
+      // --- 0) Token session : URL -> cookie, puis nettoyage de l'URL ---
+      if (parentParams.has(TOKEN_KEY)) {
+        const token = parentParams.get(TOKEN_KEY);
+        if (token) setCookie(TOKEN_KEY, token, 7);
+        removeParamFromUrl(TOKEN_KEY);
+      }
+      const tokenCookie = getCookie(TOKEN_KEY);
+
+      // --- 1) Propager uniquement ce qui doit aller à Grist ---
+      const target = new URL(baseSrc, window.location.href);
+      const whitelistToChild = ['page_', 'marche_']; // à transmettre à l'iframe
+      for (const key of whitelistToChild) {
+        if (parentParams.has(key)) target.searchParams.set(key, parentParams.get(key));
+      }
+      if (tokenCookie) target.searchParams.set(TOKEN_KEY, tokenCookie);
+      target.searchParams.set('style', 'singlePage');
+      iframe.src = target.toString();
+
+       // --- 2) Tableau de configuration responsive (à éditer) ---
+      // max = largeur max (px) du viewport pour laquelle appliquer la config
+      // zoom = facteur (>0). x/y = offsets (accepte 'px', 'vw', 'vh'). Sans unité => px.
+      const CONFIG = [
+        { name: 'sm',  max: 576,   zoom: 1, x: '0',  y: '38' },
+        { name: 'md',  max: 768,   zoom: 1, x: '0',  y: '38' },
+        { name: 'lg',  max: 992,   zoom: 1, x: '0',   y: '54'  }, // 80px/260px
+        { name: 'xl',  max: 1200,  zoom: 1, x: '0',  y: '54'  },
+        { name: 'xxl', max: Infinity, zoom: 1, x: '0', y: '54' }
+      ];
+
+      function pickConfig(width) {
+        return CONFIG.find(c => width < c.max) || CONFIG[CONFIG.length - 1];
+      }
+
+      function applyConfig() {
+        const cfg = pickConfig(window.innerWidth);
+        const r = document.documentElement.style;
+        r.setProperty('--zoom',    cfg.zoom);
+        r.setProperty('--offset-x', cfg.x);
+        r.setProperty('--offset-y', cfg.y);
+        // Optionnel : pour debug
+        console.log(`Applied ${cfg.name}`, cfg);
+      }
+
+      // Debounce léger pour les resize
+      let t;
+      window.addEventListener('resize', () => {
+        clearTimeout(t);
+        t = setTimeout(applyConfig, 120);
+      });
+
+      applyConfig();
+    })();
+  </script>
+</body>
+</html>

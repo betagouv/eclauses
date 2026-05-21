@@ -112,7 +112,7 @@ try {
             [
                 'id' => $benefId,
                 'fields' => [
-                    $TARGET_COL => ["L",$attachmentId],
+                    $TARGET_COL => [$attachmentId],
                 ],
             ],
         ],

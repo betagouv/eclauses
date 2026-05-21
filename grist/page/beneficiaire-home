@@ -1,0 +1,78 @@
+const Component = () => {
+
+  return (
+    <>
+    <section className="fr-container fr-my-6w">
+        <h1 className="fr-h2">Bienvenue sur votre espace <span className="fr-text--bold">Eclauses</span></h1>
+          <div className="fr-grid-row fr-grid-row--gutters">
+          <div className="fr-col-12 fr-col-md-4">
+            <div class="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-5">
+              <div class="fr-tile__body">
+                <div class="fr-tile__content">
+                  <h3 class="fr-tile__title">
+                    <a data-nav="beneficiaire-profil" href="#">Mes informations</a>
+                  </h3>
+                  <p class="fr-tile__desc">Coordonnées, formation, spécialités, zones de mobilité, CV. Mettez à jour votre fiche à tout moment.
+                </p>
+                </div>
+              </div>
+              <div class="fr-tile__header">
+                <div class="fr-tile__pictogram">
+                  <svg aria-hidden="true" class="fr-artwork" viewBox="0 0 80 80" width="80px" height="80px">
+                    <use class="fr-artwork-decorative" href="/svg/digital/avatar.svg#artwork-decorative"></use>
+                    <use class="fr-artwork-minor" href="/svg/digital/avatar.svg#artwork-minor"></use>
+                    <use class="fr-artwork-major" href="/svg/digital/avatar.svg#artwork-major"></use>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="fr-col-12 fr-col-md-4">
+            <div class="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-5">
+              <div class="fr-tile__body">
+                <div class="fr-tile__content">
+                  <h3 class="fr-tile__title">
+                    <a data-nav="beneficiaire-marches" href="#">Marchés actifs</a>
+                  </h3>
+                  <p class="fr-tile__desc">Liste et carte des marchés encore réalisables et filtrés par vos clauses sociales.
+                </p>
+                </div>
+              </div>
+              <div class="fr-tile__header">
+                <div class="fr-tile__pictogram">
+                  <svg aria-hidden="true" class="fr-artwork" viewBox="0 0 80 80" width="80px" height="80px">
+                    <use class="fr-artwork-decorative" href="/svg/document/contract.svg#artwork-decorative"></use>
+                    <use class="fr-artwork-minor" href="/svg/document/contract.svg#artwork-minor"></use>
+                    <use class="fr-artwork-major" href="/svg/document/contract.svg#artwork-major"></use>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="fr-col-12 fr-col-md-4">
+            <div class="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-5">
+              <div class="fr-tile__body">
+                <div class="fr-tile__content">
+                  <h3 class="fr-tile__title">
+                    <a data-nav="beneficiaire-annuaire" href="#">Annuaire</a>
+                  </h3>
+                  <p class="fr-tile__desc">Recherchez des pairs partageant des clauses communes.
+                </p>
+                </div>
+              </div>
+              <div class="fr-tile__header">
+                <div class="fr-tile__pictogram">
+                  <svg aria-hidden="true" class="fr-artwork" viewBox="0 0 80 80" width="80px" height="80px">
+                    <use class="fr-artwork-decorative" href="/svg/digital/ecosystem.svg#artwork-decorative"></use>
+                    <use class="fr-artwork-minor" href="/svg/digital/ecosystem.svg#artwork-minor"></use>
+                    <use class="fr-artwork-major" href="/svg/digital/ecosystem.svg#artwork-major"></use>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      </>
+  );
+}
