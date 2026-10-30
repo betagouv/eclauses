@@ -27,11 +27,17 @@ const ComboBox = (props) => {
 
   const valueArray = Array.isArray(value) ? value : (value == null || value === '' ? [] : [value]);
 
+  const sortedOptions = React.useMemo(() => {
+    return [...(options || [])].sort((a, b) =>
+      String(a?.label || '').localeCompare(String(b?.label || ''), 'fr', { sensitivity: 'base' })
+    );
+  }, [options]);
+
   const filteredOptions = React.useMemo(() => {
     const q = String(search || '').toLowerCase().trim();
-    if (!q) return options;
-    return options.filter(o => String(o.label || '').toLowerCase().includes(q));
-  }, [options, search]);
+    if (!q) return sortedOptions;
+    return sortedOptions.filter(o => String(o.label || '').toLowerCase().includes(q));
+  }, [sortedOptions, search]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -98,13 +104,13 @@ const ComboBox = (props) => {
       if (!valueArray.length) return placeholder;
       if (summaryMode === 'list') {
         return valueArray
-          .map(v => options.find(o => valueKey(o.value) === valueKey(v))?.label || String(v))
+          .map(v => sortedOptions.find(o => valueKey(o.value) === valueKey(v))?.label || String(v))
           .join(', ');
       }
       return `${valueArray.length} sélectionné(s)`;
     }
     if (!valueArray[0]) return placeholder;
-    return options.find(o => valueKey(o.value) === valueKey(valueArray[0]))?.label || String(valueArray[0]);
+    return sortedOptions.find(o => valueKey(o.value) === valueKey(valueArray[0]))?.label || String(valueArray[0]);
   };
 
   const displayStyle = multiple && summaryMode === 'list'
@@ -118,7 +124,7 @@ const ComboBox = (props) => {
   return (
     <div className={`fr-input-group ${className || ''}`.trim()}>
       {label && (
-        <label className="fr-label" htmlFor={id}>
+        <label className="fr-label fr-mb-1w" htmlFor={id}>
           {label}
           {required && <span className="fr-text-default--error" aria-hidden="true"> *</span>}
         </label>
@@ -193,6 +199,8 @@ const ComboBox = (props) => {
                 const checked = isSelected(o.value);
                 const active = idx === activeIndex;
                 const optId = `${id || 'combo'}-opt-${String(o.value)}`;
+                const tooltip = String(o.tooltip || '').trim();
+                const tooltipId = tooltip ? `${optId}-tooltip` : null;
                 return (
                   <div
                     key={o.value}
@@ -219,12 +227,29 @@ const ComboBox = (props) => {
                           onClick={(e) => e.stopPropagation()}
                           onChange={() => selectOne(o)}
                         />
-                        <label className="fr-label" htmlFor={optId} onClick={(e) => e.stopPropagation()}>
-                          {o.label}
+                        <label
+                          className="fr-label"
+                          htmlFor={optId}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-describedby={tooltipId || undefined}
+                        >
+                          <span>{o.label}</span>
+                          {tooltipId && (
+                            <span className="fr-tooltip fr-placement" id={tooltipId} role="tooltip">
+                              {tooltip}
+                            </span>
+                          )}
                         </label>
                       </div>
                     ) : (
-                      <span>{o.label}</span>
+                      <>
+                        <span aria-describedby={tooltipId || undefined}>{o.label}</span>
+                        {tooltipId && (
+                          <span className="fr-tooltip fr-placement" id={tooltipId} role="tooltip">
+                            {tooltip}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                 );

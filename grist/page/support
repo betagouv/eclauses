@@ -29,7 +29,6 @@ const Component = () => {
   const SECTION_IDS = {
     FAQ: 'section-foire-aux-questions',
     VIDEOS: 'section-tutoriels-videos',
-    CONTACT: 'section-contact-support',
   };
 
   const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
@@ -151,6 +150,8 @@ const Component = () => {
     const vm = extractVimeoId(raw);
     if (vm) return { type: 'iframe', src: `https://player.vimeo.com/video/${vm}` };
 
+    if (/^https?:\/\/[^/]+\/videos\/embed\//i.test(raw)) return { type: 'iframe', src: raw };
+
     if (/\.(mp4|webm|ogg)(\?|#|$)/i.test(raw)) return { type: 'video', src: raw };
 
     if (/^https?:\/\//i.test(raw)) return { type: 'external', src: raw };
@@ -169,20 +170,11 @@ const Component = () => {
   const [activeCat, setActiveCat] = React.useState('all');
   const [openIds, setOpenIds] = React.useState(new Set());
   const [pendingFaqTarget, setPendingFaqTarget] = React.useState(null);
-
-  const [contactNom, setContactNom] = React.useState('');
-  const [contactEmail, setContactEmail] = React.useState('');
-  const [contactMessage, setContactMessage] = React.useState('');
-  const [contactFile, setContactFile] = React.useState(null);
-  const [contactSending, setContactSending] = React.useState(false);
-  const [contactMsg, setContactMsg] = React.useState(null);
-  const [contactErr, setContactErr] = React.useState(null);
+  const [activeVideo, setActiveVideo] = React.useState(null);
 
   const rootRef = React.useRef(null);
 
   const auth = gristAPI?.getAuth ? gristAPI.getAuth() : null;
-
-  const emailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || ''));
 
   React.useEffect(() => {
     let mounted = true;
@@ -336,6 +328,16 @@ const Component = () => {
     [filteredVideos]
   );
 
+  const videoHostLabel = (url) => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch (_) {
+      return '';
+    }
+  };
+
+  const closeVideo = () => setActiveVideo(null);
+
   const setCatAndHash = (slug) => {
     setActiveCat(slug);
     try {
@@ -412,62 +414,6 @@ const Component = () => {
     });
   }, [pendingFaqTarget, filteredQAs]);
 
-  const submitContact = async (e) => {
-    e.preventDefault();
-    setContactErr(null);
-    setContactMsg(null);
-
-    if (!contactNom.trim()) {
-      setContactErr('Le nom est requis.');
-      return;
-    }
-    if (!emailOk(contactEmail)) {
-      setContactErr('Adresse e-mail invalide.');
-      return;
-    }
-    if (!contactMessage.trim()) {
-      setContactErr('Le message est requis.');
-      return;
-    }
-
-    const webhookUrl = gristAPI.getEnv ? gristAPI.getEnv('N8N_SUPPORT_URL') : '';
-    if (!webhookUrl) {
-      setContactErr('Configuration manquante : N8N_SUPPORT_URL.');
-      return;
-    }
-
-    try {
-      setContactSending(true);
-
-      const fd = new FormData();
-      fd.append('nom', contactNom.trim());
-      fd.append('email', contactEmail.trim());
-      fd.append('message', contactMessage.trim());
-      fd.append('source', 'support-page');
-      if (contactFile) fd.append('piece_jointe', contactFile, contactFile.name || 'piece_jointe');
-
-      const res = await fetch(webhookUrl, {
-        method: 'POST',
-        body: fd,
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '');
-        throw new Error(txt || `Webhook en erreur (${res.status}).`);
-      }
-
-      setContactNom('');
-      setContactEmail('');
-      setContactMessage('');
-      setContactFile(null);
-      setContactMsg('Votre demande a bien été envoyée au support.');
-    } catch (error) {
-      setContactErr(error?.message || "Impossible d'envoyer le message au support.");
-    } finally {
-      setContactSending(false);
-    }
-  };
-
   if (loading) {
     return (
       <section className="fr-container fr-my-6w">
@@ -490,10 +436,23 @@ const Component = () => {
   return (
     <main ref={rootRef} className="fr-container fr-my-6w">
       <header className="fr-mb-4w">
-        <h1 className="fr-h3 fr-mb-1w">Support</h1>
-        <p className="fr-text--sm fr-text-mention--grey">
-          Contactez le support, consultez la FAQ, ou regardez les tutoriels vidéo.
-        </p>
+        <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
+          <div className="fr-col">
+            <h1 className="fr-h3 fr-mb-1w">Centre d'aide</h1>
+            <p className="fr-text--sm fr-text-mention--grey">
+              Consultez la FAQ ou regardez les tutoriels vidéo.
+            </p>
+          </div>
+          <div className="fr-col-auto">
+            <button
+              className="fr-btn fr-icon-mail-line fr-btn--icon-left"
+              type="button"
+              onClick={() => gristAPI?.navigate && gristAPI.navigate('support-contact')}
+            >
+              Contacter le support
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="fr-grid-row fr-grid-row--gutters">
@@ -508,9 +467,6 @@ const Component = () => {
                   </li>
                   <li className="fr-sidemenu__item">
                     <a className="fr-sidemenu__link" href={`#${SECTION_IDS.VIDEOS}`}>Tutoriels vidéos</a>
-                  </li>
-                  <li className="fr-sidemenu__item">
-                    <a className="fr-sidemenu__link" href={`#${SECTION_IDS.CONTACT}`}>Contacter le support</a>
                   </li>
                 </ul>
               </div>
@@ -605,23 +561,22 @@ const Component = () => {
             ) : (
               <div className="fr-grid-row fr-grid-row--gutters">
                 {videosWithPlayer.map((video) => (
-                  <div key={video.id} className="fr-col-12 fr-col-lg-6">
-                    <article className="fr-card fr-card--no-arrow fr-card--shadow">
+                  <div key={video.id} className="fr-col-12">
+                    <article className="fr-card fr-card--horizontal fr-card--no-arrow">
                       <div className="fr-card__body">
                         <div className="fr-card__content">
-                          <p className="fr-card__title fr-h6">{video.label}</p>
+                          <h3 className="fr-card__title fr-h6">{video.label}</h3>
                           {video.description && <p className="fr-card__desc fr-text--sm">{video.description}</p>}
-                          {video.author && <p className="fr-text--xs fr-text-mention--grey">Par {video.author}</p>}
-
-                          <div className="fr-responsive-vid" style={{ background: '#f6f6f6', borderRadius: '0.5rem', overflow: 'hidden' }}>
-                              <iframe
-                                title={video.label || 'Tutoriel vidéo'}
-                                src={video.player.src}
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                style={{ height: '100%', border: 0 }}
-                              />
-                          </div>
+                        </div>
+                        <div className="fr-card__footer">
+                                <button
+                                  className="fr-btn fr-icon-play-circle-line fr-btn--icon-left"
+                                  type="button"
+                                  onClick={() => setActiveVideo(video)}
+                                  disabled={video.player.type === 'none'}
+                                >
+                                  Lire la vidéo
+                                </button>
                         </div>
                       </div>
                     </article>
@@ -631,76 +586,62 @@ const Component = () => {
             )}
           </section>
 
-          <section id={SECTION_IDS.CONTACT} className="fr-mb-6w">
-            <h2 className="fr-h4 fr-mb-2w">Contacter le support</h2>
-
-            {contactMsg && (
-              <div className="fr-alert fr-alert--success fr-mb-2w">
-                <p>{contactMsg}</p>
-              </div>
-            )}
-            {contactErr && (
-              <div className="fr-alert fr-alert--error fr-mb-2w">
-                <p>{contactErr}</p>
-              </div>
-            )}
-
-            <form onSubmit={submitContact}>
-              <div className="fr-input-group">
-                <label className="fr-label" htmlFor="support-nom">Nom</label>
-                <input
-                  id="support-nom"
-                  className="fr-input"
-                  type="text"
-                  value={contactNom}
-                  onChange={(e) => setContactNom(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="fr-input-group">
-                <label className="fr-label" htmlFor="support-email">Email</label>
-                <input
-                  id="support-email"
-                  className="fr-input"
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div className="fr-input-group">
-                <label className="fr-label" htmlFor="support-message">Message</label>
-                <textarea
-                  id="support-message"
-                  className="fr-input"
-                  rows="6"
-                  value={contactMessage}
-                  onChange={(e) => setContactMessage(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="fr-upload-group">
-                <label className="fr-label" htmlFor="support-piece-jointe">Pièce jointe (optionnel)</label>
-                <input
-                  id="support-piece-jointe"
-                  className="fr-upload"
-                  type="file"
-                  onChange={(e) => setContactFile((e.target.files && e.target.files[0]) || null)}
-                />
-              </div>
-
-              <div className="fr-btns-group fr-btns-group--inline fr-mt-2w">
-                <button className="fr-btn" type="submit" disabled={contactSending}>
-                  {contactSending ? 'Envoi…' : 'Envoyer au support'}
-                </button>
-              </div>
-            </form>
-          </section>
         </div>
       </div>
+
+      {activeVideo && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="video-modal-title"
+          className="fr-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,.45)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={closeVideo}
+        >
+          <div
+            className="fr-container fr-container--fluid"
+            style={{ maxWidth: 960, width: '100%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="fr-card fr-p-3w" style={{ background: 'var(--background-default-grey,#fff)' }}>
+              <div className="fr-grid-row fr-grid-row--middle fr-mb-2w">
+                <div className="fr-col">
+                  <h2 id="video-modal-title" className="fr-h5 fr-mb-0">{activeVideo.label}</h2>
+                </div>
+                <div className="fr-col-auto">
+                  <button className="fr-btn fr-btn--tertiary-no-outline" type="button" onClick={closeVideo}>
+                    Fermer
+                  </button>
+                </div>
+              </div>
+
+              <div className="fr-responsive-vid" style={{ background: '#000', overflow: 'hidden' }}>
+                {activeVideo.player.type === 'iframe' && (
+                  <iframe
+                    title={activeVideo.label || 'Tutoriel vidéo'}
+                    src={activeVideo.player.src}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    style={{ width: '100%', height: '100%', border: 0 }}
+                  />
+                )}
+                {activeVideo.player.type === 'video' && (
+                  <video src={activeVideo.player.src} controls style={{ width: '100%', height: '100%' }} />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

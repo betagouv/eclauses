@@ -1,17 +1,14 @@
 const Component = () => {
-  const lastUpdate = new Date().toLocaleDateString('fr-FR');
-
+  const lastUpdate = '24 juin 2026';
   const toc = [
-    { id: 'intro', label: 'Mention d’information (art. 14 RGPD)' },
-    { id: 'finalite', label: 'Finalité du traitement' },
+    { id: 'responsable', label: 'Responsable de traitement' },
+    { id: 'finalites', label: 'Finalités' },
+    { id: 'donnees', label: 'Données traitées' },
     { id: 'base-legale', label: 'Base légale' },
-    { id: 'categories', label: 'Catégories de données' },
-    { id: 'destinataires', label: 'Destinataires' },
-    { id: 'origine', label: 'Origine des données' },
-    { id: 'duree', label: 'Durée de conservation' },
+    { id: 'conservation', label: 'Durées de conservation' },
     { id: 'droits', label: 'Vos droits' },
-    { id: 'contact', label: 'Contact DPO' },
-    { id: 'cnil', label: 'Réclamation CNIL' },
+    { id: 'acces', label: 'Accès aux données' },
+    { id: 'sous-traitants', label: 'Sous-traitants' },
   ];
 
   return (
@@ -19,7 +16,7 @@ const Component = () => {
       <header className="fr-mb-4w">
         <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
           <div className="fr-col">
-            <h1 className="fr-h2">Données personnelles</h1>
+            <h1 className="fr-h2">Politique de confidentialité</h1>
             <p className="fr-text--sm fr-text-mention--grey">Dernière mise à jour : {lastUpdate}</p>
           </div>
           <div className="fr-col-auto">
@@ -31,7 +28,6 @@ const Component = () => {
       </header>
 
       <div className="fr-grid-row fr-grid-row--gutters">
-        {/* Sommaire */}
         <aside className="fr-col-12 fr-col-md-4">
           <nav className="fr-sidemenu fr-sidemenu--sticky-full-height" aria-label="Sommaire Données personnelles">
             <div className="fr-sidemenu__inner">
@@ -49,96 +45,159 @@ const Component = () => {
           </nav>
         </aside>
 
-        {/* Contenu */}
         <div className="fr-col-12 fr-col-md-8">
-          <section id="intro" className="fr-mb-6w">
-            <h2 className="fr-h3">Mention d’information RGPD (article 14) — Eclauses</h2>
+          <section id="responsable" className="fr-mb-6w">
+            <h2 className="fr-h3">Qui est responsable de traitement ?</h2>
             <p>
-              Nous vous informons que vos données (prénom, nom, courriel, numéro de téléphone professionnel et les informations
-              relatives à votre formation et votre profession) ont été collectées par le ministère de la Culture, par le biais de la
-              mission ministérielle des achats (MMA) sur la base de sa mission d’intérêt public conformément à l’article 6-1 e) du RGPD.
+              Eclauses est un produit numérique développé au sein de l'Atelier numérique du ministère de la Culture, sous la responsabilité de la mission ministérielle des achats (MMA).
+            </p>
+            <p>
+              Son objectif est de faciliter la mise en relation entre candidats à des marchés publics et bénéficiaires d'une clause sociale portée par le ministère de la Culture.
             </p>
           </section>
 
-          <section id="finalite" className="fr-mb-6w">
-            <h2 className="fr-h3">Finalité du traitement</h2>
+          <section id="finalites" className="fr-mb-6w">
+            <h2 className="fr-h3">Pourquoi collectons-nous des données à caractère personnel ?</h2>
             <p>
-              L’objectif de cette collecte est d’accompagner les jeunes diplômés en conservation-restauration d'œuvres d’art dans leur
-              insertion professionnelle, notamment en constituant un annuaire partagé à la suite de la mise à jour de votre fiche annuaire.
+              Pour mettre en relation des candidats à des marchés publics et des bénéficiaires de clauses sociales portées par le ministère de la Culture, des données à caractère personnel sont collectées pour :
+            </p>
+            <ul className="fr-list">
+              <li>Gérer l'inscription et la connexion des candidats et des bénéficiaires sur Eclauses via leur compte utilisateur ;</li>
+              <li>Constituer un annuaire des bénéficiaires qui partagent des clauses sociales communes ;</li>
+              <li>Permettre aux bénéficiaires de manifester leur intérêt pour des marchés publics couverts par une clause sociale ;</li>
+              <li>Permettre aux candidats à des marchés publics d'identifier facilement les bénéficiaires répondant aux exigences de la clause sociale ;</li>
+              <li>Permettre aux titulaires des marchés publics de déclarer les bénéficiaires avec lesquels ils souhaitent travailler pour mettre en œuvre leurs clauses sociales.</li>
+            </ul>
+          </section>
+
+          <section id="donnees" className="fr-mb-6w">
+            <h2 className="fr-h3">Quelles sont les données que nous traitons ?</h2>
+            <ul className="fr-list">
+              <li><strong>Données relatives au compte utilisateur</strong> : nom, prénom, formation, adresse courriel ;</li>
+              <li><strong>Données relatives à l'annuaire</strong> : nom, prénom, adresse courriel, numéro de téléphone, formation, année de diplôme, spécialité, département de résidence, région de mobilité, intitulé du mémoire, curriculum vitae ;</li>
+              <li><strong>Données relatives au contact du support</strong> : nom, adresse courriel, champs libres ;</li>
+              <li><strong>Données relatives à la date de dernière connexion.</strong></li>
+            </ul>
+            <p>
+              Pour la mise en ligne sur l'annuaire, seules les données des néo-diplômés ayant consenti à figurer dans l'annuaire sont partagées.
             </p>
           </section>
 
           <section id="base-legale" className="fr-mb-6w">
-            <h2 className="fr-h3">Base légale</h2>
-            <p>Mission d’intérêt public (article 6-1 e) du RGPD).</p>
-          </section>
-
-          <section id="categories" className="fr-mb-6w">
-            <h2 className="fr-h3">Catégories de données traitées</h2>
+            <h2 className="fr-h3">Qu'est-ce qui nous autorise à traiter ces données ?</h2>
+            <p>Eclauses traite des données à caractère personnel en se basant sur :</p>
             <ul className="fr-list">
-              <li>Prénom et nom</li>
-              <li>Courriel</li>
-              <li>Numéro de téléphone professionnel</li>
-              <li>Informations relatives à la formation et à la profession</li>
+              <li>L'exécution d'une mission d'intérêt public ou relevant de l'exercice de l'autorité publique dont est investi le responsable de traitement au sens de l'article 6-1 e) du RGPD.</li>
             </ul>
-          </section>
-
-          <section id="destinataires" className="fr-mb-6w">
-            <h2 className="fr-h3">Destinataires des données</h2>
             <p>
-              Vos données sont seulement accessibles aux professionnels de la conservation-restauration qui souhaitent répondre
-              à des marchés publics et aux agents du ministère de la Culture.
+              Cette mission d'intérêt public se traduit par le décret n° 2025-1016 du 29 octobre 2025 relatif aux attributions du ministre de la Culture et l'arrêté du 21 mars 2019 relatif aux achats du ministère de la Culture.
             </p>
           </section>
 
-          <section id="origine" className="fr-mb-6w">
-            <h2 className="fr-h3">Origine des données</h2>
-            <p>
-              Elles nous ont été transmises par les formations publiques en conservation-restauration d'œuvres d’art.
-            </p>
-          </section>
-
-          <section id="duree" className="fr-mb-6w">
-            <h2 className="fr-h3">Durée de conservation</h2>
-            <p>Vos données sont conservées pendant la durée de votre carrière professionnelle.</p>
+          <section id="conservation" className="fr-mb-6w">
+            <h2 className="fr-h3">Pendant combien de temps conservons-nous ces données ?</h2>
+            <div className="fr-table fr-table--bordered fr-table--layout-fixed">
+              <table>
+                <caption>Durées de conservation par catégorie de données</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Catégories de données</th>
+                    <th scope="col">Durée de la conservation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Données relatives au compte utilisateur (candidats)</th>
+                    <td>5 ans à partir de la dernière connexion</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives au compte utilisateur (bénéficiaires)</th>
+                    <td>5 ans après la date de diplomation</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives à l'annuaire</th>
+                    <td>10 ans après la date de diplomation</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives au contact du support</th>
+                    <td>1 an à partir de la réception de la demande</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives à date de dernière connexion</th>
+                    <td>5 ans à partir de la date de dernière connexion</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section id="droits" className="fr-mb-6w">
-            <h2 className="fr-h3">Vos droits</h2>
+            <h2 className="fr-h3">Quels droits avez-vous ?</h2>
+            <p>Vous disposez :</p>
+            <ul className="fr-list">
+              <li>D'un droit d'information et d'un droit d'accès à vos données ;</li>
+              <li>D'un droit de rectification ;</li>
+              <li>D'un droit d'opposition ;</li>
+              <li>D'un droit à la limitation du traitement.</li>
+            </ul>
             <p>
-              Vous disposez d’un droit d’information, d’accès, de rectification, d’opposition et de limitation du traitement.
-              Vous pouvez exercer vos droits, notamment d’opposition, en contactant le délégué à la protection des données
-              du ministère de la Culture.
-            </p>
-          </section>
-
-          <section id="contact" className="fr-mb-6w">
-            <h2 className="fr-h3">Contact DPO</h2>
-            <p>
-              Adresse de contact :{' '}
+              Pour les exercer, contactez-nous à :{' '}
               <a href="mailto:delegue-protection-donnees@culture.gouv.fr">
                 delegue-protection-donnees@culture.gouv.fr
               </a>
             </p>
-          </section>
-
-          <section id="cnil" className="fr-mb-6w">
-            <h2 className="fr-h3">Réclamation auprès de la CNIL</h2>
             <p>
-              Si vous estimez que vos droits ne sont pas respectés, vous pouvez à tout moment introduire une réclamation auprès de la CNIL.
-              <br />
-              Site de la CNIL :{' '}
-              <a href="https://www.cnil.fr" target="_blank" rel="noopener">
-                www.cnil.fr
+              Puisque ce sont des droits personnels, nous ne traiterons votre demande que si nous sommes en mesure de vous identifier. Dans le cas où nous ne parvenons pas à vous identifier, nous pouvons être amenés à vous demander une preuve de votre identité.
+            </p>
+            <p>
+              Pour vous aider dans votre démarche, vous trouverez un modèle de courrier élaboré par la CNIL ici :{' '}
+              <a href="https://www.cnil.fr/fr/modele/courrier/exercer-son-droit-dacces" target="_blank" rel="noopener">
+                cnil.fr/fr/modele/courrier/exercer-son-droit-dacces
               </a>
             </p>
+            <p>Nous nous engageons à vous répondre dans un délai raisonnable qui ne saurait dépasser 1 mois à compter de la réception de votre demande.</p>
           </section>
 
-          <div className="fr-callout fr-mt-6w">
-            <p className="fr-callout__text">
-              Cette page reprend la mention d’information transmise par le ministère de la Culture dans le cadre du service Eclauses.
+          <section id="acces" className="fr-mb-6w">
+            <h2 className="fr-h3">Qui va avoir accès à ces données ?</h2>
+            <p>Les accès aux données sont strictement encadrés et juridiquement justifiés. Les personnes suivantes vont avoir accès aux données :</p>
+            <ul className="fr-list">
+              <li>Pour les données de l'annuaire, elles sont uniquement accessibles aux autres néo-diplômés, aux professionnels de la conservation-restauration qui souhaitent répondre à des marchés publics, aux agents du ministère de la Culture et de ses opérateurs.</li>
+              <li>Pour les données d'identification et de connexion : seuls les agents du ministère de la Culture et ses opérateurs y ont accès.</li>
+            </ul>
+          </section>
+
+          <section id="sous-traitants" className="fr-mb-6w">
+            <h2 className="fr-h3">Qui nous aide à traiter les données ?</h2>
+            <p>
+              Certaines des données sont envoyées à d'autres acteurs, appelés sous-traitants de données, pour qu'ils nous aident à les manipuler. Nous nous assurons qu'ils respectent strictement le RGPD et qu'ils apportent des garanties suffisantes en matière de sécurité.
             </p>
-          </div>
+            <div className="fr-table fr-table--bordered fr-table--layout-fixed">
+              <table>
+                <caption>Sous-traitants de données</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Sous-traitant</th>
+                    <th scope="col">Pays destinataire</th>
+                    <th scope="col">Traitement réalisé</th>
+                    <th scope="col">Garanties</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Grist Gouv - tableur-base de données open source</th>
+                    <td>France</td>
+                    <td>Hébergement</td>
+                    <td>
+                      <a href="https://docs.numerique.gouv.fr/docs/3c7b322e-1840-419a-ac05-6bc2843ae7dd/" target="_blank" rel="noopener">
+                        Documentation DINUM
+                      </a>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
           <div className="fr-mt-6w">
             <a

@@ -12,7 +12,14 @@ const Component = () => {
 
   const C = {
     INTITULE: 'Intitule_Lot',
+    INTITULE_MARCHE: 'Intitule_du_marche',
+    INTITULE_LOT: 'Intitule_du_lot',
     INTITULE_PROPRE: 'Intitule_propre',
+    LOT: 'Numero_de_lot',
+    PARENT: 'Marche_parent',
+    LOTS: 'Lots',
+    EST_LOT: 'Est_lot',
+    STATUS: 'Statut',
     AA: 'Acheteur',
     PUB: 'Date_de_publication',
     DLRO: 'Date_Limite_de_Remise_des_Offres',
@@ -72,7 +79,7 @@ const Component = () => {
   }
   function toOptions(rows) {
     const key = pickLabelField(rows);
-    return (rows || []).map(r => ({ value: r.id, label: String(r[key] ?? r.id) }));
+    return (rows || []).map(r => ({ value: r.id, label: String(r[key] ?? r.id), tooltip: r.Tooltip || '' }));
   }
   function labelFrom(options, id) {
     const o = options.find(o => o.value === id);
@@ -137,6 +144,91 @@ const Component = () => {
   const optsAcheteurs = React.useMemo(() => toOptions(acheteurs), [acheteurs]);
   const optsClauses   = React.useMemo(() => toOptions(clauses),   [clauses]);
   const validClauseIdSet = React.useMemo(() => new Set((clauses || []).map(r => r.id)), [clauses]);
+  const rowById = React.useMemo(() => {
+    const map = new Map();
+    (marches || []).forEach((row) => map.set(row.id, row));
+    return map;
+  }, [marches]);
+
+  const isLot = React.useCallback((row) => {
+    if (!row) return false;
+    const estLot = row[C.EST_LOT];
+    if (estLot === true || estLot === 1 || estLot === '1' || String(estLot).toLowerCase() === 'true') return true;
+    return row[C.PARENT] != null && row[C.PARENT] !== '';
+  }, []);
+
+  const getLotsForParent = React.useCallback((row) => {
+    if (!row) return [];
+    const ids = asArray(row[C.LOTS]).filter(isNum);
+    if (ids.length) return ids.map((id) => rowById.get(id)).filter(Boolean);
+    return (marches || []).filter((m) => Number(m[C.PARENT]) === Number(row.id));
+  }, [marches, rowById]);
+
+  const expandToLotIds = React.useCallback((ids) => {
+    const out = new Set();
+    asArray(ids).filter(isNum).forEach((id) => {
+      const row = rowById.get(id);
+      if (!row) return;
+      const childLots = isLot(row) ? [] : getLotsForParent(row);
+      if (isLot(row) || !childLots.length) {
+        out.add(row.id);
+        return;
+      }
+      childLots.forEach((lot) => out.add(lot.id));
+    });
+    return out;
+  }, [rowById, isLot, getLotsForParent]);
+
+  const lots = React.useMemo(() => {
+    return (marches || []).filter((row) => isLot(row) || getLotsForParent(row).length === 0);
+  }, [marches, isLot, getLotsForParent]);
+
+  const parentForLot = React.useCallback((row) => {
+    if (!row || !isLot(row)) return null;
+    return rowById.get(row[C.PARENT]) || null;
+  }, [rowById, isLot]);
+
+  const valueFor = React.useCallback((row, col) => {
+    const value = row?.[col];
+    if (value != null && value !== '') return value;
+    const parent = parentForLot(row);
+    return parent?.[col];
+  }, [parentForLot]);
+
+  const parentTitle = React.useCallback((row) => {
+    const parent = parentForLot(row);
+    return parent?.[C.INTITULE_PROPRE]
+      || parent?.[C.INTITULE_MARCHE]
+      || parent?.[C.INTITULE]
+      || row?.[C.INTITULE_PROPRE]
+      || row?.[C.INTITULE_MARCHE]
+      || row?.[C.INTITULE]
+      || 'Marché non renseigné';
+  }, [parentForLot]);
+
+  const lotTitle = React.useCallback((row) => {
+    if (!row) return '—';
+    const lotNo = String(row[C.LOT] || '').trim();
+    const lotName = row[C.INTITULE_LOT] || row[C.INTITULE] || row[C.INTITULE_PROPRE] || `Lot #${row.id}`;
+    return lotNo ? `Lot ${lotNo} - ${lotName}` : lotName;
+  }, []);
+
+  const buildInterestMaps = React.useCallback((rows) => {
+    const idx = new Map();
+    (rows || []).forEach((r) => {
+      const marcheId = r[INTERET.MARCHE];
+      if (!isNum(marcheId)) return;
+      const row = rowById.get(marcheId);
+      if (!row) return;
+      const childLots = isLot(row) ? [] : getLotsForParent(row);
+      if (isLot(row) || !childLots.length) {
+        idx.set(row.id, r.id);
+        return;
+      }
+      childLots.forEach((lot) => idx.set(lot.id, r.id));
+    });
+    return { idx, set: new Set([...idx.keys()]) };
+  }, [rowById, isLot, getLotsForParent]);
 
   // Map
   const mapRef = React.useRef(null);
@@ -150,7 +242,7 @@ const Component = () => {
     }
   }, []);
 
-  // Modale marché
+  // Modale lot
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalRow, setModalRow]   = React.useState(null);
 
@@ -243,18 +335,17 @@ const Component = () => {
     }
     if (interestMode === 'table') {
       const mine = (interestRows || []).filter(r => r[INTERET.BENEF] === currentBenefId);
-      const idx = new Map();
-      mine.forEach(r => { if (isNum(r[INTERET.MARCHE])) idx.set(r[INTERET.MARCHE], r.id); });
+      const { idx, set } = buildInterestMaps(mine);
       setInterestIdx(idx);
-      setInterestedSet(new Set([...idx.keys()]));
+      setInterestedSet(set);
     } else {
       const set = new Set((marches || [])
         .filter(m => asArray(m[C.SUIVI]).includes('Intéressé'))
         .map(m => m.id));
-      setInterestedSet(set);
+      setInterestedSet(expandToLotIds([...set]));
       setInterestIdx(new Map());
     }
-  }, [interestRows, interestMode, currentBenefId, marches]);
+  }, [interestRows, interestMode, currentBenefId, marches, expandToLotIds, buildInterestMaps]);
 
   // Combobox géré par composant partagé
 
@@ -264,7 +355,7 @@ const Component = () => {
     const clauseSet = new Set(benefClauseIds);
 
     function actif(row) {
-      const dReal = parseDate(row[C.DLRO]);
+      const dReal = parseDate(valueFor(row, C.DLRO));
       if (!dReal) return true;
       return dReal >= today;
     }
@@ -273,13 +364,19 @@ const Component = () => {
       const id = row[C.CLAUSE];
       return clauseSet.size && id != null && clauseSet.has(id);
     }
+    function statusOk(row) {
+      const status = String(row[C.STATUS] || '');
+      return !status || status === 'En attente de notification';
+    }
 
     function matchSearch(row) {
       if (!search) return true;
-      const aa = labelFrom(optsAcheteurs, row[C.AA]);
+      const aa = labelFrom(optsAcheteurs, valueFor(row, C.AA));
+      const parent = parentTitle(row);
+      const lot = lotTitle(row);
       const propre = row[C.INTITULE_PROPRE] || '';
-      const adr = row[C.ADR_EXEC] || '';
-      const base = row[C.INTITULE_PROPRE] || '';
+      const adr = valueFor(row, C.ADR_EXEC) || '';
+      const base = [parent, lot, propre, adr, aa].join(' ');
       return includesI(base, search) || includesI(aa, search) || includesI(propre, search) || includesI(adr, search);
     }
     function specOk(row) {
@@ -291,19 +388,20 @@ const Component = () => {
       return !showOnlyFav || interestedSet.has(row.id);
     }
 
-    return (marches || [])
+    return lots
       .filter(actif)
+      .filter(statusOk)
       .filter(clauseOk)
       .filter(matchSearch)
       .filter(specOk)
       .filter(favOk);
-  }, [marches, benefClauseIds, search, optsAcheteurs, showOnlyFav, interestedSet, selectedSpecIds]);
+  }, [lots, benefClauseIds, search, optsAcheteurs, showOnlyFav, interestedSet, selectedSpecIds, parentTitle, lotTitle, valueFor]);
 
   // Tri
   const sorted = React.useMemo(() => {
     const arr = [...filtered];
     const byDate = (col, asc = true) => (a, b) => {
-      const da = parseDate(a[col]); const db = parseDate(b[col]);
+      const da = parseDate(valueFor(a, col)); const db = parseDate(valueFor(b, col));
       const ta = da ? da.getTime() : 0; const tb = db ? db.getTime() : 0;
       return asc ? (ta - tb) : (tb - ta);
     };
@@ -313,16 +411,16 @@ const Component = () => {
       case 'realAsc':    return arr.sort(byDate(C.EXEC_END, true));
       case 'realDesc':   return arr.sort(byDate(C.EXEC_END, false));
       case 'aaAsc':      return arr.sort((a,b) =>
-        labelFrom(optsAcheteurs, a[C.AA]).localeCompare(labelFrom(optsAcheteurs, b[C.AA]), 'fr', { sensitivity:'base' })
+        labelFrom(optsAcheteurs, valueFor(a, C.AA)).localeCompare(labelFrom(optsAcheteurs, valueFor(b, C.AA)), 'fr', { sensitivity:'base' })
       );
       case 'titleAsc':   return arr.sort((a,b) => {
-        const ta = (a[C.INTITULE_PROPRE] || a[C.INTITULE] || '').toString();
-        const tb = (b[C.INTITULE_PROPRE] || b[C.INTITULE] || '').toString();
+        const ta = `${parentTitle(a)} ${lotTitle(a)}`;
+        const tb = `${parentTitle(b)} ${lotTitle(b)}`;
         return ta.localeCompare(tb, 'fr', { sensitivity:'base' });
       });
       default: return arr;
     }
-  }, [filtered, tri, optsAcheteurs]);
+  }, [filtered, tri, optsAcheteurs, parentTitle, lotTitle, valueFor]);
 
   // Sync Carte
   React.useEffect(() => {
@@ -368,9 +466,9 @@ const Component = () => {
       map.setView([46.603354, 1.888334], 6);
     }
 
-    // Afficher un avertissement si des marchés n'ont pas de coordonnées
+    // Afficher un avertissement si des marchés/lots n'ont pas de coordonnées
     if (skippedCount > 0) {
-      console.warn(`⚠️ ${skippedCount} marché(s) ignoré(s) : coordonnées GPS manquantes ou invalides`);
+      console.warn(`${skippedCount} marché(s) ou lot(s) ignoré(s) : coordonnées GPS manquantes ou invalides`);
     }
 
     requestAnimationFrame(() => { try { map.invalidateSize(true); } catch(_) {} });
@@ -383,7 +481,7 @@ const Component = () => {
     }
   }, [tab]);
 
-  // Modale marché
+  // Modale lot
   function openModal(row) { setModalRow(row); setModalOpen(true); }
   function closeModal()   { setModalOpen(false); setModalRow(null); }
 
@@ -396,24 +494,24 @@ const Component = () => {
         if (set.has(marcheId)) {
           const recId = idx.get(marcheId);
           if (recId != null) await gristAPI.deleteRecord(T.INTERETS, recId);
-          idx.delete(marcheId);
-          set.delete(marcheId);
-
-          setInterestIdx(idx);
-          setInterestedSet(set);
+          let interets = await gristAPI.getData(T.INTERETS);
+          if (!Array.isArray(interets)) interets = [];
+          const mine = (interets || []).filter(r => r[INTERET.BENEF] === currentBenefId);
+          const next = buildInterestMaps(mine);
+          setInterestIdx(next.idx);
+          setInterestedSet(next.set);
         } else {
           await gristAPI.addRecord(T.INTERETS, {
             [INTERET.MARCHE]: marcheId,
             [INTERET.BENEF]: currentBenefId,
           });
-          interets = await gristAPI.getData(T.INTERETS);
+          let interets = await gristAPI.getData(T.INTERETS);
           if (!Array.isArray(interets)) interets = [];
 
           const mine = (interets || []).filter(r => r[INTERET.BENEF] === currentBenefId);
-          const idx = new Map();
-          mine.forEach(r => { if (isNum(r[INTERET.MARCHE])) idx.set(r[INTERET.MARCHE], r.id); });
+          const { idx, set } = buildInterestMaps(mine);
           setInterestIdx(idx);
-          setInterestedSet(new Set([...idx.keys()]));
+          setInterestedSet(set);
         }
       
     } catch (e) {
@@ -505,7 +603,7 @@ const Component = () => {
       </div>
 
       <div className="fr-alert fr-alert--info fr-mb-3w">
-        <p><strong>{count}</strong> marché(s) actif(s) correspondant à vos critères.</p>
+        <p><strong>{count}</strong> marché(s) ou lot(s) actif(s) correspondant à vos critères.</p>
       </div>
 
       {/* Liste + Carte via onglets */}
@@ -547,15 +645,16 @@ const Component = () => {
         >
           {count === 0 ? (
             <div className="fr-callout">
-              <p className="fr-callout__text">Aucun marché actif ne correspond à vos critères.</p>
+              <p className="fr-callout__text">Aucun marché ou lot actif ne correspond à vos critères.</p>
             </div>
           ) : (
             <div className="fr-grid-row fr-grid-row--gutters">
               {sorted.map((row) => {
                 const id = row.id;
-                const aaLabel = labelFrom(optsAcheteurs, row[C.AA]);
-                const title = row[C.INTITULE_PROPRE];
-                const dCand = parseDate(row[C.DLRO]);
+                const aaLabel = labelFrom(optsAcheteurs, valueFor(row, C.AA));
+                const title = lotTitle(row);
+                const parent = parentTitle(row);
+                const dCand = parseDate(valueFor(row, C.DLRO));
                 const leftCand = daysLeft(dCand);
                 const isFav = interestedSet.has(id);
 
@@ -575,6 +674,7 @@ const Component = () => {
                                 {title}
                               </a>
                             </h2>
+                            <p className="fr-text--sm fr-mb-1w"><strong>Marché :</strong> {parent}</p>
                             <p className="fr-text">{aaLabel}</p>
                           </div>
                           <div className="fr-col-auto fr-pt-2w">
@@ -629,11 +729,11 @@ const Component = () => {
           <div style={{height: '520px', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border-default-grey)'}}>
             <div ref={mapHostRef} style={{height: '100%', width: '100%'}} />
           </div>
-          <p className="fr-hint-text fr-mt-1w">Cliquez sur un marqueur pour voir les détails du marché.</p>
+          <p className="fr-hint-text fr-mt-1w">Cliquez sur un marqueur pour voir les détails du marché ou du lot.</p>
         </div>
       </div>
 
-      {/* Modale marché */}
+      {/* Modale marché/lot */}
       {modalOpen && modalRow && (
         <div role="dialog" aria-modal="true" aria-labelledby="marche-modal-title"
              className="fr-overlay" style={{
@@ -651,7 +751,7 @@ const Component = () => {
               <div className="fr-grid-row fr-grid-row--middle fr-mb-2w">
                 <div className="fr-col">
                   <h2 id="marche-modal-title" className="fr-h4 fr-mb-0">
-                    {modalRow[C.INTITULE_PROPRE] || modalRow[C.INTITULE] || `Marché #${modalRow.id}`}
+                    {lotTitle(modalRow)}
                   </h2>
                 </div>
                 <div className="fr-col-auto">
@@ -662,16 +762,17 @@ const Component = () => {
               </div>
 
               <dl className="fr-description-list fr-mb-2w">
-                <dt className="fr-text--bold">Pouvoir adjudicateur</dt><dd>{labelFrom(optsAcheteurs, modalRow[C.AA])}</dd>
-                <dt className="fr-text--bold">Adresse d'exécution</dt><dd>{modalRow[C.ADR_EXEC] || '—'}</dd>
+                <dt className="fr-text--bold">{isLot(modalRow) ? 'Marché parent' : 'Marché'}</dt><dd>{parentTitle(modalRow)}</dd>
+                <dt className="fr-text--bold">Pouvoir adjudicateur</dt><dd>{labelFrom(optsAcheteurs, valueFor(modalRow, C.AA))}</dd>
+                <dt className="fr-text--bold">Adresse d'exécution</dt><dd>{valueFor(modalRow, C.ADR_EXEC) || '—'}</dd>
                 <dt className="fr-text--bold">Clause sociale</dt><dd>{labelFrom(optsClauses, modalRow[C.CLAUSE])}</dd>
-                <dt className="fr-text--bold">Publication</dt><dd>{formatDate(parseDate(modalRow[C.PUB]))}</dd>
-                <dt className="fr-text--bold">Date limite de remise des offres</dt><dd>{formatDate(parseDate(modalRow[C.DLRO]))}</dd>
-                <dt className="fr-text--bold">Fin d’exécution prévisionnelle</dt><dd>{formatDate(parseDate(modalRow[C.EXEC_END]))}</dd>
-                {modalRow[C.DOCS] ? (
+                <dt className="fr-text--bold">Publication</dt><dd>{formatDate(parseDate(valueFor(modalRow, C.PUB)))}</dd>
+                <dt className="fr-text--bold">Date limite de remise des offres</dt><dd>{formatDate(parseDate(valueFor(modalRow, C.DLRO)))}</dd>
+                <dt className="fr-text--bold">Fin d’exécution prévisionnelle</dt><dd>{formatDate(parseDate(valueFor(modalRow, C.EXEC_END)))}</dd>
+                {valueFor(modalRow, C.DOCS) ? (
                   <>
                     <dt className="fr-text--bold">Lien vers les documents de consultation</dt>
-                    <dd><a href={modalRow[C.DOCS]} target="_blank" rel="noopener noreferrer">{modalRow[C.DOCS]}</a></dd>
+                    <dd><a href={valueFor(modalRow, C.DOCS)} target="_blank" rel="noopener noreferrer">{valueFor(modalRow, C.DOCS)}</a></dd>
                   </>
                 ) : null}
                 <dt className="fr-text--bold">Spécialités</dt>

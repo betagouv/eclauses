@@ -1,14 +1,10 @@
 const Component = () => {
-  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
   // ===== Tables / Colonnes (strict) =====
   const T = {
     UA: 'Utilisateurs_Acheteurs',
     ACH: 'Acheteurs',
     M:  'Marches',
     C:  'Clauses_sociales',
-    SPECS: 'T0_Referentiel_Specialites',
-    DB: 'Declarations_Beneficiaires',
-    BEN: 'Beneficiaires',
     // INIT: 'InitLink',              // ← plus utilisé
     INV: 'Invitation_Titulaire',      // ← NOUVELLE TABLE
   };
@@ -20,7 +16,6 @@ const Component = () => {
     LOT: 'Numero_de_lot',
     ACHETEUR: 'Acheteur',
     CLAUSE: 'Clauses_sociales',
-    SPECS: 'Specialites_du_marche',
     ADR: 'Lieu_d_execution',
     PUB: 'Date_de_publication',
     DLRO: 'Date_Limite_de_Remise_des_Offres',
@@ -31,31 +26,17 @@ const Component = () => {
     INVIT: 'Invitation_Titulaire_Marche',
     LIEN_DOCS: 'Lien_vers_les_documents_de_consultation',
 
-    TITULAIRE: 'Titulaire',
-    BENEFICIAIRES: 'Beneficiaires',
     PARENT: 'Marche_parent',
     LOTS: 'Lots',
-    EST_LOT: 'Est_lot',
-    EST_PARENT: 'Est_marche_parent',
     STATUT_GLOBAL: 'Statut_global',
-    NB_LOTS: 'Nb_lots',
-    NB_LOTS_ECLAUSES: 'Nb_lots_eclauses',
-    NB_LOTS_DECL: 'Nb_lots_en_attente_declaration',
-    NB_LOTS_A_VALIDER: 'Nb_lots_a_valider',
     NB_LOTS_VALIDES: 'Nb_lots_valides',
-    TOUS_LOTS_VALIDES: 'Tous_lots_valides',
   };
   const INV = {
     MARCHE: 'Marche',
     LAST_REMINDER: 'Derniere_relance_le',
   };
 
-  const { toOptions, parseDate, formatDate, daysLeft } = gristAPI.helpers;
-  const toBool = (v) => {
-    if (v === true || v === 1 || v === '1') return true;
-    if (typeof v === 'string' && v.toLowerCase() === 'true') return true;
-    return false;
-  };
+  const { toOptions, parseDate, formatDate } = gristAPI.helpers;
 
   const ymd = (v) => {
     if (!v) return '';
@@ -78,14 +59,6 @@ const Component = () => {
   const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
   const emailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||''));  
   const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
-  const isBlank = (v) => String(v ?? '').trim() === '';
-  const toRefList = (v) => {
-    const ids = asArray(v)
-      .filter((x) => x !== 'L' && x != null && x !== '')
-      .map((x) => (typeof x === 'number' ? x : Number(x)))
-      .filter((x) => Number.isFinite(x));
-    return ids.length ? ['L', ...ids] : null;
-  };
   const formatDateOrDash = (v) => {
     const d = parseDate(v);
     return d ? formatDate(d) : '—';
@@ -100,19 +73,13 @@ const Component = () => {
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(null);
 
-  const [ua, setUA] = React.useState(null);
   const [org, setOrg] = React.useState(null);
   const [rows, setRows] = React.useState([]);
 
-  const [clauses, setClauses] = React.useState([]);
   const [optsClauses, setOptsClauses] = React.useState([]);
-  const [optsSpecs, setOptsSpecs] = React.useState([]);
-  const [declRows, setDeclRows] = React.useState([]);
-  const [benefRows, setBenefRows] = React.useState([]);
   const [invRows, setInvRows] = React.useState([]);
   const [msg, setMsg] = React.useState(null);
   const [copiedId, setCopiedId] = React.useState(null);
-  const [duplicatedId, setDuplicatedId] = React.useState(null);
   const [relancingId, setRelancingId] = React.useState(null);
   const [relancedId, setRelancedId] = React.useState(null);
 
@@ -120,54 +87,25 @@ const Component = () => {
   const [search, setSearch] = React.useState('');
   const [clauseFilter, setClauseFilter] = React.useState('');
 
-  // Création
-  const [newOpen, setNewOpen] = React.useState(false);
-  const [creating, setCreating] = React.useState(false);
-  const [newErrors, setNewErrors] = React.useState({});
-  const [newLots, setNewLots] = React.useState([
-    { [M.INTITULE_LOT]: '', [M.LOT]: '', [M.CLAUSE]: '', [M.SPECS]: [], [M.ADR]: '', [M.EXEC_END]: '' },
-  ]);
-  const [newForm, setNewForm] = React.useState({
-    [M.INTITULE]: '',
-    [M.LIEN_DOCS]: '',
-    [M.PUB]: '',
-    [M.DLRO]: '',
-    [M.DNOTPREV]: '',
-    [M.STATUS]: '',
-  });
-
-  // Édition (modale)
-  const [editingId, setEditingId] = React.useState(null);
-  const [editForm, setEditForm] = React.useState({});
-  const [savingId, setSavingId] = React.useState(null);
-  const [modalEditOpen, setModalEditOpen] = React.useState(false);
-  const [editErrors, setEditErrors] = React.useState({});
-  const [editNoLot, setEditNoLot] = React.useState(false);
-  const [editingKind, setEditingKind] = React.useState('parent');
-  const [lotCreateFor, setLotCreateFor] = React.useState(null);
-
   // Invitation (modale)
   const [inviteFor, setInviteFor] = React.useState(null);
+  const [inviteForRow, setInviteForRow] = React.useState(null);
 
   const [hasInvited, setHasInvited] = React.useState(null);
   const [inviteEmail, setInviteEmail] = React.useState('');
+  const [inviteExecEnd, setInviteExecEnd] = React.useState('');
+  const [invitePlaceNotified, setInvitePlaceNotified] = React.useState(false);
   const [inviting, setInviting] = React.useState(false);
   const [modalInviteOpen, setModalInviteOpen] = React.useState(false);
   const [inviteMsg, setInviteMsg] = React.useState(null);   // ← message court en cas de succès
+  const [modalTitulaireLotsOpen, setModalTitulaireLotsOpen] = React.useState(false);
+  const [titulaireLotsFor, setTitulaireLotsFor] = React.useState(null);
 
   const [modalPubOpen, setModalPubOpen] = React.useState(false);
   const [pubLink, setPubLink] = React.useState('');
   const [pubDate, setPubDate] = React.useState('');
   const [pubFor, setPubFor] = React.useState(null);
   const [pubMarche, setPubMarche] = React.useState(null);
-
-  const [modalDeclOpen, setModalDeclOpen] = React.useState(false);
-  const [declFor, setDeclFor] = React.useState(null);
-  const [declList, setDeclList] = React.useState([]);
-  const [validating, setValidating] = React.useState(false);
-
-  const [detailOpen, setDetailOpen] = React.useState(false);
-  const [detailRow, setDetailRow] = React.useState(null);
 
   // Suppression
   const [deletingId, setDeletingId] = React.useState(null);
@@ -192,8 +130,6 @@ const Component = () => {
         setLoading(false);
         return;
       }
-      setUA(me);
-
       const achRows = await gristAPI.getData(T.ACH);
       const entite = achRows.find(a => a.id === me.Entite_de_rattachement);
       if (!entite) {
@@ -203,24 +139,15 @@ const Component = () => {
       }
       setOrg(entite);
 
-      const [c, specs] = await Promise.all([
-        gristAPI.getData(T.C),
-        gristAPI.getData(T.SPECS).catch(() => []),
-      ]);
-      setClauses(c || []);
+      const c = await gristAPI.getData(T.C);
       setOptsClauses(toOptions(c || []));
-      setOptsSpecs(toOptions(specs || []));
 
-      const [ms, db, bens, invs] = await Promise.all([
+      const [ms, invs] = await Promise.all([
         gristAPI.getData(T.M),
-        gristAPI.getData(T.DB).catch(() => []),
-        gristAPI.getData(T.BEN).catch(() => []),
         gristAPI.getData(T.INV).catch(() => []),
       ]);
       const mine = (ms || []).filter(m => m[M.ACHETEUR] === entite.id);
       setRows(mine);
-      setDeclRows(db || []);
-      setBenefRows(bens || []);
       setInvRows(invs || []);
 
       setLoading(false);
@@ -231,16 +158,6 @@ const Component = () => {
     const o = optsClauses.find(x => x.value === id);
     return o ? o.label : String(id ?? '—');
   }, [optsClauses]);
-  const specLabel = React.useCallback((id) => {
-    const o = optsSpecs.find(x => x.value === id);
-    return o ? o.label : String(id ?? '—');
-  }, [optsSpecs]);
-
-  const benefMap = React.useMemo(() => {
-    const map = new Map();
-    (benefRows || []).forEach(b => map.set(b.id, b));
-    return map;
-  }, [benefRows]);
   const invById = React.useMemo(() => {
     const map = new Map();
     (invRows || []).forEach(inv => map.set(inv.id, inv));
@@ -265,6 +182,13 @@ const Component = () => {
     return lots.slice().sort(compareByLot);
   }, [rowById, rows]);
   const getDisplayStatus = React.useCallback((row) => row?.[M.STATUT_GLOBAL] || row?.[M.STATUS] || '', []);
+  const getConsultationDisplayStatus = React.useCallback((row) => {
+    const lots = getLotsForParent(row);
+    if (lots.length > 0 && lots.some((lot) => String(lot[M.STATUS] || '') === 'En attente de notification')) {
+      return 'En attente de notification';
+    }
+    return getDisplayStatus(row);
+  }, [getDisplayStatus, getLotsForParent]);
   const getMarketClauses = React.useCallback((row) => {
     const lots = getLotsForParent(row);
     const ids = (lots.length ? lots : [row])
@@ -286,9 +210,9 @@ const Component = () => {
   const STATUS_OPTIONS = [
     { value: 'En attente de notification', label: 'En attente de notification', cls: 'fr-badge--new' },
     { value: 'En attente de déclaration des bénéficiaires', label: 'En attente de déclaration des bénéficiaires', cls: 'fr-badge--warning' },
-    { value: 'Déclaration à vérifier', label: 'Déclaration à vérifier', cls: 'fr-badge--info' },
     { value: 'Déclaration à valider', label: 'Déclaration à valider', cls: 'fr-badge--info' },
     { value: 'Clause validée', label: 'Clause validée', cls: 'fr-badge--success' },
+    { value: 'Archivé', label: 'Archivé', cls: 'fr-badge--grey' },
     { value: 'En attente de publication', label: 'En attente de publication', cls: 'fr-badge--new' },
   ];
 
@@ -313,9 +237,12 @@ const Component = () => {
     }).catch((e) => console.log(e) && setErr("Impossible de copier le lien."));
   };
   const hasInvitation = (row) => {
-    const v = row?.[M.INVIT];
-    if (Array.isArray(v)) return v.filter((x) => x !== 'L' && x != null && x !== '').length > 0;
-    return v != null && v !== '' && v;
+    if (!row?.id) return false;
+    return (invRows || []).some((inv) => Number(inv[INV.MARCHE]) === Number(row.id));
+  };
+  const hasInvitationInRows = (row, invitations) => {
+    if (!row?.id) return false;
+    return (invitations || []).some((inv) => Number(inv[INV.MARCHE]) === Number(row.id));
   };
   const getInvitationRowsForMarche = React.useCallback((row) => {
     if (!row) return [];
@@ -323,10 +250,9 @@ const Component = () => {
       .filter((x) => x !== 'L' && x != null && x !== '')
       .map((x) => (typeof x === 'number' ? x : Number(x)))
       .filter((x) => Number.isFinite(x));
-    if (ids.length) {
-      return ids.map((id) => invById.get(id)).filter(Boolean);
-    }
-    return (invRows || []).filter((inv) => Number(inv[INV.MARCHE]) === Number(row.id));
+    const fromRefs = ids.map((id) => invById.get(id)).filter((inv) => Number(inv?.[INV.MARCHE]) === Number(row.id));
+    const fromRows = (invRows || []).filter((inv) => Number(inv[INV.MARCHE]) === Number(row.id));
+    return fromRefs.length ? fromRefs : fromRows;
   }, [invById, invRows]);
   const getLastReminderDate = React.useCallback((row) => {
     const invites = getInvitationRowsForMarche(row);
@@ -391,32 +317,6 @@ const Component = () => {
     }
   }
 
-  async function duplicateMarche(row) {
-    if (!org || !row) return;
-    setErr(null);
-    try {
-      const payload = {
-        [M.INTITULE]: row[M.INTITULE] || null,
-        [M.INTITULE_LOT]: row[M.INTITULE_LOT] || null,
-        [M.LOT]: row[M.LOT] || null,
-        [M.CLAUSE]: row[M.CLAUSE] ? Number(row[M.CLAUSE]) : null,
-        [M.SPECS]: toRefList(row[M.SPECS]),
-        [M.ADR]: row[M.ADR] || null,
-        [M.PUB]: ymd(new Date()),
-        [M.DLRO]: row[M.DLRO] ? ymd(row[M.DLRO]) : null,
-        [M.DNOTPREV]: row[M.DNOTPREV] ? ymd(row[M.DNOTPREV]) : null,
-        [M.EXEC_END]: row[M.EXEC_END] ? ymd(row[M.EXEC_END]) : null,
-        [M.STATUS]: row[M.STATUS] || null,
-      };
-      await gristAPI.addRecord(T.M, payload);
-      await reloadMine();
-      setDuplicatedId(row.id);
-      setTimeout(() => setDuplicatedId(null), 2500);
-    } catch (e) {
-      setErr(e.message || 'Duplication impossible.');
-    }
-  }
-
   const applyCommonFilters = React.useCallback((list) => {
     const s = (search || '').toLowerCase();
     const cf = clauseFilter ? Number(clauseFilter) : null;
@@ -439,7 +339,6 @@ const Component = () => {
     });
   }, [search, clauseFilter, clauseLabel, getLotsForParent, getMarketClauses]);
 
-  const today0 = today();
   const compareByDlroThenLot = React.useCallback((a, b) => {
     const da = parseDate(a[M.DLRO])?.getTime() || 0;
     const db = parseDate(b[M.DLRO])?.getTime() || 0;
@@ -472,11 +371,29 @@ const Component = () => {
 
     base.forEach(r => {
       const status = (getDisplayStatus(r) || '').toString();
+      const lots = getLotsForParent(r);
+      if (lots.length > 0) {
+        const lotStatuses = lots.map((lot) => String(lot[M.STATUS] || ''));
+        const hasLotWithoutTitulaire = lots.some((lot) => !hasInvitation(lot));
+        const hasLotDecl = lotStatuses.includes('En attente de déclaration des bénéficiaires');
+        const hasLotAValider = lotStatuses.includes('Déclaration à valider');
+        const allLotsValides = lots.length > 0 && lotStatuses.every((s) => s === 'Clause validée' || s === 'Archivé');
+        const allLotsArchives = lots.length > 0 && lotStatuses.every((s) => s === 'Archivé');
+
+        if (status === 'En attente de publication') pub.push(r);
+        if (status === 'En attente de notification' || (status !== 'En attente de publication' && hasLotWithoutTitulaire)) notif.push(r);
+        if (hasLotDecl || status === 'En attente de déclaration des bénéficiaires') decl.push(r);
+        if (hasLotAValider || status === 'Déclaration à valider') avalider.push(r);
+        if (allLotsValides || allLotsArchives || status === 'Clause validée' || status === 'Archivé') valide.push(r);
+        return;
+      }
+
       if (status === 'En attente de publication') { pub.push(r); return; }
       if (status === 'En attente de notification') { notif.push(r); return; }
       if (status === 'Déclaration à valider') { avalider.push(r); return; }
       if (status === 'En attente de déclaration des bénéficiaires') { decl.push(r); return; }
       if (status === 'Clause validée') { valide.push(r); return; }
+      if (status === 'Archivé') { valide.push(r); return; }
       // fallback : sans statut on range en notification
       console.log("Statut inconnu", r);
     });
@@ -486,15 +403,18 @@ const Component = () => {
     decl.sort((a,b) => (parseDate(a[M.DNOTPREV])?.getTime()||0) - (parseDate(b[M.DNOTPREV])?.getTime()||0));
     avalider.sort((a,b) => (parseDate(a[M.EXEC_END])?.getTime()||0) - (parseDate(b[M.EXEC_END])?.getTime()||0));
     valide.sort((a,b) => (parseDate(b[M.EXEC_END])?.getTime()||0) - (parseDate(a[M.EXEC_END])?.getTime()||0));
+    const enCours = [...decl, ...avalider].filter((row, idx, arr) => arr.findIndex((item) => item.id === row.id) === idx);
+    enCours.sort((a,b) => (parseDate(a[M.DNOTPREV])?.getTime()||0) - (parseDate(b[M.DNOTPREV])?.getTime()||0));
 
     return {
       pub: applyCommonFilters(pub),
       notif: applyCommonFilters(notif),
       decl: applyCommonFilters(decl),
       avalider: applyCommonFilters(avalider),
+      enCours: applyCommonFilters(enCours),
       valide: applyCommonFilters(valide),
     };
-  }, [rows, applyCommonFilters, compareByDlroThenLot, getDisplayStatus, isLot]);
+  }, [rows, invRows, applyCommonFilters, compareByDlroThenLot, getDisplayStatus, getLotsForParent, isLot]);
 
   const goToDeclarationsToValidate = React.useCallback((e) => {
     e.preventDefault();
@@ -525,40 +445,14 @@ const Component = () => {
   }, []);
 
   // ===== CRUD =====
-  const resetNewForm = () => setNewForm({
-    [M.INTITULE]: '',
-    [M.LIEN_DOCS]: '',
-    [M.PUB]: ymd(new Date()),
-    [M.DLRO]: '',
-    [M.DNOTPREV]: '',
-    [M.STATUS]: ''
-  });
-  const emptyLotForm = () => ({
-    [M.INTITULE_LOT]: '',
-    [M.LOT]: '',
-    [M.CLAUSE]: '',
-    [M.SPECS]: [],
-    [M.ADR]: '',
-    [M.EXEC_END]: '',
-  });
-  const resetNewLots = () => setNewLots([emptyLotForm()]);
-  const updateNewLot = (idx, updates) => {
-    setNewLots((prev) => prev.map((lot, i) => i === idx ? { ...lot, ...updates } : lot));
-  };
-  const addNewLot = () => setNewLots((prev) => [...prev, emptyLotForm()]);
-  const removeNewLot = (idx) => setNewLots((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx));
-
   async function reloadMine() {
-    const [ms, db, bens, invs] = await Promise.all([
+    const [ms, invs] = await Promise.all([
       gristAPI.getData(T.M),
-      gristAPI.getData(T.DB).catch(() => []),
-      gristAPI.getData(T.BEN).catch(() => []),
       gristAPI.getData(T.INV).catch(() => []),
     ]);
     setRows((ms || []).filter(m => m[M.ACHETEUR] === org.id));
-    setDeclRows(db || []);
-    setBenefRows(bens || []);
     setInvRows(invs || []);
+    return { marches: ms || [], invitations: invs || [] };
   }
 
   function openPubModal(row) {
@@ -604,7 +498,7 @@ const Component = () => {
           [M.STATUS]: 'En attente de notification',
         });
       }
-      setMsg("Publication déclarée.");
+      setMsg("Publication déclarée. Retrouvez ce marché dans l'onglet 'Consultation et passation'.");
       closePubModal();
       await reloadMine();
     } catch (e) {
@@ -612,252 +506,88 @@ const Component = () => {
     }
   }
 
-  async function createMarche() {
-    if (!org) return;
-    setErr(null);
-    setNewErrors({});
-    const nextErrors = {};
-    const lots = (newLots || []).filter((lot) => ![
-      lot[M.LOT], lot[M.INTITULE_LOT], lot[M.CLAUSE], lot[M.ADR], lot[M.EXEC_END],
-      ...(Array.isArray(lot[M.SPECS]) ? lot[M.SPECS] : [])
-    ].every(isBlank));
-    if (!String(newForm[M.INTITULE] || '').trim()) nextErrors[M.INTITULE] = 'Champ requis.';
-    if (!String(newForm[M.DLRO] || '').trim()) nextErrors[M.DLRO] = 'Champ requis.';
-    if (!String(newForm[M.DNOTPREV] || '').trim()) nextErrors[M.DNOTPREV] = 'Champ requis.';
-    if (!lots.length) nextErrors.lots = 'Ajoutez au moins un lot.';
-    lots.forEach((lot, idx) => {
-      if (isBlank(lot[M.LOT])) nextErrors[`lot-${idx}-${M.LOT}`] = 'Champ requis.';
-      if (isBlank(lot[M.INTITULE_LOT])) nextErrors[`lot-${idx}-${M.INTITULE_LOT}`] = 'Champ requis.';
-      if (!lot[M.CLAUSE]) nextErrors[`lot-${idx}-${M.CLAUSE}`] = 'Champ requis.';
-      if (!Array.isArray(lot[M.SPECS]) || !lot[M.SPECS].length) nextErrors[`lot-${idx}-${M.SPECS}`] = 'Champ requis.';
-      if (isBlank(lot[M.ADR])) nextErrors[`lot-${idx}-${M.ADR}`] = 'Champ requis.';
-      if (!isValidDateStr(lot[M.EXEC_END])) nextErrors[`lot-${idx}-${M.EXEC_END}`] = 'Format invalide (AAAA-MM-JJ).';
-    });
-    if (!isValidDateStr(newForm[M.DLRO])) nextErrors[M.DLRO] = 'Format invalide (AAAA-MM-JJ).';
-    const dlroDate = parseDate(newForm[M.DLRO]);
-    if (dlroDate) {
-      const dlro0 = new Date(dlroDate);
-      dlro0.setHours(0, 0, 0, 0);
-      if (dlro0 < today()) {
-        nextErrors[M.DLRO] = 'La date limite de remise des offres ne peut pas être antérieure au jour J.';
-      }
-    }
-    if (!isValidDateStr(newForm[M.DNOTPREV])) nextErrors[M.DNOTPREV] = 'Format invalide (AAAA-MM-JJ).';
-    if (!isValidDateStr(newForm[M.EXEC_END])) nextErrors[M.EXEC_END] = 'Format invalide (AAAA-MM-JJ).';
-    if (Object.keys(nextErrors).length) {
-      setNewErrors(nextErrors);
-      return;
-    }
-    const payload = {
-      [M.INTITULE]: newForm[M.INTITULE] || null,
-      [M.PUB]: newForm[M.PUB] || null,
-      [M.DLRO]: newForm[M.DLRO] || null,
-      [M.DNOTPREV]: newForm[M.DNOTPREV] || null,
-      [M.ACHETEUR]: org.id,
-      [M.STATUS]: 'En attente de publication',
-    };
-    try {
-      setCreating(true);
-      const parentId = await gristAPI.addRecord(T.M, payload);
-      for (const lot of lots) {
-        await gristAPI.addRecord(T.M, {
-          [M.INTITULE]: newForm[M.INTITULE] || null,
-          [M.PARENT]: parentId,
-          [M.ACHETEUR]: org.id,
-          [M.INTITULE_LOT]: lot[M.INTITULE_LOT] || null,
-          [M.LOT]: lot[M.LOT] || null,
-          [M.CLAUSE]: lot[M.CLAUSE] ? Number(lot[M.CLAUSE]) : null,
-          [M.SPECS]: toRefList(lot[M.SPECS]),
-          [M.ADR]: lot[M.ADR] || null,
-          [M.PUB]: newForm[M.PUB] || null,
-          [M.DLRO]: newForm[M.DLRO] || null,
-          [M.DNOTPREV]: newForm[M.DNOTPREV] || null,
-          [M.EXEC_END]: lot[M.EXEC_END] || null,
-          [M.STATUS]: 'En attente de publication',
-        });
-      }
-      await reloadMine();
-      setNewOpen(false);
-      resetNewForm();
-      resetNewLots();
-    } catch (e) {
-      setErr(e.message || "Échec de création du marché.");
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  // Édition via modale
-  function openEditModal(row) {
-    const kind = isLot(row) ? 'lot' : 'parent';
-    setEditingKind(kind);
-    setLotCreateFor(null);
-    setEditingId(row.id);
-    setEditErrors({});
-    setEditForm({
-      [M.INTITULE]: row[M.INTITULE] || '',
-      [M.INTITULE_LOT]: row[M.INTITULE_LOT] || '',
-      [M.LOT]: row[M.LOT] || '',
-      [M.CLAUSE]: row[M.CLAUSE] || '',
-      [M.SPECS]: asArray(row[M.SPECS])
-        .filter((x) => x !== 'L' && x != null && x !== '')
-        .map((x) => (typeof x === 'number' ? x : Number(x)))
-        .filter((x) => Number.isFinite(x)),
-      [M.ADR]: row[M.ADR] || '',
-      [M.PUB]: ymd(row[M.PUB]),
-      [M.DLRO]: ymd(row[M.DLRO]),
-      [M.DNOTPREV]: ymd(row[M.DNOTPREV]),
-      [M.EXEC_END]: ymd(row[M.EXEC_END]),
-    });
-    const noLot = !(row[M.INTITULE_LOT] || row[M.LOT]);
-    setEditNoLot(noLot);
-    setModalEditOpen(true);
-  }
-  function openCreateLotModal(parent) {
-    setEditingKind('lot-create');
-    setLotCreateFor(parent);
-    setEditingId(null);
-    setEditErrors({});
-    setEditNoLot(false);
-    setEditForm({
-      [M.INTITULE]: parent[M.INTITULE] || '',
-      [M.INTITULE_LOT]: '',
-      [M.LOT]: '',
-      [M.CLAUSE]: parent[M.CLAUSE] || '',
-      [M.SPECS]: [],
-      [M.ADR]: '',
-      [M.PUB]: ymd(parent[M.PUB]),
-      [M.DLRO]: ymd(parent[M.DLRO]),
-      [M.DNOTPREV]: ymd(parent[M.DNOTPREV]),
-      [M.EXEC_END]: '',
-    });
-    setModalEditOpen(true);
-  }
-  function closeEditModal() {
-    setModalEditOpen(false);
-    setEditingId(null);
-    setEditForm({});
-    setEditNoLot(false);
-    setEditingKind('parent');
-    setLotCreateFor(null);
-  }
-  async function saveEdit(id) {
-    setErr(null);
-    setEditErrors({});
-    const nextErrors = {};
-    if (isBlank(editForm[M.INTITULE])) nextErrors[M.INTITULE] = 'Champ requis.';
-    if (editingKind === 'lot' || editingKind === 'lot-create') {
-      if (isBlank(editForm[M.LOT])) nextErrors[M.LOT] = 'Champ requis.';
-      if (isBlank(editForm[M.INTITULE_LOT])) nextErrors[M.INTITULE_LOT] = 'Champ requis.';
-      if (!editForm[M.CLAUSE]) nextErrors[M.CLAUSE] = 'Champ requis.';
-      if (!Array.isArray(editForm[M.SPECS]) || !editForm[M.SPECS].length) nextErrors[M.SPECS] = 'Champ requis.';
-      if (isBlank(editForm[M.ADR])) nextErrors[M.ADR] = 'Champ requis.';
-    }
-    if (isBlank(editForm[M.DLRO])) nextErrors[M.DLRO] = 'Champ requis.';
-    if (isBlank(editForm[M.DNOTPREV])) nextErrors[M.DNOTPREV] = 'Champ requis.';
-    if (!isValidDateStr(editForm[M.DLRO])) nextErrors[M.DLRO] = 'Format invalide (AAAA-MM-JJ).';
-    const dlroDate = parseDate(editForm[M.DLRO]);
-    if (dlroDate) {
-      const dlro0 = new Date(dlroDate);
-      dlro0.setHours(0, 0, 0, 0);
-      if (dlro0 < today()) {
-        nextErrors[M.DLRO] = 'La date limite de remise des offres ne peut pas être antérieure au jour J.';
-      }
-    }
-    if (!isValidDateStr(editForm[M.DNOTPREV])) nextErrors[M.DNOTPREV] = 'Format invalide (AAAA-MM-JJ).';
-    if (!isValidDateStr(editForm[M.EXEC_END])) nextErrors[M.EXEC_END] = 'Format invalide (AAAA-MM-JJ).';
-    if (Object.keys(nextErrors).length) {
-      setEditErrors(nextErrors);
-      return;
-    }
-    try {
-      setSavingId(id || 'lot-create');
-      if (editingKind === 'lot-create') {
-        if (!lotCreateFor?.id) return;
-        await gristAPI.addRecord(T.M, {
-          [M.INTITULE]: editForm[M.INTITULE] || null,
-          [M.PARENT]: lotCreateFor.id,
-          [M.ACHETEUR]: org.id,
-          [M.INTITULE_LOT]: editForm[M.INTITULE_LOT] || null,
-          [M.LOT]: editForm[M.LOT] || null,
-          [M.CLAUSE]: editForm[M.CLAUSE] ? Number(editForm[M.CLAUSE]) : null,
-          [M.SPECS]: toRefList(editForm[M.SPECS]),
-          [M.ADR]: editForm[M.ADR] || null,
-          [M.PUB]: editForm[M.PUB] || null,
-          [M.DLRO]: editForm[M.DLRO] || null,
-          [M.DNOTPREV]: editForm[M.DNOTPREV] || null,
-          [M.EXEC_END]: editForm[M.EXEC_END] || null,
-          [M.STATUS]: lotCreateFor[M.STATUS] || 'En attente de publication',
-        });
-        await reloadMine();
-        closeEditModal();
-        return;
-      }
-      const updates = {
-        [M.INTITULE]: editForm[M.INTITULE] || null,
-        [M.PUB]: editForm[M.PUB] || null,
-        [M.DLRO]: editForm[M.DLRO] || null,
-        [M.DNOTPREV]: editForm[M.DNOTPREV] || null,
-        [M.EXEC_END]: editForm[M.EXEC_END] || null,
-      };
-      if (editingKind === 'lot') {
-        updates[M.INTITULE_LOT] = editForm[M.INTITULE_LOT] || null;
-        updates[M.LOT] = editForm[M.LOT] || null;
-        updates[M.CLAUSE] = editForm[M.CLAUSE] ? Number(editForm[M.CLAUSE]) : null;
-        updates[M.SPECS] = toRefList(editForm[M.SPECS]);
-        updates[M.ADR] = editForm[M.ADR] || null;
-      }
-      await gristAPI.updateRecord(T.M, id, updates);
-      if (editingKind === 'parent') {
-        const lots = getLotsForParent(rowById.get(id));
-        for (const lot of lots) {
-          await gristAPI.updateRecord(T.M, lot.id, {
-            [M.INTITULE]: editForm[M.INTITULE] || null,
-            [M.PUB]: editForm[M.PUB] || null,
-            [M.DLRO]: editForm[M.DLRO] || null,
-            [M.DNOTPREV]: editForm[M.DNOTPREV] || null,
-          });
-        }
-      }
-      await reloadMine();
-      closeEditModal();
-    } catch (e) {
-      setErr(e.message || 'Échec de la sauvegarde.');
-    } finally {
-      setSavingId(null);
-    }
-  }
-
   // Invitation via modale → écrit dans Invitation_Titulaire
   function openInviteModal(row) {
     setInviteFor(row.id);
+    setInviteForRow(row);
     setHasInvited(hasInvitation(row));
     setInviteEmail('');
+    setInviteExecEnd(ymd(row[M.EXEC_END]) || '');
+    setInvitePlaceNotified(false);
     setInviteMsg(null);
     setModalInviteOpen(true);
+  }
+  function openTitulaireLotsModal(row) {
+    setTitulaireLotsFor(row);
+    setModalTitulaireLotsOpen(true);
+    setErr(null);
+  }
+  function closeTitulaireLotsModal() {
+    setModalTitulaireLotsOpen(false);
+    setTitulaireLotsFor(null);
+  }
+  function openInviteModalFromLot(row) {
+    closeTitulaireLotsModal();
+    openInviteModal(row);
   }
   function closeInviteModal() {
     setModalInviteOpen(false);
     setInviteFor(null);
+    setInviteForRow(null);
     setHasInvited(null);
     setInviteEmail('');
+    setInviteExecEnd('');
+    setInvitePlaceNotified(false);
     setInviteMsg(null);
   }
   async function inviteTitulaire(marcheId) {
-    if (!emailOk(inviteEmail)) {
+    const normalizedEmail = String(inviteEmail || '').trim().toLowerCase();
+    if (!emailOk(normalizedEmail)) {
       setErr("Adresse e-mail titulaire invalide.");
+      return;
+    }
+    if (!invitePlaceNotified) {
+      setErr("Merci de confirmer que le titulaire a bien été notifié sur PLACE.");
       return;
     }
     try {
       setInviting(true);
       // ⬇️ Remplace InitLink par Invitation_Titulaire : Grist génère le Token
-      await gristAPI.addRecord(T.INV, { Marche: marcheId, Email: inviteEmail });
-      await gristAPI.updateRecord(T.M, marcheId, { [M.STATUS]: 'En attente de déclaration des bénéficiaires' });
+      await gristAPI.addRecord(T.INV, { Marche: marcheId, Email: normalizedEmail });
+      const invitationsWithCurrent = [...(invRows || []), { [INV.MARCHE]: marcheId }];
+      const invitedRow = inviteForRow || rowById.get(marcheId);
+      const parentId = invitedRow?.[M.PARENT];
+      const parentRow = parentId ? rowById.get(Number(parentId)) : null;
+
+      if (!parentRow) {
+        await gristAPI.updateRecord(T.M, marcheId, { [M.STATUS]: 'En attente de déclaration des bénéficiaires', [M.EXEC_END]: inviteExecEnd || null });
+      } else {
+        await gristAPI.updateRecord(T.M, marcheId, { [M.STATUS]: 'En attente de déclaration des bénéficiaires', [M.EXEC_END]: inviteExecEnd || null });
+        const lots = getLotsForParent(parentRow);
+        const allLotsInvited = lots.length > 0 && lots.every((lot) => hasInvitationInRows(lot, invitationsWithCurrent));
+        if (allLotsInvited) {
+          await gristAPI.updateRecord(T.M, parentRow.id, { [M.STATUS]: 'En attente de déclaration des bénéficiaires' });
+        } else if (parentRow[M.STATUS] === 'En attente de déclaration des bénéficiaires') {
+          await gristAPI.updateRecord(T.M, parentRow.id, { [M.STATUS]: 'En attente de notification' });
+        }
+      }
       setInviteMsg("Le titulaire a été déclaré et invité à rejoindre Eclauses.");
-      // tu peux garder la modale ouverte pour afficher le message
-      // ou refermer après un court délai :
-       setTimeout(closeInviteModal, 1200);
-      await reloadMine();
+      const refreshed = await reloadMine();
+      if (parentRow) {
+        closeInviteModal();
+        const refreshedRows = refreshed?.marches || [];
+        const refreshedInvitations = refreshed?.invitations || invitationsWithCurrent;
+        const refreshedById = new Map(refreshedRows.map((row) => [row.id, row]));
+        const refreshedParent = refreshedById.get(parentRow.id) || parentRow;
+        const lots = getLotsForParent(parentRow);
+        const allLotsInvited = lots.length > 0 && lots.every((lot) => hasInvitationInRows(lot, refreshedInvitations));
+        if (!allLotsInvited) {
+          setTitulaireLotsFor(refreshedParent);
+          setModalTitulaireLotsOpen(true);
+        }
+      } else {
+        setTimeout(closeInviteModal, 1200);
+      }
     } catch (e) {
       setErr(e.message || "Impossible d’enregistrer l’invitation.");
     } finally {
@@ -865,46 +595,15 @@ const Component = () => {
     }
   }
 
-  function openDeclModal(row) {
-    const ids = Array.isArray(row[M.BENEFICIAIRES]) ? row[M.BENEFICIAIRES].filter(x => x !== 'L') : [];
-    const list = (declRows || []).filter(d => ids.includes(d.id));
-    setDeclList(list);
-    setDeclFor(row.id);
-    setModalDeclOpen(true);
-    setErr(null);
+  function goToDetailMarche(row) {
+    if (!row?.id) return;
+    try { sessionStorage.setItem('acheteurMarcheDetailId', String(row.id)); } catch (_) {}
+    if (gristAPI.navigate) gristAPI.navigate('acheteur-marches-detail');
   }
-  function closeDeclModal() {
-    setModalDeclOpen(false);
-    setDeclFor(null);
-    setDeclList([]);
-  }
-  async function validateDeclaration() {
-    if (!declFor) return;
-    setErr(null);
-    try {
-      setValidating(true);
-      const ids = declList.map(d => d.id).filter(Boolean);
-      for (const id of ids) {
-        await gristAPI.updateRecord(T.DB, id, { Statut: 'validé' });
-      }
-      await gristAPI.updateRecord(T.M, declFor, { [M.STATUS]: 'Clause validée' });
-      setMsg('Déclaration validée et clause marquée comme validée.');
-      closeDeclModal();
-      await reloadMine();
-    } catch (e) {
-      setErr(e.message || "Impossible de valider la déclaration.");
-    } finally {
-      setValidating(false);
-    }
-  }
-
-  function openDetailModal(row) {
-    setDetailRow(row);
-    setDetailOpen(true);
-  }
-  function closeDetailModal() {
-    setDetailOpen(false);
-    setDetailRow(null);
+  function goToEditMarche(row) {
+    if (!row?.id) return;
+    try { sessionStorage.setItem('acheteurMarcheEditId', String(row.id)); } catch (_) {}
+    if (gristAPI.navigate) gristAPI.navigate('acheteur-marches-modification');
   }
 
   function openDeleteModal(row) {
@@ -921,8 +620,13 @@ const Component = () => {
     setErr(null);
     try {
       setDeletingId(id);
+      const lots = getLotsForParent(deleteRowItem);
+      for (const lot of lots) {
+        await gristAPI.deleteRecord(T.M, lot.id);
+      }
       await gristAPI.deleteRecord(T.M, id);
-      setRows(rows.filter(r => r.id !== id));
+      const deletedIds = new Set([id, ...lots.map(l => l.id)]);
+      setRows(rows.filter(r => !deletedIds.has(r.id)));
       closeDeleteModal();
     } catch (e) {
       setErr(e.message || 'Suppression impossible.');
@@ -935,8 +639,9 @@ const Component = () => {
   function RowViewConsultation({r}) {
     const dlro = parseDate(r[M.DLRO]);
     const aa = r[M.INTITULE_PROP] || r[M.INTITULE] || '—';
-    const status = renderStatus(getDisplayStatus(r));
+    const status = renderStatus(getConsultationDisplayStatus(r));
     const lots = getLotsForParent(r);
+    const isAllotted = lots.length > 0;
     const clauseTxt = getMarketClauses(r).map(clauseLabel).join(', ') || '—';
     return (
       <div className="fr-col-12">
@@ -950,15 +655,28 @@ const Component = () => {
                   <p className="fr-card__desc fr-text--sm">
                     Date limite de remise des offres : <strong>{dlro ? formatDate(dlro) : '—'}</strong>
                   </p>
-                  <p className="fr-card__desc fr-text--sm">
-                    Lots Eclauses : <strong>{lots.length}</strong> · Clause sociale : <strong>{clauseTxt}</strong>
-                  </p>
-                </div>
+                  { lots.length > 0 ? (
+	                     <p className="fr-card__desc fr-text--sm">
+	                      Nombre de lots : <strong>{lots.length}</strong>
+	                    </p>
+	                  ) : (
+	                    <p className="fr-card__desc fr-text--sm">
+	                      Clause sociale : <strong>{clauseTxt}</strong>
+	                    </p>
+	                    )}
+	                </div>
               </div>
               <div className="fr-col-12 fr-col-md-4">
                 <div className="fr-card__footer">
                   <ul className="fr-btns-group fr-btns-group--right fr-btns-group--icon-left fr-btns-group--sm">
-                  
+                    <li>
+                      <button
+                        className="fr-btn fr-btn--primary fr-btn--sm fr-icon-checkbox-line"
+                        onClick={()=>isAllotted ? openTitulaireLotsModal(r) : openInviteModal(r)}
+                      >
+                        {isAllotted ? 'Déclarer les titulaires' : 'Déclarer le titulaire'}
+                      </button>
+                    </li>
                      <li>
                         <button
                           className={`fr-btn fr-btn--secondary ${copiedId === r.id ? 'fr-icon-check-line' : 'fr-icon-clipboard-line'}`}
@@ -968,8 +686,8 @@ const Component = () => {
                         </button>
                       </li>
                     <li>
-                      <button className="fr-btn fr-btn--primary fr-btn--sm fr-icon-eye-line" onClick={()=>openDetailModal(r)}>
-                        Gérer le marché
+                      <button className="fr-btn fr-btn--secondary fr-btn--sm fr-icon-eye-line" onClick={()=>goToDetailMarche(r)}>
+                        Détail du marché
                       </button>
                     </li>
                   </ul>
@@ -982,104 +700,115 @@ const Component = () => {
     );
   }
 
-  function RowViewExecution({r}) {
+  const getLotStatusGroups = (row) => {
+    const lots = getLotsForParent(row);
+    const groups = [
+      {
+        key: 'decl',
+        label: 'En attente de déclaration des bénéficiaires',
+        cls: 'fr-badge--warning',
+        lots: lots.filter((lot) => String(lot[M.STATUS] || '') === 'En attente de déclaration des bénéficiaires'),
+      },
+      {
+        key: 'avalider',
+        label: 'Déclaration à valider',
+        cls: 'fr-badge--info',
+        lots: lots.filter((lot) => String(lot[M.STATUS] || '') === 'Déclaration à valider'),
+      },
+      {
+        key: 'valide',
+        label: 'Clause sociale validée',
+        cls: 'fr-badge--success',
+        lots: lots.filter((lot) => String(lot[M.STATUS] || '') === 'Clause validée'),
+      },
+    ];
+    return groups;
+  };
+  const statusBadgeClass = (status) => {
+    const opt = STATUS_OPTIONS.find((o) => o.value === status);
+    return opt?.cls || 'fr-badge--grey';
+  };
+
+  function RowViewExecutionMarket({r, archived = false}) {
     const lots = getLotsForParent(r);
     const dExecEnd = lots.map(l => parseDate(l[M.EXEC_END])).filter(Boolean).sort((a,b)=>b-a)[0] || parseDate(r[M.EXEC_END]);
     const aa = r[M.INTITULE_PROP] || r[M.INTITULE] || '—';
-    const status = renderStatus(getDisplayStatus(r));
-    return (
-      <div className="fr-col-12">
-        <div className="fr-card fr-card--horizontal">
-          <div className="fr-card__body">
-            <div className="fr-grid-row fr-grid-row--gutters fr-grid-row--middle">
-              <div className="fr-col-12 fr-col-md-8">
-                <div className="fr-card__content">
-                  <div className="fr-mb-1w">{status}</div>
-                  <h3 className="fr-card__title fr-text--md">{aa}</h3>
-                  <p className="fr-card__desc fr-text--sm">Fin d’exécution prévisionnelle : <strong>{dExecEnd ? formatDate(dExecEnd) : '—'}</strong></p>
-                  <p className="fr-card__desc fr-text--sm">
-                    Lots en attente : <strong>{r[M.NB_LOTS_DECL] || 0}</strong> · Lots à valider : <strong>{r[M.NB_LOTS_A_VALIDER] || 0}</strong> · Lots validés : <strong>{r[M.NB_LOTS_VALIDES] || 0}</strong>
-                  </p>
+    const displayStatus = getDisplayStatus(r);
+    const groups = getLotStatusGroups(r);
+    if (archived) {
+      return (
+        <div className="fr-col-12">
+          <div className="fr-card fr-card--horizontal">
+            <div className="fr-card__body">
+              <div className="fr-grid-row fr-grid-row--gutters fr-grid-row--middle">
+                <div className="fr-col-12 fr-col-md-8">
+                  <div className="fr-card__content">
+                    <div className="fr-mb-1w">{renderStatus(displayStatus)}</div>
+                    <h3 className="fr-card__title fr-text--md">{aa}</h3>
+                    {lots.length == 0 && (
+                     <p className="fr-card__desc fr-text--sm">Fin d’exécution prévisionnelle : <strong>{dExecEnd ? formatDate(dExecEnd) : '—'}</strong></p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="fr-col-12 fr-col-md-4">
-                <div className="fr-card__footer">
-                  <ul className="fr-btns-group fr-btns-group--right fr-btns-group--icon-left fr-btns-group--sm">
-                    <li>
-                      <button className="fr-btn fr-btn--primary fr-btn--sm fr-icon-eye-line" onClick={()=>openDetailModal(r)}>
-                        Gérer le marché
-                      </button>
-                    </li>
-                  </ul>
+                <div className="fr-col-12 fr-col-md-4">
+                  <div className="fr-card__footer">
+                    <ul className="fr-btns-group fr-btns-group--right fr-btns-group--icon-left fr-btns-group--sm">
+                      <li>
+                        <button className="fr-btn fr-btn--secondary fr-btn--sm fr-icon-eye-line" onClick={()=>goToDetailMarche(r)}>
+                          Détails du marché
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  function RowViewAValider({r}) {
-    const lots = getLotsForParent(r);
-    const dExecEnd = lots.map(l => parseDate(l[M.EXEC_END])).filter(Boolean).sort((a,b)=>b-a)[0] || parseDate(r[M.EXEC_END]);
-    const aa = r[M.INTITULE_PROP] || r[M.INTITULE] || '—';
-    const status = renderStatus(getDisplayStatus(r));
     return (
       <div className="fr-col-12">
         <div className="fr-card fr-card--horizontal">
           <div className="fr-card__body">
             <div className="fr-grid-row fr-grid-row--gutters fr-grid-row--middle">
               <div className="fr-col-12 fr-col-md-8">
-                <div className="fr-card__content">
-                  <div className="fr-mb-1w">{status}</div>
-                  <h3 className="fr-card__title fr-text--md">{aa}</h3>
-                  <p className="fr-card__desc fr-text--sm">Fin d’exécution prévisionnelle : <strong>{dExecEnd ? formatDate(dExecEnd) : '—'}</strong></p>
-                  <p className="fr-card__desc fr-text--sm">Lots à valider : <strong>{r[M.NB_LOTS_A_VALIDER] || 0}</strong></p>
-                 </div>
-              </div>
-              <div className="fr-col-12 fr-col-md-4">
-                <div className="fr-card__footer">
-                  <ul className="fr-btns-group fr-btns-group--right fr-btns-group--icon-left fr-btns-group--sm">
-                    <li>
-                      <button className="fr-btn fr-btn--primary fr-btn--sm fr-icon-eye-line" onClick={()=>openDetailModal(r)}>
-                        Gérer le marché
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function RowViewArchived({r}) {
-    const lots = getLotsForParent(r);
-    const dExecEnd = lots.map(l => parseDate(l[M.EXEC_END])).filter(Boolean).sort((a,b)=>b-a)[0] || parseDate(r[M.EXEC_END]);
-    const aa = r[M.INTITULE_PROP] || r[M.INTITULE] || '—';
-    const status = renderStatus(getDisplayStatus(r));
-    return (
-      <div className="fr-col-12">
-        <div className="fr-card fr-card--horizontal">
-          <div className="fr-card__body">
-            <div className="fr-grid-row fr-grid-row--gutters fr-grid-row--middle">
-              <div className="fr-col-12 fr-col-md-8">
-                <div className="fr-card__content">
-                  <div className="fr-mb-1w">{status}</div>
-                  <h3 className="fr-card__title fr-text--md">{aa}</h3>
-                  <p className="fr-card__desc fr-text--sm">Fin d’exécution prévisionnelle : <strong>{dExecEnd ? formatDate(dExecEnd) : '—'}</strong></p>
-                  <p className="fr-card__desc fr-text--sm">Lots validés : <strong>{r[M.NB_LOTS_VALIDES] || lots.length}</strong></p>
+                <div className="fr-mb-3w">
+                  <h3 className="fr-h6 fr-mt-3w fr-mb-2w">{aa}</h3>
+                  {lots.length > 0 ? (
+                    <p className="fr-mt-3w">
+                    <strong>Etat des lots du marché :</strong>
+                    <ul className="fr-mb-0">
+	                      {groups.map((group) => (
+	                        <li key={group.key}>
+	                          <p className={`fr-badge fr-badge--sm ${group.lots.length ? group.cls : 'fr-badge--grey'}`}>
+	                            {group.label} : {group.lots.length}
+	                          </p>
+	                        </li>
+	                      ))}
+                    </ul>
+                    </p>
+                  ) : (
+                    <>
+                    <p className="fr-card__desc fr-text--sm">Fin d’exécution prévisionnelle : <strong>{dExecEnd ? formatDate(dExecEnd) : '—'}</strong></p>
+                    <ul className="fr-badges-group fr-mt-3w fr-mb-0">
+                      <li>
+                        <p className={`fr-badge fr-badge--sm ${statusBadgeClass(displayStatus)}`}>
+                          {displayStatus || 'Statut non renseigné'}
+                        </p>
+                      </li>
+                    </ul>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="fr-col-12 fr-col-md-4">
                 <div className="fr-card__footer">
                   <ul className="fr-btns-group fr-btns-group--right fr-btns-group--icon-left fr-btns-group--sm">
                     <li>
-                      <button className="fr-btn fr-btn--secondary fr-btn--sm fr-icon-eye-line" onClick={()=>openDetailModal(r)}>
-                        Détails du marché
+                      <button className={`fr-btn ${archived ? 'fr-btn--secondary' : 'fr-btn--primary'} fr-btn--sm fr-icon-eye-line`} onClick={()=>goToDetailMarche(r)}>
+                        {archived ? 'Détails du marché' : 'Gérer le marché'}
                       </button>
                     </li>
                   </ul>
@@ -1139,7 +868,7 @@ const Component = () => {
           </div>
         </div>
         <div className="fr-col-12 fr-col-md-6">
-          <button className="fr-btn fr-icon-add-line fr-btn--icon-left" onClick={()=>setNewOpen(true)}>
+          <button className="fr-btn fr-icon-add-line fr-btn--icon-left" onClick={()=>gristAPI.navigate && gristAPI.navigate('acheteur-marches-declaration')}>
             Déclarer un marché
           </button>
         </div>
@@ -1150,7 +879,8 @@ const Component = () => {
           <p>
             Attention, vous avez des déclarations de bénéficiaires à valider.
             {' '}
-            <a href="#section-declaration-a-valider" className="fr-link" onClick={goToDeclarationsToValidate}>Aller à la section “Déclaration à valider”</a>.
+            <a href="#section-declaration-a-valider" className="fr-link" onClick={goToDeclarationsToValidate}>Aller à la section “En cours de validation
+”</a>.
           </p>
         </div>
       )}
@@ -1167,7 +897,7 @@ const Component = () => {
             >
               Préparation du marché <span className="fr-badge fr-badge--sm fr-ml-1w">{lists.pub.length}</span>
             </button>
-          
+
           </li>
           <li role="presentation">
             <button
@@ -1186,7 +916,7 @@ const Component = () => {
               role="tab"
               aria-controls="tab-decl"
             >
-              Exécution <span className="fr-badge fr-badge--sm fr-ml-1w">{(lists.decl.length + lists.avalider.length + lists.valide.length)}</span>
+              Exécution <span className="fr-badge fr-badge--sm fr-ml-1w">{(lists.enCours.length + lists.valide.length)}</span>
             </button>
           </li>
           
@@ -1209,18 +939,25 @@ const Component = () => {
                             <p className="fr-card__desc fr-text--sm">
                               Date limite de remise des offres : <strong>{formatDate(parseDate(r[M.DLRO]))}</strong>
                             </p>
-                            <p className="fr-card__desc fr-text--sm">
-                              Lots Eclauses : <strong>{getLotsForParent(r).length}</strong> · Clause sociale : <strong>{getMarketClauses(r).map(clauseLabel).join(', ') || '—'}</strong>
-                            </p>
-                          </div>
+
+                            { getLotsForParent(r).length > 0 ? (
+	                     <p className="fr-card__desc fr-text--sm">
+	                      Nombre de lots : <strong>{getLotsForParent(r).length}</strong>
+	                    </p>
+	                  ) : (
+	                    <p className="fr-card__desc fr-text--sm">
+	                      Clause sociale : <strong>{getMarketClauses(r).map(clauseLabel).join(', ') || '—'}</strong>
+	                    </p>
+	                    )}
+	                          </div>
                         </div>
                         <div className="fr-col-12 fr-col-md-4">
                           <div className="fr-card__footer">
                             <ul className="fr-btns-group fr-btns-group--sm fr-btns-group--icon-left fr-btns-group--right fr-mt-2w">
                               <li>
-                                <button className="fr-btn fr-btn--primary fr-icon-checkbox-line" onClick={()=>openPubModal(r)}>
-                                  Déclarer la publication de la consultation
-                                </button>
+	                                <button className="fr-btn fr-btn--primary fr-icon-checkbox-line" onClick={()=>openPubModal(r)}>
+	                                  Déclarer la publication du marché
+	                                </button>
                               </li>
                               <li>
                                 <button
@@ -1231,22 +968,8 @@ const Component = () => {
                                 </button>
                               </li>
                               <li>
-                                <button className="fr-btn fr-btn--secondary fr-icon-edit-line" onClick={()=>openEditModal(r)}>
+                                <button className="fr-btn fr-btn--secondary fr-icon-edit-line" onClick={()=>goToEditMarche(r)}>
                                   Modifier
-                                </button>
-                              </li>
-                              <li>
-                                <button className="fr-btn fr-btn--secondary fr-icon-eye-line" onClick={()=>openDetailModal(r)}>
-                                  Gérer les lots
-                                </button>
-                              </li>
-                              
-                              <li>
-                                <button
-                                  className={`fr-btn fr-btn--secondary ${duplicatedId === r.id ? 'fr-icon-check-line' : 'fr-icon-stack-line'}`}
-                                  onClick={()=>duplicateMarche(r)}
-                                >
-                                  {duplicatedId === r.id ? 'Marché dupliqué' : 'Dupliquer le marché'}
                                 </button>
                               </li>
                               <li>
@@ -1268,13 +991,7 @@ const Component = () => {
         </div>
 
         <div id="tab-notif" className="fr-tabs__panel" role="tabpanel" hidden>
-          <div className="fr-alert fr-alert--warning fr-mb-3w">
-            <p>
-              Si vous souhaitez modifier les informations du marché, merci de contacter le
-              {' '}
-              <a href="#" data-nav="support" className="fr-link">support Eclauses</a>.
-            </p>
-          </div>
+
           {lists.notif.length === 0 ? (
             <div className="fr-callout"><p className="fr-callout__text">Aucun marché en attente de notification.</p></div>
           ) : (
@@ -1285,321 +1002,77 @@ const Component = () => {
         </div>
 
         <div id="tab-decl" className="fr-tabs__panel" role="tabpanel" hidden>
-          <h2 className="fr-h5 fr-mb-2w">En attente de déclaration des bénéficiaires</h2>
-          {lists.decl.length === 0 ? (
-            <div className="fr-callout fr-mb-4w"><p className="fr-callout__text">Aucun marché en attente de déclaration des bénéficiaires.</p></div>
+          <h2 id="section-declaration-a-valider" className="fr-h5 fr-mb-2w">En cours de validation</h2>
+          {lists.enCours.length === 0 ? (
+            <div className="fr-callout fr-mb-4w"><p className="fr-callout__text">Aucun marché en cours de validation.</p></div>
           ) : (
             <div className="fr-grid-row fr-grid-row--gutters fr-mb-4w">
-              {lists.decl.map(r => <RowViewExecution key={r.id} r={r} />)}
+              {lists.enCours.map(r => <RowViewExecutionMarket key={r.id} r={r} />)}
             </div>
           )}
 
-          <h2 id="section-declaration-a-valider" className="fr-h5 fr-mb-2w">Déclaration à valider</h2>
-          {lists.avalider.length === 0 ? (
-            <div className="fr-callout fr-mb-4w"><p className="fr-callout__text">Aucun marché en attente de validation.</p></div>
-          ) : (
-            <div className="fr-grid-row fr-grid-row--gutters fr-mb-4w">
-              {lists.avalider.map(r => <RowViewAValider key={r.id} r={r} />)}
-            </div>
-          )}
-
-          <h2 className="fr-h5 fr-mb-2w">Clause sociale validée</h2>
+          <h2 className="fr-h5 fr-mb-2w">Clause sociale validée ou archivée</h2>
           {lists.valide?.length ? (
             <div className="fr-grid-row fr-grid-row--gutters">
-              {lists.valide.map(r => <RowViewArchived key={r.id} r={r} />)}
+              {lists.valide.map(r => <RowViewExecutionMarket key={r.id} r={r} archived />)}
             </div>
           ) : (
-            <div className="fr-callout"><p className="fr-callout__text">Aucun marché dont la clause sociale est validée.</p></div>
+            <div className="fr-callout"><p className="fr-callout__text">Aucun marché dont la clause sociale est validée ou archivée.</p></div>
           )}
         </div>
       </div>
 
-      {/* ==== MODALE CRÉATION ==== */}
-      {newOpen && (
-        <div role="dialog" aria-modal="true" aria-labelledby="new-modal-title"
+      {/* ==== MODALE CHOIX LOT TITULAIRE ==== */}
+      {modalTitulaireLotsOpen && titulaireLotsFor && (
+        <div role="dialog" aria-modal="true" aria-labelledby="titulaire-lots-modal-title"
              className="fr-overlay"
              style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:9999,
                       display:'flex', alignItems:'center', justifyContent:'center',
                       padding:'1rem', overflow:'auto' }}
-             onClick={()=>{ setNewOpen(false); resetNewForm(); resetNewLots(); }}>
+             onClick={closeTitulaireLotsModal}>
           <div className="fr-container fr-container--fluid fr-container-md"
-               style={{maxWidth:'960px', width:'100%'}}
+               style={{maxWidth:'760px', width:'100%'}}
                onClick={(e)=>e.stopPropagation()}>
             <div className="fr-card fr-p-3w"
                  style={{background:'var(--background-default-grey,#fff)', maxHeight:'90vh', overflowY:'auto'}}>
               <div className="fr-grid-row fr-grid-row--middle fr-mb-2w">
                 <div className="fr-col">
-                  <h2 id="new-modal-title" className="fr-h4 fr-mb-0">Déclarer une consultation</h2>
+                  <h2 id="titulaire-lots-modal-title" className="fr-h4 fr-mb-0">Déclarer les titulaires</h2>
                 </div>
                 <div className="fr-col-auto">
-                  <button className="fr-btn fr-btn--tertiary-no-outline" onClick={()=>{ setNewOpen(false); resetNewForm(); resetNewLots(); }}>Fermer</button>
+                  <button className="fr-btn fr-btn--tertiary-no-outline" onClick={closeTitulaireLotsModal}>Fermer</button>
                 </div>
               </div>
 
+              <p className="fr-text--sm fr-mb-2w">
+                {titulaireLotsFor[M.INTITULE] || titulaireLotsFor[M.INTITULE_PROP] || `Marché #${titulaireLotsFor.id}`}
+              </p>
+
               <div className="fr-grid-row fr-grid-row--gutters">
-                <div className="fr-col-12">
-                <p className="fr-text--sm fr-mb-2w">
-                    <span className="fr-text-default--error" aria-hidden="true">*</span> Champs obligatoires
-                  </p>
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="n-intitule">Intitulé du marché <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <input id="n-intitule" className="fr-input" type="text"
-                           value={newForm[M.INTITULE]} onChange={(e)=>setNewForm({...newForm, [M.INTITULE]: e.target.value})}/>
-                    {newErrors[M.INTITULE] && <p className="fr-error-text">{newErrors[M.INTITULE]}</p>}
-                  </div>
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="n-cand">Date limite de remise des offres <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <input id="n-cand" className="fr-input" type="date"
-                            min={ymd(today())}
-                            value={newForm[M.DLRO]} onChange={(e)=>setNewForm({...newForm, [M.DLRO]: e.target.value})}/>
-                    {newErrors[M.DLRO] && <p className="fr-error-text">{newErrors[M.DLRO]}</p>}
-                  </div>
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="n-execend">Date de notification prévisionnelle <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <input id="n-execend" className="fr-input" type="date"
-                            value={newForm[M.DNOTPREV]} onChange={(e)=>setNewForm({...newForm, [M.DNOTPREV]: e.target.value})}/>
-                    {newErrors[M.DNOTPREV] && <p className="fr-error-text">{newErrors[M.DNOTPREV]}</p>}
-                  </div>
-                  <h3 className="fr-h6 fr-mt-4w fr-mb-2w">Lots traités dans Eclauses</h3>
-                  {newErrors.lots && <p className="fr-error-text">{newErrors.lots}</p>}
-                  {newLots.map((lot, idx) => (
-                    <div className="fr-card fr-card--sm fr-mb-2w" key={`new-lot-${idx}`}>
-                      <div className="fr-card__body">
-                        <div className="fr-card__content">
-                          <div className="fr-grid-row fr-grid-row--gutters">
-                            <div className="fr-col-12 fr-col-md-3">
-                              <div className="fr-input-group">
-                                <label className="fr-label" htmlFor={`n-lot-${idx}`}>Numéro de lot <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                                <input id={`n-lot-${idx}`} className="fr-input" type="text" value={lot[M.LOT]} onChange={(e)=>updateNewLot(idx, { [M.LOT]: e.target.value })}/>
-                                {newErrors[`lot-${idx}-${M.LOT}`] && <p className="fr-error-text">{newErrors[`lot-${idx}-${M.LOT}`]}</p>}
-                              </div>
-                            </div>
-                            <div className="fr-col-12 fr-col-md-9">
-                              <div className="fr-input-group">
-                                <label className="fr-label" htmlFor={`n-intitule-lot-${idx}`}>Intitulé du lot <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                                <input id={`n-intitule-lot-${idx}`} className="fr-input" type="text" value={lot[M.INTITULE_LOT]} onChange={(e)=>updateNewLot(idx, { [M.INTITULE_LOT]: e.target.value })}/>
-                                {newErrors[`lot-${idx}-${M.INTITULE_LOT}`] && <p className="fr-error-text">{newErrors[`lot-${idx}-${M.INTITULE_LOT}`]}</p>}
-                              </div>
-                            </div>
-                            <div className="fr-col-12 fr-col-md-6">
-                              <div className="fr-select-group">
-                                <label className="fr-label" htmlFor={`n-clause-${idx}`}>Clause sociale <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                                <select id={`n-clause-${idx}`} className="fr-select" value={lot[M.CLAUSE]} onChange={(e)=>updateNewLot(idx, { [M.CLAUSE]: e.target.value })}>
-                                  <option value="">—</option>
-                                  {optsClauses.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                </select>
-                                {newErrors[`lot-${idx}-${M.CLAUSE}`] && <p className="fr-error-text">{newErrors[`lot-${idx}-${M.CLAUSE}`]}</p>}
-                              </div>
-                            </div>
-                            <div className="fr-col-12 fr-col-md-6">
-                              <div className="fr-input-group">
-                                {ComboBox ? (
-                                  <ComboBox
-                                    id={`n-specs-${idx}`}
-                                    label="Spécialités du marché"
-                                    required
-                                    options={optsSpecs}
-                                    multiple
-                                    value={lot[M.SPECS] || []}
-                                    onChange={(vals) => updateNewLot(idx, {
-                                      [M.SPECS]: (vals || []).map((v) => (typeof v === 'number' ? v : Number(v))).filter((v) => Number.isFinite(v)),
-                                    })}
-                                    placeholder="Choisir des spécialités"
-                                    searchPlaceholder="Rechercher une spécialité"
-                                    summaryMode="list"
-                                  />
-                                ) : (
-                                  <div className="fr-alert fr-alert--error"><p>ComboBox indisponible.</p></div>
-                                )}
-                                {newErrors[`lot-${idx}-${M.SPECS}`] && <p className="fr-error-text">{newErrors[`lot-${idx}-${M.SPECS}`]}</p>}
-                              </div>
-                            </div>
-                            <div className="fr-col-12 fr-col-md-6">
-                              <div className="fr-input-group">
-                                <label className="fr-label" htmlFor={`n-adr-${idx}`}>Lieu d’exécution <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                                <input id={`n-adr-${idx}`} className="fr-input" type="text" value={lot[M.ADR]} onChange={(e)=>updateNewLot(idx, { [M.ADR]: e.target.value })}/>
-                                {newErrors[`lot-${idx}-${M.ADR}`] && <p className="fr-error-text">{newErrors[`lot-${idx}-${M.ADR}`]}</p>}
-                              </div>
-                            </div>
-                            <div className="fr-col-12 fr-col-md-6">
-                              <div className="fr-input-group">
-                                <label className="fr-label" htmlFor={`n-execend-${idx}`}>Date de fin d'exécution prévisionnelle</label>
-                                <input id={`n-execend-${idx}`} className="fr-input" type="date" value={lot[M.EXEC_END]} onChange={(e)=>updateNewLot(idx, { [M.EXEC_END]: e.target.value })}/>
-                                {newErrors[`lot-${idx}-${M.EXEC_END}`] && <p className="fr-error-text">{newErrors[`lot-${idx}-${M.EXEC_END}`]}</p>}
-                              </div>
-                            </div>
+                {getLotsForParent(titulaireLotsFor).map((lot) => {
+                  const invited = hasInvitation(lot);
+                  return (
+                    <div className="fr-col-12" key={`titulaire-lot-${lot.id}`}>
+                      <div className="fr-p-2w" style={{border:'1px solid var(--border-default-grey)', background:'var(--background-default-grey)'}}>
+                        <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
+                          <div className="fr-col">
+                            <p className="fr-text--bold fr-mb-1w">Lot {lot[M.LOT] || '—'} - {lot[M.INTITULE_LOT] || 'Sans intitulé'}</p>
+                            <p className="fr-text--sm fr-mb-0">Clause sociale : <strong>{clauseLabel(lot[M.CLAUSE])}</strong></p>
                           </div>
-                          <div className="fr-btns-group fr-btns-group--right fr-btns-group--sm fr-mt-1w">
-                            <button className="fr-btn fr-btn--secondary" onClick={()=>removeNewLot(idx)} disabled={newLots.length <= 1}>Retirer ce lot</button>
+                          <div className="fr-col-auto">
+                            <button
+                              className="fr-btn fr-btn--sm fr-icon-checkbox-line fr-btn--icon-left"
+                              onClick={() => openInviteModalFromLot(lot)}
+                              disabled={invited}
+                            >
+                              {invited ? 'Titulaire déclaré' : 'Déclarer le titulaire de ce lot'}
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                  ))}
-                  <button className="fr-btn fr-btn--secondary fr-btn--sm fr-icon-add-line fr-btn--icon-left" onClick={addNewLot}>
-                    Ajouter un lot
-                  </button>
-                  <div className="fr-btns-group fr-btns-group--inline fr-btns-group--right fr-mt-2w">
-                    <button className="fr-btn" onClick={createMarche} disabled={creating}>
-                      {creating ? 'Création…' : 'Créer'}
-                    </button>
-                    <button className="fr-btn fr-btn--secondary" onClick={()=>{ setNewOpen(false); resetNewForm(); resetNewLots(); }} disabled={creating}>
-                      Annuler
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==== MODALE ÉDITION ==== */}
-      {modalEditOpen && (
-        <div role="dialog" aria-modal="true" aria-labelledby="edit-modal-title"
-             className="fr-overlay"
-             style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:9999,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      padding:'1rem', overflow:'auto' }}
-             onClick={closeEditModal}>
-          <div className="fr-container fr-container--fluid fr-container-md"
-               style={{maxWidth:'960px', width:'100%'}}
-               onClick={(e)=>e.stopPropagation()}>
-            <div className="fr-card fr-p-3w"
-                 style={{background:'var(--background-default-grey,#fff)', maxHeight:'90vh', overflowY:'auto'}}>
-              <div className="fr-grid-row fr-grid-row--middle fr-mb-2w">
-                <div className="fr-col">
-                  <h2 id="edit-modal-title" className="fr-h4 fr-mb-0">
-                    {editingKind === 'lot-create' ? 'Ajouter un lot' : (editingKind === 'lot' ? 'Modifier le lot' : 'Modifier le marché')}
-                  </h2>
-                </div>
-                <div className="fr-col-auto">
-                  <button className="fr-btn fr-btn--tertiary-no-outline" onClick={closeEditModal}>Fermer</button>
-                </div>
-              </div>
-
-              <div className="fr-grid-row fr-grid-row--gutters">
-                <div className="fr-col-12">
-                  <p className="fr-text--sm fr-mb-2w">
-                    <span className="fr-text-default--error" aria-hidden="true">*</span> Champs obligatoires
-                  </p>
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="e-intitule">Intitulé du marché <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <input id="e-intitule" className="fr-input" type="text"
-                           value={editForm[M.INTITULE]} onChange={(e)=>setEditForm({...editForm, [M.INTITULE]: e.target.value})}/>
-                    {editErrors[M.INTITULE] && <p className="fr-error-text">{editErrors[M.INTITULE]}</p>}
-                  </div>
-                  {editingKind === 'parent' && (
-                    <p className="fr-text--sm fr-mb-2w">Les informations propres aux lots se modifient depuis la fiche marché.</p>
-                  )}
-                  {editingKind !== 'parent' && (
-                  <div className="fr-checkbox-group fr-checkbox-group--sm fr-mb-2w" style={{display:'none'}}>
-                    <input type="checkbox" id="e-no-lot"
-                      checked={editNoLot}
-                      onChange={(e)=>{ 
-                        const checked = e.target.checked;
-                        setEditNoLot(checked);
-                        if (checked) {
-                          setEditForm({ ...editForm, [M.INTITULE_LOT]: '', [M.LOT]: '' });
-                        }
-                      }} />
-                    <label className="fr-label" htmlFor="e-no-lot">Marché non alloti</label>
-                  </div>
-                  )}
-                  {editingKind !== 'parent' && (
-                    <div className="fr-grid-row fr-grid-row--gutters fr-mb-2w">
-                      <div className="fr-col">
-                        <div className="fr-input-group">
-                          <label className="fr-label" htmlFor="e-lot">Numéro de lot <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                          <input id="e-lot" className="fr-input" type="text"
-                                value={editForm[M.LOT]} onChange={(e)=>setEditForm({...editForm, [M.LOT]: e.target.value})}/>
-                          {editErrors[M.LOT] && <p className="fr-error-text">{editErrors[M.LOT]}</p>}
-                        </div>
-                      </div>
-                      <div className="fr-col">
-                        <div className="fr-input-group">
-                          <label className="fr-label" htmlFor="e-intitule-lot">Intitulé du lot <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                          <input id="e-intitule-lot" className="fr-input" type="text"
-                                value={editForm[M.INTITULE_LOT]} onChange={(e)=>setEditForm({...editForm, [M.INTITULE_LOT]: e.target.value})}/>
-                          {editErrors[M.INTITULE_LOT] && <p className="fr-error-text">{editErrors[M.INTITULE_LOT]}</p>}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {editingKind !== 'parent' && (
-                  <>
-                  <div className="fr-select-group">
-                    <label className="fr-label" htmlFor="n-clause">Clause sociale <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <select id="n-clause" className="fr-select"
-                            value={editForm[M.CLAUSE]} onChange={(e)=>setEditForm({...editForm, [M.CLAUSE]: e.target.value})}>
-                      <option value="">—</option>
-                      {optsClauses.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    {editErrors[M.CLAUSE] && <p className="fr-error-text">{editErrors[M.CLAUSE]}</p>}
-                  </div>
-                  <div className="fr-input-group">
-                    {ComboBox ? (
-                      <ComboBox
-                        id="e-specs"
-                        label="Spécialités du marché"
-                        required
-                        options={optsSpecs}
-                        multiple
-                        value={editForm[M.SPECS] || []}
-                        onChange={(vals) => setEditForm({
-                          ...editForm,
-                          [M.SPECS]: (vals || [])
-                            .map((v) => (typeof v === 'number' ? v : Number(v)))
-                            .filter((v) => Number.isFinite(v)),
-                        })}
-                        placeholder="Choisir des spécialités"
-                        searchPlaceholder="Rechercher une spécialité"
-                        summaryMode="list"
-                      />
-                    ) : (
-                      <div className="fr-alert fr-alert--error"><p>ComboBox indisponible.</p></div>
-                    )}
-                    {editErrors[M.SPECS] && <p className="fr-error-text">{editErrors[M.SPECS]}</p>}
-                  </div>
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="n-adr">Lieu d’exécution <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <input id="n-adr" className="fr-input" type="text"
-                           value={editForm[M.ADR]} onChange={(e)=>setEditForm({...editForm, [M.ADR]: e.target.value})}/>
-                    {editErrors[M.ADR] && <p className="fr-error-text">{editErrors[M.ADR]}</p>}
-                  </div>
-                  </>
-                  )}
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="n-cand">Date limite de remise des offres <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <input id="n-cand" className="fr-input" type="date"
-                            min={ymd(today())}
-                            value={editForm[M.DLRO]} onChange={(e)=>setEditForm({...editForm, [M.DLRO]: e.target.value})}/>
-                    {editErrors[M.DLRO] && <p className="fr-error-text">{editErrors[M.DLRO]}</p>}
-                  </div>
-
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="n-execend">Date de notification prévisionnelle <span className="fr-text-default--error" aria-hidden="true">*</span></label>
-                    <input id="n-execend" className="fr-input" type="date"
-                            value={editForm[M.DNOTPREV]} onChange={(e)=>setEditForm({...editForm, [M.DNOTPREV]: e.target.value})}/>
-                    {editErrors[M.DNOTPREV] && <p className="fr-error-text">{editErrors[M.DNOTPREV]}</p>}
-                  </div>
-                  {editingKind !== 'parent' && (
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="n-execend">Date de fin d'exécution prévisionnelle</label>
-                    <input id="n-execend" className="fr-input" type="date"
-                            value={editForm[M.EXEC_END]} onChange={(e)=>setEditForm({...editForm, [M.EXEC_END]: e.target.value})}/>
-                    {editErrors[M.EXEC_END] && <p className="fr-error-text">{editErrors[M.EXEC_END]}</p>}
-                  </div>
-                  )}
-                  <div className="fr-btns-group fr-btns-group--inline fr-btns-group--right fr-mt-2w">
-                    <button className="fr-btn" onClick={() => saveEdit(editingId)} disabled={savingId != null}>
-                      {savingId===editingId || savingId === 'lot-create' ? 'Enregistrement…' : (editingKind === 'lot-create' ? 'Ajouter le lot' : 'Enregistrer')}
-                    </button>
-                    <button className="fr-btn fr-btn--secondary" onClick={closeEditModal}>
-                      Annuler
-                    </button>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1630,15 +1103,30 @@ const Component = () => {
 
                {!hasInvited && (
                 <>
+	                  <div className="fr-input-group">
+	                    <label className="fr-label" htmlFor="invite-email">E-mail du titulaire</label>
+	                    <input id="invite-email" className="fr-input" type="email" placeholder="email@domaine.fr"
+	                          value={inviteEmail} onChange={(e)=>setInviteEmail(e.target.value.toLowerCase())} />
+	                    <p className="fr-hint-text">En cas de groupement, déclarez uniquement le mandataire.</p>
+	                    {!emailOk(inviteEmail) && inviteEmail && <p className="fr-error-text">Adresse invalide.</p>}
+	                  </div>
                   <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="invite-email">E-mail du titulaire</label>
-                    <input id="invite-email" className="fr-input" type="email" placeholder="email@domaine.fr"
-                          value={inviteEmail} onChange={(e)=>setInviteEmail(e.target.value)} />
-                    {!emailOk(inviteEmail) && inviteEmail && <p className="fr-error-text">Adresse invalide.</p>}
-                  </div>
+                    <label className="fr-label" htmlFor="invite-exec-end">Date de fin d'exécution prévisionnelle</label>
+                    <input id="invite-exec-end" className="fr-input" type="date"
+	                          value={inviteExecEnd} onChange={(e)=>setInviteExecEnd(e.target.value)} />
+	                  </div>
+	                  <div className="fr-checkbox-group fr-checkbox-group--sm fr-mb-2w">
+	                    <input
+	                      type="checkbox"
+	                      id="invite-place-notified"
+	                      checked={invitePlaceNotified}
+	                      onChange={(e)=>setInvitePlaceNotified(e.target.checked)}
+	                    />
+	                    <label className="fr-label" htmlFor="invite-place-notified">J'ai bien notifié le titulaire sur PLACE</label>
+	                  </div>
 
-                <div className="fr-btns-group fr-btns-group--right fr-mt-2w">
-                  <button className="fr-btn" onClick={()=>inviteTitulaire(inviteFor)} disabled={inviting || !emailOk(inviteEmail)}>
+	                <div className="fr-btns-group fr-btns-group--right fr-mt-2w">
+	                  <button className="fr-btn" onClick={()=>inviteTitulaire(inviteFor)} disabled={inviting || !emailOk(inviteEmail) || !invitePlaceNotified}>
                     {inviting ? 'Invitation…' : 'Déclarer le titulaire'}
                   </button>
                   <button className="fr-btn fr-btn--secondary" onClick={closeInviteModal}>Fermer</button>
@@ -1666,7 +1154,7 @@ const Component = () => {
                  style={{background:'var(--background-default-grey,#fff)', maxHeight:'90vh', overflowY:'auto'}}>
               <div className="fr-grid-row fr-grid-row--middle fr-mb-2w">
                 <div className="fr-col">
-                  <h2 id="pub-modal-title" className="fr-h4 fr-mb-0">Déclarer la publication de la consultation</h2>
+                  <h2 id="pub-modal-title" className="fr-h4 fr-mb-0">Déclarer la publication du marché</h2>
                 </div>
                 <div className="fr-col-auto">
                   <button className="fr-btn fr-btn--tertiary-no-outline" onClick={closePubModal}>Fermer</button>
@@ -1679,35 +1167,22 @@ const Component = () => {
                   <p>Attention ! Veillez à vérifier les informations de ce marché, toute modification ultérieure nécessitera l'intervention du support Eclauses.</p>
                 </div>
                 {(() => {
-                  const hasLotTitle = Boolean(pubMarche[M.INTITULE_LOT]);
-                  const hasLotNumber = Boolean(pubMarche[M.LOT]);
+                  const lots = getLotsForParent(pubMarche);
                   return (
                     <>
                 <dl className="fr-text--sm fr-mb-2w">
                   <dt className="fr-text--bold">Intitulé du marché</dt>
                   <dd>{pubMarche[M.INTITULE] || '—'}</dd>
-                  {hasLotTitle && (
-                    <>
-                      <dt className="fr-text--bold">Intitulé du lot</dt>
-                      <dd>{pubMarche[M.INTITULE_LOT] || '—'}</dd>
-                    </>
-                  )}
-                  {hasLotNumber && (
-                    <>
-                      <dt className="fr-text--bold">Numéro de lot</dt>
-                      <dd>{pubMarche[M.LOT] || '—'}</dd>
-                    </>
-                  )}
-                  <dt className="fr-text--bold">Clause sociale</dt>
-                  <dd>{clauseLabel(pubMarche[M.CLAUSE])}</dd>
-                  <dt className="fr-text--bold">Lieu d’exécution</dt>
-                  <dd>{pubMarche[M.ADR] || '—'}</dd>
+	                  { lots.length > 0 && (
+	                     <dt className="fr-text--bold">Nombre de lot</dt>
+	                  )}
+	                  <dd>{lots.length || '—'}</dd>
+                  <dt className="fr-text--bold">Clauses sociales</dt>
+                  <dd>{getMarketClauses(pubMarche).map(clauseLabel).join(', ') || '—'}</dd>
                   <dt className="fr-text--bold">Date limite de remise des offres</dt>
                   <dd>{formatDateOrDash(pubMarche[M.DLRO])}</dd>
                   <dt className="fr-text--bold">Date de notification prévisionnelle</dt>
                   <dd>{formatDateOrDash(pubMarche[M.DNOTPREV])}</dd>
-                  <dt className="fr-text--bold">Date de fin d'exécution prévisionnelle</dt>
-                  <dd>{formatDateOrDash(pubMarche[M.EXEC_END])}</dd>
                 </dl>
                     </>
                   );
@@ -1741,68 +1216,6 @@ const Component = () => {
                   Valider la publication
                 </button>
                 <button className="fr-btn fr-btn--secondary" onClick={closePubModal}>Annuler</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==== MODALE VALIDATION DÉCLARATION ==== */}
-      {modalDeclOpen && (
-        <div role="dialog" aria-modal="true" aria-labelledby="decl-modal-title"
-             className="fr-overlay"
-             style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:9999,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      padding:'1rem', overflow:'auto' }}
-             onClick={closeDeclModal}>
-          <div className="fr-container fr-container--fluid fr-container-md"
-               style={{maxWidth:'840px', width:'100%'}}
-               onClick={(e)=>e.stopPropagation()}>
-            <div className="fr-card fr-p-3w"
-                 style={{background:'var(--background-default-grey,#fff)', maxHeight:'90vh', overflowY:'auto'}}>
-              <div className="fr-grid-row fr-grid-row--middle fr-mb-2w">
-                <div className="fr-col">
-                  <h2 id="decl-modal-title" className="fr-h4 fr-mb-0">Déclaration des bénéficiaires</h2>
-                </div>
-                <div className="fr-col-auto">
-                  <button className="fr-btn fr-btn--tertiary-no-outline" onClick={closeDeclModal}>Fermer</button>
-                </div>
-              </div>
-
-              {declList.length === 0 ? (
-                <div className="fr-callout"><p className="fr-callout__text">Aucun bénéficiaire déclaré pour ce marché.</p></div>
-              ) : (
-                <div className="fr-grid-row fr-grid-row--gutters">
-                  {declList.map(d => {
-                    const isE = toBool(d.Est_beneficiaire_eclauses);
-                    const b = isE ? benefMap.get(d.Beneficiaire) : null;
-                    const nom = isE ? (b?.NOM || b?.Nom || '—') : (d.Nom || '—');
-                    const prenom = isE ? (b?.Prenom || b?.PRENOM || '—') : (d.Prenom || '—');
-                    const email = isE ? (b?.Courriel || b?.Email || '—') : (d.Email || d.Courriel || '—');
-                    const statut = d.Statut || '—';
-                    return (
-                      <div className="fr-col-12 fr-col-md-6" key={d.id}>
-                        <div className="fr-card fr-card--sm">
-                          <div className="fr-card__body">
-                            <div className="fr-card__content">
-                              <p className="fr-badge fr-badge--sm fr-mb-1w">{statut}</p>
-                              <p className="fr-text--sm fr-mb-1w"><strong>Type :</strong> {isE ? 'Eclauses' : 'Externe'}</p>
-                              <p className="fr-text--sm fr-mb-1w"><strong>Bénéficiaire :</strong> {`${prenom} ${nom}`.trim() || '—'}</p>
-                              <p className="fr-text--sm fr-mb-0"><strong>Email :</strong> {email}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="fr-btns-group fr-btns-group--right fr-mt-3w">
-                <button className="fr-btn" onClick={validateDeclaration} disabled={validating || !declList.length}>
-                  {validating ? 'Validation…' : 'Valider la déclaration'}
-                </button>
-                <button className="fr-btn fr-btn--secondary" onClick={closeDeclModal}>Annuler</button>
               </div>
             </div>
           </div>
@@ -1843,121 +1256,6 @@ const Component = () => {
                 <button className="fr-btn fr-btn--danger" onClick={deleteRowConfirmed} disabled={deletingId===deleteRowItem.id}>
                   {deletingId===deleteRowItem.id ? 'Suppression…' : 'Supprimer'}
                 </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {detailOpen && detailRow && (
-        <div role="dialog" aria-modal="true" aria-labelledby="detail-modal-title"
-             className="fr-overlay"
-             style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.45)', zIndex:9999,
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      padding:'1rem', overflow:'auto' }}
-             onClick={closeDetailModal}>
-          <div className="fr-container fr-container--fluid fr-container-md"
-               style={{maxWidth:'720px', width:'100%'}}
-               onClick={(e)=>e.stopPropagation()}>
-            <div className="fr-card fr-p-3w"
-                 style={{background:'var(--background-default-grey,#fff)', maxHeight:'90vh', overflowY:'auto'}}>
-              <div className="fr-grid-row fr-grid-row--middle fr-mb-2w">
-                <div className="fr-col">
-                  <h2 id="detail-modal-title" className="fr-h4 fr-mb-0">Détails du marché</h2>
-                </div>
-                <div className="fr-col-auto">
-                  <button className="fr-btn fr-btn--tertiary-no-outline" onClick={closeDetailModal}>Fermer</button>
-                </div>
-              </div>
-
-              <div className="fr-mb-2w">
-                {renderStatus(detailRow[M.STATUS])}
-              </div>
-
-              <dl className="fr-text--sm">
-                <dt className="fr-text--bold">Intitulé du marché</dt>
-                <dd>{detailRow[M.INTITULE] || '—'}</dd>
-                <dt className="fr-text--bold">Intitulé du lot</dt>
-                <dd>{detailRow[M.INTITULE_LOT] || '—'}</dd>
-                <dt className="fr-text--bold">Numéro de lot</dt>
-                <dd>{detailRow[M.LOT] || '—'}</dd>
-                <dt className="fr-text--bold">Clause sociale</dt>
-                <dd>{clauseLabel(detailRow[M.CLAUSE])}</dd>
-                <dt className="fr-text--bold">Lieu d’exécution</dt>
-                <dd>{detailRow[M.ADR] || '—'}</dd>
-                <dt className="fr-text--bold">Spécialités du marché</dt>
-                <dd>
-                  {asArray(detailRow[M.SPECS])
-                    .filter((x) => x !== 'L' && x != null && x !== '')
-                    .map((x) => {
-                      const n = Number(x);
-                      return Number.isFinite(n) ? n : x;
-                    })
-                    .map((id) => specLabel(id))
-                    .join(', ') || '—'}
-                </dd>
-                <dt className="fr-text--bold">Date limite de remise des offres</dt>
-                <dd>{formatDate(parseDate(detailRow[M.DLRO]))}</dd>
-                <dt className="fr-text--bold">Date de notification prévisionnelle</dt>
-                <dd>{formatDate(parseDate(detailRow[M.DNOTPREV]))}</dd>
-                <dt className="fr-text--bold">Lien des documents de consultation</dt>
-                <dd>
-                  {detailRow[M.LIEN_DOCS] ? (
-                    <a className="fr-link" href={detailRow[M.LIEN_DOCS]} target="_blank" rel="noreferrer">
-                      Ouvrir le lien
-                    </a>
-                  ) : '—'}
-                </dd>
-              </dl>
-
-              {['Clause validée', 'Clauses validées'].includes(String(detailRow[M.STATUS] || '')) && (
-                <section className="fr-mt-3w">
-                  <h3 className="fr-h6 fr-mb-2w">Bénéficiaires déclarés</h3>
-                  {(() => {
-                    const ids = Array.isArray(detailRow[M.BENEFICIAIRES])
-                      ? detailRow[M.BENEFICIAIRES].filter(x => x !== 'L')
-                      : [];
-                    const list = (declRows || []).filter(d => ids.includes(d.id));
-                    if (!list.length) {
-                      return (
-                        <div className="fr-callout">
-                          <p className="fr-callout__text">Aucun bénéficiaire déclaré.</p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="fr-grid-row fr-grid-row--gutters">
-                        {list.map(d => {
-                          const isE = toBool(d.Est_beneficiaire_eclauses);
-                          const b = isE ? benefMap.get(d.Beneficiaire) : null;
-                          const nom = isE ? (b?.NOM || b?.Nom || '—') : (d.Nom || '—');
-                          const prenom = isE ? (b?.Prenom || b?.PRENOM || '—') : (d.Prenom || '—');
-                          const email = isE ? (b?.Courriel || b?.Email || '—') : (d.Email || d.Courriel || '—');
-                          const statut = String(d.Statut || 'déclaré');
-                        const isValid = statut.toLowerCase() === 'validé';
-                        return (
-                          <div className="fr-col-12 fr-col-md-6" key={`decl-${d.id}`}>
-                            <div className="fr-card fr-card--sm">
-                              <div className="fr-card__body">
-                                <div className="fr-card__content">
-                                  <p className={`fr-badge fr-badge--sm ${isValid ? 'fr-badge--success' : 'fr-badge--info'} fr-mb-1w`}>{statut}</p>
-                                  <p className="fr-text--sm fr-mb-1w"><strong>Type :</strong> {isE ? 'Eclauses' : 'Externe'}</p>
-                                    <p className="fr-text--sm fr-mb-1w"><strong>Bénéficiaire :</strong> {`${prenom} ${nom}`.trim() || '—'}</p>
-                                    <p className="fr-text--sm fr-mb-0"><strong>Email :</strong> {email}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </section>
-              )}
-
-              <div className="fr-btns-group fr-btns-group--right fr-mt-3w">
-                <button className="fr-btn fr-btn--primary" onClick={closeDetailModal}>Fermer</button>
               </div>
             </div>
           </div>

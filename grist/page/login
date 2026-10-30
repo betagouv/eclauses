@@ -124,7 +124,11 @@ const Component = () => {
           </form>
 
       <div className="fr-mt-3w">
-        <p>Pour créer votre compte, <a href="#" data-nav="support">contacter le support Eclauses</a>.</p>
+        <p>
+          <a href="#" data-nav="support-contact">
+            Contacter le support pour demander la création de mon compte Eclauses
+          </a>
+        </p>
         <button
           className="fr-link"
           type="button"
