@@ -6,7 +6,6 @@ import { LegacyHost, type HostProps } from './LegacyHost';
 
 /** Chaque page reprise du widget est chargée à la demande (un seul gros fichier par page). */
 export const LOADERS: Record<string, () => Promise<{ default: ComponentType }>> = {
-  accueil: () => import('./pages/accueil'),
   login: () => import('./pages/login'),
   'mot-de-passe-oublie': () => import('./pages/mot-de-passe-oublie'),
   'reset-password': () => import('./pages/reset-password'),
@@ -19,10 +18,6 @@ export const LOADERS: Record<string, () => Promise<{ default: ComponentType }>> 
   'mentions-legales': () => import('./pages/mentions-legales'),
   'donnees-personnelles': () => import('./pages/donnees-personnelles'),
   accessibilite: () => import('./pages/accessibilite'),
-  'beneficiaire-home': () => import('./pages/beneficiaire-home'),
-  'beneficiaire-profil': () => import('./pages/beneficiaire-profil'),
-  'beneficiaire-marches': () => import('./pages/beneficiaire-marches'),
-  'beneficiaire-annuaire': () => import('./pages/beneficiaire-annuaire'),
   'acheteur-home': () => import('./pages/acheteur-home'),
   'acheteur-marches': () => import('./pages/acheteur-marches'),
   'acheteur-annuaire': () => import('./pages/acheteur-annuaire'),

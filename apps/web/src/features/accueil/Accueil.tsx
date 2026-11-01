@@ -1,35 +1,11 @@
-// @ts-nocheck : code repris du widget Grist (grist/page/accueil), typé progressivement.
-'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
-import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import Link from 'next/link';
+import type { ServerSession } from '@/legacy/gristAPI';
 
-const Component = () => {
-  const go = (id) => {
-    try {
-      if (typeof helpers !== 'undefined' && helpers?.go) {
-        return helpers.go(id);
-      }
-      if (gristAPI?.navigate) {
-        gristAPI.navigate(id);
-      }
-    } catch (e) {
-      console.warn(e);
-    }
-  };
-  const [authed, setAuthed] = React.useState(false);
-
-  React.useEffect(() => {
-    try {
-      const ok = gristAPI?.isAuthenticated && gristAPI.isAuthenticated();
-      setAuthed(!!ok);
-      document.title = 'Eclauses';
-    } catch (_) {}
-  }, []);
-
-
+/**
+ * Page d'accueil publique, rendue par le serveur : le contenu est dans le HTML, sans JavaScript ni
+ * appel de données. La session sert seulement à choisir entre « Se connecter » et « Retour à mon espace ».
+ */
+export function Accueil({ session }: { session: ServerSession | null }) {
   return (
     <main className="fr-container fr-my-6w">
       {/* Hero */}
@@ -41,18 +17,18 @@ const Component = () => {
               Eclauses met en relation des candidats à des marchés publics et des bénéficiaires de clauses sociales portées par le ministère de la Culture
             </p>
             <div className="fr-btns-group fr-btns-group--inline fr-btns-group--icon-left fr-mt-3w">
-              {authed ? (
-                <button className="fr-btn fr-icon-account-line" onClick={() => gristAPI.goToDefault()}>
+              {session ? (
+                <Link className="fr-btn fr-icon-account-line" href="/">
                   Retour à mon espace
-                </button>
+                </Link>
               ) : (
-                <button className="fr-btn fr-icon-lock-line" onClick={() => go('login')}>
+                <Link className="fr-btn fr-icon-lock-line" href="/login">
                   Se connecter
-                </button>
+                </Link>
               )}
-              <button className="fr-btn fr-btn--secondary fr-icon-question-line" onClick={() => go('support')}>
+              <Link className="fr-btn fr-btn--secondary fr-icon-question-line" href="/support">
                 Centre d'aide
-              </button>
+              </Link>
             </div>
           </div>
           <div className="fr-col-12 fr-col-md-5">
@@ -77,7 +53,7 @@ const Component = () => {
                 <div className="fr-tile__body">
                     <div className="fr-tile__content">
                         <h3 className="fr-tile__title">
-                            <a href="#" onClick={(e) => { e.preventDefault(); go('login'); }}>Bénéficiaires</a>
+                            <Link href="/login">Bénéficiaires</Link>
                         </h3>
                         <p className="fr-tile__desc">Ils sont mis en visibilité et peuvent indiquer leur intérêt pour des marchés couverts par la clause sociale qui les concerne.</p>
                     </div>
@@ -94,7 +70,7 @@ const Component = () => {
                 <div className="fr-tile__body">
                     <div className="fr-tile__content">
                         <h3 className="fr-tile__title">
-                            <a href="#" onClick={(e) => { e.preventDefault(); go('login'); }}>Candidats & Titulaires</a>
+                            <Link href="/login">Candidats & Titulaires</Link>
                         </h3>
                         <p className="fr-tile__desc">Ils effectuent des recherches de bénéficiaires et entrent en contact avec eux pour mettre en œuvre la considération sociale du marché concerné.</p>
                     </div>
@@ -111,7 +87,7 @@ const Component = () => {
                     <div className="fr-tile__body">
                         <div className="fr-tile__content">
                             <h3 className="fr-tile__title">
-                                <a href="#" onClick={(e) => { e.preventDefault(); go('login'); }}>Acheteurs</a>
+                                <Link href="/login">Acheteurs</Link>
                             </h3>
                             <p className="fr-tile__desc"> Ils déclarent les marchés couverts par des clauses sociales culture et suivent leur mise en œuvre.</p>
                         </div>
@@ -131,12 +107,10 @@ const Component = () => {
       <section className="fr-mb-6w">
         <h2 className="fr-h4 fr-mb-2w">Support</h2>
         <ul className="fr-list fr-text--sm">
-          <li>Consultez la <button className="fr-link" onClick={() => go('support')}>FAQ</button> pour les questions courantes.</li>
+          <li>Consultez la <Link className="fr-link" href="/support">FAQ</Link> pour les questions courantes.</li>
           <li>Consultez la vidéo de démonstration d’Eclauses [A venir]</li>
         </ul>
       </section>
     </main>
   );
-};
-
-export default Component;
+}

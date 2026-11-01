@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/AppShell';
+import { SERVER_PAGES } from '@/features/registry';
 import { PageHost } from '@/legacy/PageHost';
 import { pageById } from '@/legacy/pages';
 import { currentSession } from '@/server/http';
@@ -24,9 +25,10 @@ export default async function Page({ params }: Props) {
   if (def.auth && !session) redirect(`/login?next=${def.id}`);
   if (def.role && !session?.roles.includes(def.role)) redirect('/');
 
+  const render = Object.hasOwn(SERVER_PAGES, def.id) ? SERVER_PAGES[def.id] : undefined;
   return (
     <AppShell session={session} currentPage={def.id}>
-      <PageHost id={def.id} session={session} env={publicEnv()} />
+      {render && session ? await render({ session }) : <PageHost id={def.id} session={session} env={publicEnv()} />}
     </AppShell>
   );
 }

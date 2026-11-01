@@ -1,13 +1,13 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/beneficiaire-marches), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif de « Marchés actifs » : le serveur lit les marchés, intérêts et référentiels et les
+// passe en `initial` ; le premier rendu (côté serveur) contient déjà la liste. Les favoris passent par
+// des Server Actions.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import ComboBox from '@/legacy/components/ComboBox';
+import { ajouterInteret, retirerInteret } from '@/server/actions/beneficiaire';
 
-const Component = () => {
-  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
+const Component = ({ initial, session }) => {
   // ===== Tables & colonnes =====
   const T = {
     MARCHES: 'Marches',
@@ -124,23 +124,21 @@ const Component = () => {
   }
 
   // ===== State =====
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState(null);
 
-  const [marches, setMarches] = React.useState([]);
-  const [acheteurs, setAcheteurs] = React.useState([]);
-  const [clauses, setClauses] = React.useState([]);
-  const [benefRows, setBenefRows] = React.useState([]);
-  const [currentBenefId, setCurrentBenefId] = React.useState(null);
+  const [marches, setMarches] = React.useState(initial.marches);
+  const [acheteurs, setAcheteurs] = React.useState(initial.acheteurs);
+  const [clauses, setClauses] = React.useState(initial.clauses);
+  const [benefRows, setBenefRows] = React.useState(initial.beneficiaires);
+  const [currentBenefId, setCurrentBenefId] = React.useState(session.beneficiaireId || null);
 
-  const [specRows, setSpecRows] = React.useState([]);
-  const [optsSpecs, setOptsSpecs] = React.useState([]);
+  const [specRows, setSpecRows] = React.useState(initial.specialites);
+  const [optsSpecs, setOptsSpecs] = React.useState(() => toOptions(initial.specialites));
 
   // Intérêts
   const [interestMode, setInterestMode] = React.useState('table'); // 'table' | 'suivi'
-  const [interestRows, setInterestRows] = React.useState([]);
-  const [interestedSet, setInterestedSet] = React.useState(new Set());
-  const [interestIdx, setInterestIdx] = React.useState(new Map());
+  const [interestRows, setInterestRows] = React.useState(initial.interets);
 
   // UI
   const [search, setSearch] = React.useState('');
@@ -254,62 +252,13 @@ const Component = () => {
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalRow, setModalRow]   = React.useState(null);
 
-  // ===== Load =====
+  // ===== Carte : Leaflet se charge dans le navigateur, après l'affichage de la liste =====
   React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true); setErr(null);
-
-        const auth = gristAPI?.getAuth ? gristAPI.getAuth() : null;
-
-        const [m, a, c, b, s] = await Promise.all([
-          gristAPI.getData(T.MARCHES),
-          gristAPI.getData(T.ACHETEURS).catch(() => []),
-          gristAPI.getData(T.CLAUSES).catch(() => []),
-          gristAPI.getData(T.BENEF).catch(() => []),
-          gristAPI.getData(T.SPECS).catch(() => []),
-        ]);
-
-        // Intérêts
-        let interets = [];
-        interets = await gristAPI.getData(T.INTERETS);
-        if (!Array.isArray(interets)) interets = [];
-
-        if (!mounted) return;
-
-        setMarches(Array.isArray(m) ? m : []);
-        setAcheteurs(Array.isArray(a) ? a : []);
-        setClauses(Array.isArray(c) ? c : []);
-        setBenefRows(Array.isArray(b) ? b : []);
-        setSpecRows(Array.isArray(s) ? s : []);
-        setOptsSpecs(toOptions(Array.isArray(s) ? s : []));
-        setInterestRows(interets);
-
-        // Bénéficiaire courant
-        let id = auth?.beneficiaireId || null;
-        if (!id && auth?.email) {
-          const low = String(auth.email).toLowerCase();
-          const byMail = (b || []).find(r => String(r.Courriel || '').toLowerCase() === low);
-          if (byMail) id = byMail.id;
-        }
-        if (!id && b && b.length === 1) id = b[0].id;
-        setCurrentBenefId(id || null);
-
-        // Prépare Leaflet
-        loadLeaflet().then(() => {
-          leafletReadyRef.current = true;
-          if (mapElRef.current && !mapRef.current) initMap();
-        }).catch(() => {});
-      } catch (e) {
-        if (!mounted) return;
-        setErr(e?.message || 'Erreur de chargement');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => { mounted = false; };
+    document.title = 'Marchés actifs - Eclauses';
+    loadLeaflet().then(() => {
+      leafletReadyRef.current = true;
+      if (mapElRef.current && !mapRef.current) initMap();
+    }).catch(() => {});
   }, []);
 
   // initMap : création unique quand container dispo
@@ -334,25 +283,18 @@ const Component = () => {
     return raw.filter((x) => isNum(x) && validClauseIdSet.has(x));
   }, [benefRows, currentBenefId, validClauseIdSet]);
 
-  // Construire intérêts
-  React.useEffect(() => {
-    if (!currentBenefId) {
-      setInterestedSet(new Set());
-      setInterestIdx(new Map());
-      return;
-    }
+  // Intérêts du bénéficiaire (calcul pur à partir des lignes lues : même résultat côté serveur et navigateur)
+  const { interestedSet, interestIdx } = React.useMemo(() => {
+    if (!currentBenefId) return { interestedSet: new Set(), interestIdx: new Map() };
     if (interestMode === 'table') {
       const mine = (interestRows || []).filter(r => r[INTERET.BENEF] === currentBenefId);
       const { idx, set } = buildInterestMaps(mine);
-      setInterestIdx(idx);
-      setInterestedSet(set);
-    } else {
-      const set = new Set((marches || [])
-        .filter(m => asArray(m[C.SUIVI]).includes('Intéressé'))
-        .map(m => m.id));
-      setInterestedSet(expandToLotIds([...set]));
-      setInterestIdx(new Map());
+      return { interestedSet: set, interestIdx: idx };
     }
+    const set = new Set((marches || [])
+      .filter(m => asArray(m[C.SUIVI]).includes('Intéressé'))
+      .map(m => m.id));
+    return { interestedSet: expandToLotIds([...set]), interestIdx: new Map() };
   }, [interestRows, interestMode, currentBenefId, marches, expandToLotIds, buildInterestMaps]);
 
   // Combobox géré par composant partagé
@@ -497,31 +439,12 @@ const Component = () => {
     if (!currentBenefId) { setErr("Vous devez être connecté."); return; }
     const marcheId = row.id;
     try {
-        const idx = new Map(interestIdx);
-        const set = new Set(interestedSet);
-        if (set.has(marcheId)) {
-          const recId = idx.get(marcheId);
-          if (recId != null) await gristAPI.deleteRecord(T.INTERETS, recId);
-          let interets = await gristAPI.getData(T.INTERETS);
-          if (!Array.isArray(interets)) interets = [];
-          const mine = (interets || []).filter(r => r[INTERET.BENEF] === currentBenefId);
-          const next = buildInterestMaps(mine);
-          setInterestIdx(next.idx);
-          setInterestedSet(next.set);
-        } else {
-          await gristAPI.addRecord(T.INTERETS, {
-            [INTERET.MARCHE]: marcheId,
-            [INTERET.BENEF]: currentBenefId,
-          });
-          let interets = await gristAPI.getData(T.INTERETS);
-          if (!Array.isArray(interets)) interets = [];
-
-          const mine = (interets || []).filter(r => r[INTERET.BENEF] === currentBenefId);
-          const { idx, set } = buildInterestMaps(mine);
-          setInterestIdx(idx);
-          setInterestedSet(set);
-        }
-      
+      const recId = interestedSet.has(marcheId) ? interestIdx.get(marcheId) : null;
+      const res = interestedSet.has(marcheId)
+        ? (recId != null ? await retirerInteret(recId) : null)
+        : await ajouterInteret(marcheId);
+      if (res && !res.ok) throw new Error(res.message);
+      if (res) setInterestRows(res.data);
     } catch (e) {
       setErr(e?.message || "Impossible de changer l'état de favori.");
     }

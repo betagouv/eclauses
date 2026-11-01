@@ -52,10 +52,6 @@ async function json<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-const unsupported = (name: string) => async () => {
-  throw new Error(`gristAPI.${name} n'est pas disponible : l'écriture passe par des routes dédiées.`);
-};
-
 export const gristAPI = {
   /** Lecture soumise aux politiques d'accès du serveur. `id` restreint à une ou plusieurs lignes. */
   async getData(table: string, opts: { id?: number | number[] } = {}): Promise<Record<string, unknown>[]> {
@@ -76,8 +72,18 @@ export const gristAPI = {
     return true;
   },
 
-  addRecord: unsupported('addRecord'),
-  deleteRecord: unsupported('deleteRecord'),
+  /** Création d'une ligne ; renvoie son identifiant. */
+  async addRecord(table: string, fields: Record<string, unknown>): Promise<number> {
+    const body = await json<{ id: number }>(
+      await fetch(`/api/data/${encodeURIComponent(table)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) }),
+    );
+    return body.id;
+  },
+
+  async deleteRecord(table: string, id: number): Promise<boolean> {
+    await json(await fetch(`/api/data/${encodeURIComponent(table)}/${id}`, { method: 'DELETE' }));
+    return true;
+  },
 
   getAuth: (): LegacyAuth | null => auth,
   isAuthenticated: (): boolean => !!auth,
@@ -93,7 +99,7 @@ export const gristAPI = {
   getComponent: (name: string): unknown => components.get(name) ?? null,
   helpers,
 
-  /** Dépôt du CV : le serveur contrôle le fichier, l'envoie à Grist et l'associe à la fiche. */
+  /** Dépôt du CV : le serveur contrôle le fichier, l'enregistre et l'associe à la fiche. */
   async uploadCV(benefId: number, file: File): Promise<{ attachmentId: number }> {
     const form = new FormData();
     form.append('file', file, file.name);

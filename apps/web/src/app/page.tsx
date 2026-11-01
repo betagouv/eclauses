@@ -1,12 +1,12 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
-import { PageHost } from '@/legacy/PageHost';
+import { Accueil } from '@/features/accueil/Accueil';
 import { homeOf } from '@/legacy/pages';
 import { currentSession } from '@/server/http';
-import { publicEnv } from '@/server/env';
 import { activeSpace } from '@/server/space';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { title: 'Eclauses' };
 
 /** Visiteur : page d'accueil publique. Utilisateur connecté : accueil de son espace. */
 export default async function Home() {
@@ -15,7 +15,7 @@ export default async function Home() {
   if (space) redirect(`/${homeOf(space)}`);
   return (
     <AppShell session={session} currentPage="accueil">
-      <PageHost id="accueil" session={session} env={publicEnv()} />
+      <Accueil session={session} />
     </AppShell>
   );
 }

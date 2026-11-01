@@ -1,13 +1,12 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/beneficiaire-annuaire), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif de l'« Annuaire » : le serveur lit les fiches visibles, les clauses et les référentiels
+// et les passe en `initial` ; le premier rendu (côté serveur) contient déjà la liste.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import ComboBox from '@/legacy/components/ComboBox';
+import { attachmentUrl } from '@/lib/urls';
 
-const Component = () => {
-  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
+const Component = ({ initial, session }) => {
   // ===== Tables & colonnes =====
   const TABLE = {
     BENEF: 'Beneficiaires',
@@ -95,17 +94,22 @@ const Component = () => {
   }
 
   // ===== State =====
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState(null);
 
-  const [benefRows, setBenefRows] = React.useState([]);
-  const [currentBenefId, setCurrentBenefId] = React.useState(null);
+  const [benefRows, setBenefRows] = React.useState(initial.beneficiaires);
+  const [currentBenefId, setCurrentBenefId] = React.useState(
+    session.beneficiaireId || (initial.beneficiaires.length === 1 ? initial.beneficiaires[0].id : null),
+  );
 
-  const [clauseOptions, setClauseOptions] = React.useState([]);
-  const [validClauseIdSet, setValidClauseIdSet] = React.useState(new Set());
+  const [clauseOptions, setClauseOptions] = React.useState(() => {
+    const labelKey = pickLabelField(initial.clauses);
+    return initial.clauses.map(r => ({ value: r.id, label: String(r[labelKey] ?? r.id) }));
+  });
+  const [validClauseIdSet, setValidClauseIdSet] = React.useState(() => new Set(initial.clauses.map(r => r.id)));
 
-  const [deptsRows, setDeptsRows] = React.useState([]);
-  const deptsByIdRef = React.useRef(new Map());
+  const [deptsRows, setDeptsRows] = React.useState(initial.departements);
+  const deptsByIdRef = React.useRef(mapById(initial.departements));
 
   const [search, setSearch] = React.useState('');
 
@@ -113,7 +117,10 @@ const Component = () => {
 
   // Sélection unique de clause
   const [selectedClauseId, setSelectedClauseId] = React.useState(null);
-  const [specOptions, setSpecOptions] = React.useState([]);
+  const [specOptions, setSpecOptions] = React.useState(() => {
+    const specLabelKey = pickLabelField(initial.specialites);
+    return initial.specialites.map(r => ({ value: r.id, label: String(r[specLabelKey] ?? r.id), tooltip: r.Tooltip || '' }));
+  });
   const [selectedSpecIds, setSelectedSpecIds] = React.useState([]);
   // Combobox géré par composant partagé
 
@@ -132,56 +139,10 @@ const Component = () => {
   const [cvPreviewError, setCvPreviewError] = React.useState(null);
   const cvPreviewObjectUrlRef = React.useRef(null);
 
-  // ===== Load =====
+  // ===== Carte : Leaflet se charge dans le navigateur, après l'affichage de la liste =====
   React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true); setErr(null);
-
-        const [b, c, d, s] = await Promise.all([
-          gristAPI.getData(TABLE.BENEF),
-          gristAPI.getData(TABLE.CLAUSES).catch(() => []),
-          gristAPI.getData(TABLE.DEPTS).catch(() => []),
-          gristAPI.getData(TABLE.SPECS).catch(() => []),
-        ]);
-        if (!mounted) return;
-
-        setBenefRows(Array.isArray(b) ? b : []);
-
-        const labelKey = pickLabelField(c || []);
-        const opts = (c || []).map(r => ({ value: r.id, label: String(r[labelKey] ?? r.id) }));
-        setClauseOptions(opts);
-        setValidClauseIdSet(new Set((c || []).map(r => r.id)));
-
-        const depts = Array.isArray(d) ? d : [];
-        setDeptsRows(depts);
-        deptsByIdRef.current = mapById(depts);
-
-        const specLabelKey = pickLabelField(s || []);
-        setSpecOptions((s || []).map(r => ({ value: r.id, label: String(r[specLabelKey] ?? r.id), tooltip: r.Tooltip || '' })));
-
-        // Sélection initiale : auth → selection → unique
-        const auth = gristAPI?.getAuth ? gristAPI.getAuth() : null;
-        let selId = auth?.beneficiaireId || null;
-        if (!selId) {
-          const sel = gristAPI.getSelection ? gristAPI.getSelection() : null;
-          const fromSel = sel?.record?.id || null;
-          const fromUnique = (!fromSel && Array.isArray(b) && b.length === 1) ? b[0].id : null;
-          selId = fromSel || fromUnique || null;
-        }
-        setCurrentBenefId(selId);
-
-        loadLeaflet().catch(() => {});
-      } catch (e) {
-        if (!mounted) return;
-        setErr(e.message || 'Erreur de chargement');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => { mounted = false; };
+    document.title = 'Annuaire - Eclauses';
+    loadLeaflet().catch(() => {});
   }, []);
 
   // Labels clauses
@@ -339,7 +300,7 @@ const Component = () => {
   async function openModal(row) { 
     
     const cv = row[COL.CV]?.filter((x)=>x!=='L')[0];
-    row.cv_url = cv === undefined ? undefined : gristAPI.attachmentUrl(cv);
+    row.cv_url = cv === undefined ? undefined : attachmentUrl(cv);
 
     setModalRow(row); setModalOpen(true);
      }

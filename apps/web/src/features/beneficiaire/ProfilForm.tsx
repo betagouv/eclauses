@@ -1,13 +1,17 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/beneficiaire-profil), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif de la page « Mes informations » : le serveur lit la fiche et les référentiels et les
+// passe en `initial` ; le premier rendu (côté serveur) contient donc déjà le formulaire rempli.
 import React from 'react';
+import { useRouter } from 'next/navigation';
+import ComboBox from '@/legacy/components/ComboBox';
 import { gristAPI } from '@/legacy/gristAPI';
-const helpers = gristAPI.helpers;
+import { attachmentUrl } from '@/lib/urls';
+import { enregistrerProfil, lireProfil } from '@/server/actions/beneficiaire';
 
-const Component = () => {
+const Component = ({ initial, session }) => {
   const { useState, useEffect } = React;
-  const ComboBox = gristAPI.getComponent('ComboBox');
+  const router = useRouter();
   // === Constantes ===
   const MAX_CV_BYTES = 5 * 1024 * 1024; // 5 Mo
   const ACCEPTED_CV_TYPES = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
@@ -70,37 +74,63 @@ const Component = () => {
 
   function goSupportContact(e) {
     if (e) e.preventDefault();
-    if (gristAPI?.navigate) gristAPI.navigate('support-contact');
+    router.push('/support-contact');
   }
 
+  /** Formulaire à partir d'une fiche (lecture pure : sert au premier rendu et après chaque rechargement). */
+  function formFromRec(rec) {
+    return {
+      'NOM': rec['NOM'] || '',
+      'Prenom': rec['Prenom'] || '',
+      'Courriel': rec['Courriel'] || '',
+      'Telephone': rec['Telephone'] || '',
+      'Specialite_ecole': rec['Specialite_ecole'] || '',
+      'Sous_specialite': rec['Sous_specialite'] || '',
+      'Intitule_du_memoire': rec['Intitule_du_memoire'] || '',
+      'Autres_informations': rec['Autres_informations'] || '',
+      'Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur': toBool(rec['Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur']),
+      'Je_consens_a_etre_contacte_pour_rejoindre_des_groupements': toBool(rec['Je_consens_a_etre_contacte_pour_rejoindre_des_groupements']),
+      'Annee_de_diplome': rec['Annee_de_diplome'] || '',
+      'Formation': rec['Formation'] ?? null,
+      'Specialite': asArray(rec['Specialite']),
+      'Departement_de_residence': asArray(rec['Departement_de_residence']),
+      'Regions_ou_vous_etes_mobile': asArray(rec['Regions_ou_vous_etes_mobile']),
+      [COL_CV]: asArray(rec[COL_CV])
+    };
+  }
+  const cvUrlFrom = (list) => {
+    const cvId = asArray(list).filter((x) => x !== 'L' && x != null && x !== '').map(String)[0];
+    return cvId ? attachmentUrl(cvId) : null;
+  };
+
   // === États ===
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(initial.rec ? null : (session.beneficiaireId ? "Votre fiche n'est pas accessible." : null));
   const [rows, setRows] = useState([]);
-  const [currentId, setCurrentId] = useState(null);
+  const [currentId, setCurrentId] = useState(session.beneficiaireId || null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [consentMsg, setConsentMsg] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
   // Auth (depuis MagicLink)
-  const [auth, setAuth] = useState(null);
+  const [auth, setAuth] = useState(session);
 
   // Référentiels
-  const [optFormation, setOptFormation] = useState([]);
-  const [optSpecialites, setOptSpecialites] = useState([]);
-  const [optDepartements, setOptDepartements] = useState([]);
-  const [optRegions, setOptRegions] = useState([]);
+  const [optFormation, setOptFormation] = useState(() => sortByLabelFr(toOptions(initial.formations, 'Intitule')));
+  const [optSpecialites, setOptSpecialites] = useState(() => sortByLabelFr(toOptions(initial.specialites, 'Intitule')));
+  const [optDepartements, setOptDepartements] = useState(() => (initial.departements || []).map(r => ({ value: r.id, label: String(r['Departement_Numero'])+" - "+String(r['Departement_Nom']) })));
+  const [optRegions, setOptRegions] = useState(() => toOptions(initial.regions, 'Intitule'));
 
   // Choice suggestions
-  const [yearsOptions, setYearsOptions] = useState([]);
+  const [yearsOptions, setYearsOptions] = useState(initial.years || []);
   const [otherFormation, setOtherFormation] = useState('');
 
   // Fichier CV en attente d’upload
   const [fileCV, setFileCV] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState(null);
-  const [cvUrl, setCvUrl] = useState(null);
+  const [cvUrl, setCvUrl] = useState(() => (initial.rec ? cvUrlFrom(initial.rec[COL_CV]) : null));
   const cvInputRef = React.useRef(null);
   const [cvMsg, setCvMsg] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -112,87 +142,15 @@ const Component = () => {
   ]), []);
 
   // Formulaire (état éditable)
-  const [form, setForm] = useState({
-    'NOM': '',
-    'Prenom': '',
-    'Courriel': '',
-    'Telephone': '',
-    'Sous_specialite': '',
-    'Intitule_du_memoire': '',
-    'Autres_informations': '',
+  const [form, setForm] = useState(() => (initial.rec ? formFromRec(initial.rec) : {
+    'NOM': '', 'Prenom': '', 'Courriel': '', 'Telephone': '', 'Sous_specialite': '', 'Intitule_du_memoire': '', 'Autres_informations': '',
     'Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur': false,
     'Je_consens_a_etre_contacte_pour_rejoindre_des_groupements': false,
-    'Annee_de_diplome': '',
-    'Formation': null,
-    'Specialite': [],
-    'Departement_de_residence': [],
-    'Regions_ou_vous_etes_mobile': [],
-    [COL_CV]: []
-  });
+    'Annee_de_diplome': '', 'Formation': null, 'Specialite': [], 'Departement_de_residence': [], 'Regions_ou_vous_etes_mobile': [], [COL_CV]: []
+  }));
 
-  // === Chargement initial via AUTH (MagicLink) ===
   useEffect(() => {
-    let mounted = true;
-
-    async function loadAll() {
-      try {
-        setLoading(true);
-        setErr(null);
-
-        // 0) Auth via MagicLink (si exposé par le widget)
-        let authInfo = gristAPI.getAuth ? gristAPI.getAuth() : null;
-        if (!mounted) return;
-        setAuth(authInfo);
-
-        // 1) Données principales
-        const data = await gristAPI.getData(TABLE);
-
-        // 2) Référentiels (si interdits par ACL, on retombe sur des listes vides)
-        const [formations, specs, deps, regs] = await Promise.all([
-          gristAPI.getData(REF.formation).catch(() => []),
-          gristAPI.getData(REF.specialites).catch(() => []),
-          gristAPI.getData(REF.departements).catch(() => []),
-          gristAPI.getData(REF.regions).catch(() => []),
-        ]);
-
-        if (!mounted) return;
-
-        setRows(data || []);
-        setOptFormation(sortByLabelFr(toOptions(formations,'Intitule')));
-        setOptSpecialites(sortByLabelFr(toOptions(specs, 'Intitule')));
-        setOptDepartements((deps || []).map(r => ({ value: r.id, label: String(r['Departement_Numero'])+" - "+String(r['Departement_Nom']) })));
-        setOptRegions(toOptions(regs,'Intitule'));
-
-        // Suggestions pour Choice "Annee_de_diplome"
-        const yearValues = uniqSorted((data || []).map(r => r['Annee_de_diplome']).filter(Boolean).map(String));
-        setYearsOptions(yearValues);
-
-        // 3) Déterminer l'ID courant depuis l'auth
-        let id = authInfo && authInfo.beneficiaireId ? authInfo.beneficiaireId : null;
-
-        // Fallback : si ACL limite la table à une seule ligne visible
-        if (!id && Array.isArray(data) && data.length === 1) {
-          id = data[0].id;
-        }
-
-        setCurrentId(id || null);
-
-        if (id) {
-          const rec = (data || []).find(r => r.id === id) || null;
-          if (rec) seedForm(rec);
-          else setErr("Votre fiche n'est pas accessible avec ce lien.");
-        }
-      } catch (e) {
-        if (!mounted) return;
-        setErr(e.message || 'Erreur de chargement');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    loadAll();
-
-    return () => { mounted = false; };
+    document.title = 'Mes informations - Eclauses';
   }, []);
 
   useEffect(() => {
@@ -212,25 +170,8 @@ const Component = () => {
 
   // === Seed form depuis un record ===
   function seedForm(rec) {
-    setForm({
-      'NOM': rec['NOM'] || '',
-      'Prenom': rec['Prenom'] || '',
-      'Courriel': rec['Courriel'] || '',
-      'Telephone': rec['Telephone'] || '',
-      'Specialite_ecole': rec['Specialite_ecole'] || '',
-      'Sous_specialite': rec['Sous_specialite'] || '',
-      'Intitule_du_memoire': rec['Intitule_du_memoire'] || '',
-      'Autres_informations': rec['Autres_informations'] || '',
-      'Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur': toBool(rec['Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur']),
-      'Je_consens_a_etre_contacte_pour_rejoindre_des_groupements': toBool(rec['Je_consens_a_etre_contacte_pour_rejoindre_des_groupements']),
-      'Annee_de_diplome': rec['Annee_de_diplome'] || '',
-      'Formation': rec['Formation'] ?? null,
-      'Specialite': asArray(rec['Specialite']),
-      'Departement_de_residence': asArray(rec['Departement_de_residence']),
-      'Regions_ou_vous_etes_mobile': asArray(rec['Regions_ou_vous_etes_mobile']),
-      [COL_CV]: asArray(rec[COL_CV])
-    });
-    refreshCvUrl(asArray(rec[COL_CV]));
+    setForm(formFromRec(rec));
+    setCvUrl(cvUrlFrom(rec[COL_CV]));
     setFileCV(null);
   }
 
@@ -247,9 +188,9 @@ const Component = () => {
   async function refreshRow() {
     if (!currentId) return;
     try {
-      const data = await gristAPI.getData(TABLE, { id: currentId });
-      const rec = (data || []).find(r => r.id === currentId);
-      if (rec) seedForm(rec);
+      const res = await lireProfil();
+      if (!res.ok) throw new Error(res.message);
+      if (res.data) seedForm(res.data);
     } catch (e) {
       setErr(e.message || 'Impossible de rafraîchir la fiche.');
     }
@@ -306,7 +247,8 @@ const Component = () => {
 
     try {
       setSaving(true);
-      await gristAPI.updateRecord(TABLE, currentId, updates);
+      const res = await enregistrerProfil(updates);
+      if (!res.ok) throw new Error(res.message);
       if (source === 'consents') {
         setConsentMsg(true);
         setTimeout(() => setConsentMsg(false), 2500);
@@ -339,7 +281,7 @@ const Component = () => {
       // Le serveur contrôle le fichier, l'envoie à Grist et l'associe à la fiche en une seule opération.
       const { attachmentId } = await gristAPI.uploadCV(currentId, fileCV);
       await refreshRow();
-      refreshCvUrl([Number(attachmentId)]);
+      setCvUrl(attachmentUrl(String(attachmentId)));
 
       setFileCV(null);
       if (cvInputRef.current) cvInputRef.current.value = '';
@@ -351,20 +293,6 @@ const Component = () => {
     } finally {
       setUploading(false);
     }
-  }
-
-  async function refreshCvUrl(list) {
-    const cvListLocal = list || form[COL_CV] || [];
-    // Nettoyer la liste : supprimer "L" et ne garder que les IDs numériques valides
-    const cleanedList = asArray(cvListLocal)
-      .filter(x => x !== 'L' && x !== null && x !== undefined)
-      .map(x => typeof x === 'number' ? x : Number(x))
-      .filter(x => Number.isFinite(x));
-
-    const cvId = cleanedList[0]; // Premier ID valide
-    if (!cvId) { setCvUrl(null); return; }
-
-    setCvUrl(gristAPI.attachmentUrl(cvId));
   }
 
 function sortByLabelFr(options) {

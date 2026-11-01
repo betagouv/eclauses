@@ -460,7 +460,8 @@ const Component = () => {
   async function openBenefDetail(row) {
     if (!row) return;
     const detail = { ...row };
-    const cv = asRefIds(detail[B.CV])[0];
+    // Les CV sont désormais identifiés par un identifiant opaque (pas un entier) : on ne le convertit pas.
+    const cv = asArray(detail[B.CV]).filter((x) => x !== 'L' && x != null && x !== '')[0];
     detail.cv_url = cv ? gristAPI.attachmentUrl(cv) : undefined;
     setBenefDetail(detail);
   }

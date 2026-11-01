@@ -1,13 +1,7 @@
-// @ts-nocheck : code repris du widget Grist (grist/page/beneficiaire-home), typé progressivement.
-'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
-import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import Link from 'next/link';
 
-const Component = () => {
-
+/** Accueil de l'espace bénéficiaire : trois tuiles, entièrement rendues par le serveur. */
+export function BeneficiaireHome() {
   return (
     <>
     <section className="fr-container fr-my-6w">
@@ -18,7 +12,7 @@ const Component = () => {
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
                   <h3 className="fr-tile__title">
-                    <a data-nav="beneficiaire-profil" href="#">Mes informations</a>
+                    <Link href="/beneficiaire-profil">Mes informations</Link>
                   </h3>
                   <p className="fr-tile__desc">Mettez à jour votre fiche bénéficiaire (coordonnées, formations, mobilité...)
                 </p>
@@ -40,7 +34,7 @@ const Component = () => {
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
                   <h3 className="fr-tile__title">
-                    <a data-nav="beneficiaire-marches" href="#">Marchés actifs</a>
+                    <Link href="/beneficiaire-marches">Marchés actifs</Link>
                   </h3>
                   <p className="fr-tile__desc">Consultez les marchés couverts par une clause sociale sur tout le territoire.
                 </p>
@@ -62,7 +56,7 @@ const Component = () => {
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
                   <h3 className="fr-tile__title">
-                    <a data-nav="beneficiaire-annuaire" href="#">Annuaire</a>
+                    <Link href="/beneficiaire-annuaire">Annuaire</Link>
                   </h3>
                   <p className="fr-tile__desc">Consultez l’annuaire des bénéficiaires partageant la même clause sociale.
                 </p>
@@ -84,5 +78,3 @@ const Component = () => {
       </>
   );
 }
-
-export default Component;

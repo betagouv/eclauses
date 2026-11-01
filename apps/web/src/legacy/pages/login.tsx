@@ -110,7 +110,7 @@ const Component = () => {
               <div className="fr-input-wrap">
                 <input className="fr-password__input fr-input" autoCapitalize="off" autoCorrect="off" 
                 aria-describedby="storybook-password-input-messages" aria-required="true" name="password" 
-                autocomplete="current-password" id="pwd" type="password"
+                autoComplete="current-password" id="pwd" type="password"
                 value={password}
                 onChange={(e)=>setPassword(e.target.value)}/>
               </div>
