@@ -6,6 +6,11 @@ import { resourceByKey } from '@/server/admin/resources';
 
 export const dynamic = 'force-dynamic';
 
+export async function generateMetadata({ params }: { params: Promise<{ ressource: string }> }) {
+  const r = resourceByKey((await params).ressource);
+  return { title: `${r?.labelPluriel ?? 'Administration'} - Administration Eclauses` };
+}
+
 export default async function Page({ params }: { params: Promise<{ ressource: string; id: string }> }) {
   const { ressource, id } = await params;
   const resource = resourceByKey(ressource);

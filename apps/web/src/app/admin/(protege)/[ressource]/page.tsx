@@ -7,6 +7,11 @@ type Props = { params: Promise<{ ressource: string }>; searchParams: Promise<Rec
 
 export const dynamic = 'force-dynamic';
 
+export async function generateMetadata({ params }: { params: Promise<{ ressource: string }> }) {
+  const r = resourceByKey((await params).ressource);
+  return { title: `${r?.labelPluriel ?? 'Administration'} - Administration Eclauses` };
+}
+
 export default async function Page({ params, searchParams }: Props) {
   const resource = resourceByKey((await params).ressource);
   if (!resource) notFound();

@@ -19,6 +19,11 @@ export function AdminShell({ email, children }: { email: string; children: React
                     </p>
                   </Link>
                 </div>
+                <div className="fr-header__navbar">
+                  <button type="button" className="fr-btn--menu fr-btn" data-fr-opened="false" aria-controls="admin-modal-menu" aria-haspopup="menu" id="admin-btn-menu" title="Menu">
+                    Menu
+                  </button>
+                </div>
               </div>
               <div className="fr-header__tools">
                 <div className="fr-header__tools-links">
@@ -30,6 +35,14 @@ export function AdminShell({ email, children }: { email: string; children: React
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+        <div className="fr-header__menu fr-modal" id="admin-modal-menu" aria-labelledby="admin-btn-menu">
+          <div className="fr-container">
+            <button type="button" className="fr-btn--close fr-btn" aria-controls="admin-modal-menu" title="Fermer">
+              Fermer
+            </button>
+            <div className="fr-header__menu-links" />
           </div>
         </div>
       </header>
