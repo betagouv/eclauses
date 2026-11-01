@@ -34,6 +34,16 @@ Branche `rewrite-postgres`. Décision prise après lecture de la documentation d
 | `acheteur-marches-declaration` | serveur + îlot : le marché et ses lots sont créés par **une** action, en une transaction |
 | `acheteur-marches-modification` | serveur + îlot : marché, lots ajoutés, modifiés ou supprimés en une transaction |
 | `acheteur-marches-detail` | serveur + îlot : invitation, relance, validation et refus des déclarations par actions |
+| `cgu`, `mentions-legales`, `donnees-personnelles`, `accessibilite` | entièrement serveur (seuls « Imprimer » et « Haut de page » sont du JavaScript : `components/PageActions.tsx`) |
+| `apropos` | entièrement serveur |
+| `statistiques` | entièrement serveur (indicateurs calculés en base au rendu) |
+| `support` | serveur + îlot (recherche, filtres, accordéons, vidéos) : la FAQ est dans le HTML |
+| `support-contact` | serveur + îlot ; la pièce jointe passe toujours par la route `/api/support/contact` (type et taille contrôlés) |
+| `login` | serveur (un utilisateur déjà connecté est redirigé avant d'afficher le formulaire) + îlot qui appelle `/api/auth/login` |
+| `mot-de-passe-oublie`, `reset-password` | serveur + îlot ; **actions** `demanderReinitialisation` et `definirMotDePasse` ; l'état du lien est lu côté serveur |
+| `inscription-candidat` | serveur (marché `?marche=` et lots ouverts calculés côté serveur) + îlot ; **actions** `verifierEmailCandidat` et `inscrire` |
+
+Les actions publiques (`server/actions/public.ts`) sont **limitées en débit par adresse IP**, comme les routes HTTP, et ne révèlent jamais si une adresse a un compte (seule la vérification d'inscription le dit, pour éviter un doublon). L'inscription et la vérification passent par `services/candidats.ts`, aussi utilisé par la route.
 
 ## Mesures (production, en local)
 
@@ -58,6 +68,12 @@ Les anciennes pages enchaînaient plusieurs écritures depuis le navigateur (cr�
 
 La navigation entre pages n'utilise plus `sessionStorage` : le marché est dans l'adresse (`/acheteur-marches-detail?id=12`), ce qui permet le retour arrière, le partage d'un lien et le rendu serveur.
 
+## Liens cassés trouvés en convertissant les pages publiques
+
+- Le lien d'inscription donné aux candidats (`?page=inscription-candidat&marche=12`) et le lien « Se connecter » des courriers (`?page=login`) pointaient vers un routage qui n'existe plus : ils arrivaient sur l'accueil. Ils sont corrigés (`/inscription-candidat?marche=12`, `/login`), et **les anciens liens déjà publiés (dossiers de consultation, courriers) sont redirigés** par la page d'accueil, avec leurs paramètres.
+- Des liens internes écrits en `data-nav="…"` (connexion → support, réinitialisation → CGU, réponses de la FAQ « interne:page ») n'avaient plus de gestionnaire de clic : ce sont maintenant de vrais liens.
+- La page « À propos » renvoyait vers des identifiants du widget (`espace-beneficiaire`, `faq`, `profil`, `marches`, `annuaire`) qui n'existent plus : corrigés.
+
 ## Défauts du modèle trouvés en lisant les flux d'écriture
 
 - Les marchés créés depuis le front partent « en attente de publication » : ce statut **n'existait pas** dans mes énumérations, donc la déclaration d'un marché aurait échoué. Ajouté (migration `0005`).
@@ -79,4 +95,6 @@ Recette : copier la page dans `features/`, remplacer le chargement `useEffect` p
 
 ## Reste à faire
 
-16 pages en ancien mode : répondant (4 : accueil, infos, marchés, recherches), support (2), statistiques, inscription d'un candidat, connexion, mot de passe oublié, réinitialisation, et les pages légales (CGU, mentions, données personnelles, accessibilité, à propos). Une fois toutes converties, la couche de compatibilité (`/api/data`, `compat/`) et le shim `gristAPI` pourront être supprimés.
+4 pages en ancien mode : **répondant** (accueil, infos, marchés, recherches). Une fois converties, la couche de compatibilité (`/api/data`, `compat/`) et le shim `gristAPI` pourront être supprimés.
+
+**À traiter par l'équipe, hors code** : le texte de la page « Mentions légales » dit encore que les données sont hébergées sur l'instance Grist `grist.numerique.gouv.fr` ; il sera faux après la bascule (hébergement Scaleway). Les pages « Données personnelles » et « Accessibilité » sont à relire pour la même raison.

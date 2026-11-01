@@ -2,12 +2,10 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { demanderReinitialisation } from '@/server/actions/public';
 
+/** Demande de lien de réinitialisation (îlot) : l'action ne révèle jamais si l'adresse a un compte. */
 const Component = () => {
-  const RESET_TABLE = 'Application_Password_Reset';
   const [email, setEmail] = React.useState('');
   const [status, setStatus] = React.useState({ state: 'idle', message: '' });
 
@@ -22,17 +20,18 @@ const Component = () => {
       setStatus({ state: 'error', message: 'Merci de renseigner votre adresse e-mail.' });
       return;
     }
-    if (!gristAPI?.helpers?.emailLooksOk(value)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
       setStatus({ state: 'error', message: 'Adresse e-mail invalide.' });
       return;
     }
     try {
       setStatus({ state: 'loading', message: 'Envoi du lien…' });
-      await gristAPI.addRecord(RESET_TABLE, { Email: value, Is_Reset: true });
+      const res = await demanderReinitialisation(value);
+      if (!res.ok) throw new Error(res.message);
       setStatus({ state: 'success', message: 'Si un compte associé à cet e-mail existe, un lien de réinitialisation vous a été envoyé.' });
     } catch (err) {
       console.error(err);
-      setStatus({ state: 'error', message: 'Impossible d’enregistrer la demande. Réessayez dans quelques instants.' });
+      setStatus({ state: 'error', message: err?.message || 'Impossible d’enregistrer la demande. Réessayez dans quelques instants.' });
     }
   };
 

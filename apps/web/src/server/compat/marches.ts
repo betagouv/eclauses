@@ -144,7 +144,7 @@ async function computeMarches(rows: Row[]): Promise<void> {
       Ne_Doit_Pas_Notifier: alreadyNotified,
       Doit_Notifier_Publication: !isLot && m.statut === 'en_attente_notification' && !alreadyNotified,
       Doit_archiver: !!m.dateFinExecution && m.statut === 'clause_validee' && addMonths(m.dateFinExecution, 54) < today,
-      Lien_Inscription_Candidat: `${publicUrl()}?page=inscription-candidat&marche=${racine.id}`,
+      Lien_Inscription_Candidat: `${publicUrl()}/inscription-candidat?marche=${racine.id}`,
     });
   }
 }

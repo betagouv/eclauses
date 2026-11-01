@@ -2,22 +2,22 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { definirMotDePasse } from '@/server/actions/public';
 
-const Component = () => {
-  const RESET_TABLE = 'Application_Password_Reset';
-
-  const [record, setRecord] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
+/** Choix du mot de passe (îlot) : l'état du jeton est lu par le serveur (`initial`), le jeton n'est consommé qu'à la validation. */
+const Component = ({ initial }) => {
+  const router = useRouter();
+  const [record, setRecord] = React.useState(initial.valid ? { Token: initial.token, Type: initial.type, Email: initial.email } : null);
+  const [loading, setLoading] = React.useState(false);
   const [password, setPassword] = React.useState('');
   const [confirm, setConfirm] = React.useState('');
   const [acceptedCgu, setAcceptedCgu] = React.useState(false);
-  const [status, setStatus] = React.useState({ state: 'idle', message: '' });
+  const [status, setStatus] = React.useState(initial.valid ? { state: 'idle', message: '' } : { state: 'error', message: initial.used ? 'Lien déjà utilisé.' : 'Lien invalide ou expiré.' });
 
   const goToLogin = React.useCallback(() => {
-    if (gristAPI?.navigate) gristAPI.navigate('login');
+    router.push('/login');
   }, []);
 
   const isCreatePurpose = React.useMemo(() => {
@@ -34,21 +34,6 @@ const Component = () => {
 
   React.useEffect(() => {
     document.title = 'Choix du mot de passe';
-    (async () => {
-      try {
-        const token = new URLSearchParams(window.location.search).get('token') || '';
-        const res = await fetch('/api/auth/reset?token=' + encodeURIComponent(token));
-        const info = await res.json().catch(() => ({}));
-        if (info.used) throw new Error('Lien déjà utilisé.');
-        if (!info.valid) throw new Error('Lien invalide ou expiré.');
-        setRecord({ Token: token, Type: info.type, Email: info.email });
-      } catch (e) {
-        console.log(e)
-        setStatus({ state: 'error', message: e.message || 'Lien invalide ou expiré.' });
-      } finally {
-        setLoading(false);
-      }
-    })();
   }, []);
 
   React.useEffect(() => {
@@ -81,16 +66,8 @@ const Component = () => {
     try {
       setStatus({ state: 'loading', message: 'Mise à jour…' });
       const token = record.Token || record.token || record.token_;
-      const payload = { token, password };
-      const res = await fetch('/api/auth/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || 'Échec de la mise à jour du mot de passe.');
-      }
+      const res = await definirMotDePasse(token, password);
+      if (!res.ok) throw new Error(res.message);
       setStatus({ state: 'success', message: 'Votre mot de passe a été mis à jour. Vous pouvez maintenant vous connecter.' });
     } catch (err) {
       console.error(err);
@@ -194,9 +171,9 @@ const Component = () => {
                   />
                   <label className="fr-label" htmlFor="accept-cgu">
                     En activant mon espace, j'accepte les{' '}
-                    <a href="#" data-nav="cgu" className="fr-link">
+                    <Link href="/cgu" className="fr-link">
                       Conditions générales d'utilisation de la plateforme Eclauses
-                    </a>.
+                    </Link>.
                   </label>
                 </div>
               )}

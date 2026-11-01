@@ -1,12 +1,13 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/support), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif du Centre d'aide : le serveur lit les questions, catégories et vidéos publiées (`initial`), le premier
+// rendu contient donc déjà la FAQ. Recherche, filtres, accordéons et liens internes restent côté navigateur.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { useRouter } from 'next/navigation';
+import { pagePath } from '@/legacy/navigation';
 
-const Component = () => {
+const Component = ({ initial, session }) => {
+  const router = useRouter();
   const T = {
     CATS: 'Application_FAQ_Categories',
     QAS: 'Application_FAQ_Questions',
@@ -167,12 +168,12 @@ const Component = () => {
     return { type: 'none', src: '' };
   };
 
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState(null);
 
-  const [cats, setCats] = React.useState([]);
-  const [qas, setQAs] = React.useState([]);
-  const [videos, setVideos] = React.useState([]);
+  const [cats, setCats] = React.useState(initial.categories);
+  const [qas, setQAs] = React.useState(initial.questions);
+  const [videos, setVideos] = React.useState(initial.videos);
 
   const [search, setSearch] = React.useState('');
   const [activeCat, setActiveCat] = React.useState('all');
@@ -182,40 +183,18 @@ const Component = () => {
 
   const rootRef = React.useRef(null);
 
-  const auth = gristAPI?.getAuth ? gristAPI.getAuth() : null;
+  const auth = session;
 
+  // Catégorie et recherche mémorisées dans l'adresse (#cat=…&q=…) : lues dans le navigateur, après l'affichage.
   React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setErr(null);
-        const [c, q, vids] = await Promise.all([
-          gristAPI.getData(T.CATS).catch(() => []),
-          gristAPI.getData(T.QAS).catch(() => []),
-          gristAPI.getData(T.VIDEOS).catch(() => []),
-        ]);
-        if (!mounted) return;
-
-        setCats(Array.isArray(c) ? c : []);
-        setQAs(Array.isArray(q) ? q : []);
-        setVideos(Array.isArray(vids) ? vids : []);
-
-        try {
-          const url = new URL(window.location.href);
-          const hCat = url.hash.match(/cat=([^&]+)/)?.[1];
-          const hQ = url.hash.match(/q=([^&]+)/)?.[1];
-          if (hCat) setActiveCat(decodeURIComponent(hCat));
-          if (hQ) setSearch(decodeURIComponent(hQ));
-        } catch (_) {}
-      } catch (e) {
-        if (!mounted) return;
-        setErr(e?.message || 'Erreur de chargement');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
+    document.title = 'Centre d’aide - Eclauses';
+    try {
+      const url = new URL(window.location.href);
+      const hCat = url.hash.match(/cat=([^&]+)/)?.[1];
+      const hQ = url.hash.match(/q=([^&]+)/)?.[1];
+      if (hCat) setActiveCat(decodeURIComponent(hCat));
+      if (hQ) setSearch(decodeURIComponent(hQ));
+    } catch (_) {}
   }, []);
 
   const catOptions = React.useMemo(() => {
@@ -383,6 +362,13 @@ const Component = () => {
     if (!root) return;
 
     const onClick = (e) => {
+      // Lien interne d'une réponse (« [texte](interne:page) ») : navigation dans l'application.
+      const nav = e.target && e.target.closest ? e.target.closest('a[data-nav]') : null;
+      if (nav && root.contains(nav)) {
+        e.preventDefault();
+        router.push(pagePath(String(nav.getAttribute('data-nav') || '').trim()));
+        return;
+      }
       const a = e.target && e.target.closest ? e.target.closest('a[data-faq-target]') : null;
       if (!a || !root.contains(a)) return;
       e.preventDefault();
@@ -455,7 +441,7 @@ const Component = () => {
             <button
               className="fr-btn fr-icon-mail-line fr-btn--icon-left"
               type="button"
-              onClick={() => gristAPI?.navigate && gristAPI.navigate('support-contact')}
+              onClick={() => router.push('/support-contact')}
             >
               Contacter le support
             </button>

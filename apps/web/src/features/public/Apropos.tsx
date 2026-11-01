@@ -1,25 +1,8 @@
-// @ts-nocheck : code repris du widget Grist (grist/page/apropos), typé progressivement.
-'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
-import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import Link from 'next/link';
+import type { ServerSession } from '@/legacy/gristAPI';
 
-const Component = () => {
-  const [authed, setAuthed] = React.useState(false);
-
-  React.useEffect(() => {
-    try {
-      setAuthed(!!(gristAPI?.isAuthenticated && gristAPI.isAuthenticated()));
-      document.title = 'Eclauses — À propos';
-    } catch (_) {}
-  }, []);
-
-  function go(id) {
-    try { if (gristAPI?.navigate) gristAPI.navigate(id); } catch (e) { console.warn(e); }
-  }
-
+/** « À propos », rendue par le serveur. Les liens pointent vers les vraies pages (les anciens identifiants du widget n'existent plus). */
+export function Apropos({ session }: { session: ServerSession | null }) {
   return (
     <main className="fr-container fr-my-6w">
       {/* Hero */}
@@ -33,18 +16,16 @@ const Component = () => {
               publics intégrant des <strong>clauses sociales</strong>, et annuaire des professionnels.
             </p>
             <div className="fr-btns-group fr-btns-group--inline fr-btns-group--icon-left fr-mt-3w">
-              {authed ? (
-                <button className="fr-btn fr-icon-account-line" onClick={() => go('espace-beneficiaire')}>
+              {session ? (
+                <Link className="fr-btn fr-icon-account-line" href="/">
                   Accéder à mon espace
-                </button>
+                </Link>
               ) : (
-                <button className="fr-btn fr-icon-lock-line" onClick={() => go('login')}>
+                <Link className="fr-btn fr-icon-lock-line" href="/login">
                   Se connecter / Obtenir mon lien
-                </button>
+                </Link>
               )}
-              <button className="fr-btn fr-btn--secondary fr-icon-question-line" onClick={() => go('faq')}>
-                FAQ
-              </button>
+              <Link className="fr-btn fr-btn--secondary fr-icon-question-line" href="/support">FAQ</Link>
             </div>
           </div>
           <div className="fr-col-12 fr-col-md-5">
@@ -68,9 +49,9 @@ const Component = () => {
             <article className="fr-card fr-enlarge-link">
               <div className="fr-card__body">
                 <h3 className="fr-card__title fr-text--md">
-                  <a href="#" onClick={(e) => { e.preventDefault(); go('profil'); }}>
+                  <Link href="/beneficiaire-profil">
                     Mon profil
-                  </a>
+                  </Link>
                 </h3>
                 <p className="fr-card__desc fr-text--sm">
                   Coordonnées, formation, spécialités, zones de mobilité, CV. Mettez à jour votre fiche à tout moment.
@@ -82,9 +63,9 @@ const Component = () => {
             <article className="fr-card fr-enlarge-link">
               <div className="fr-card__body">
                 <h3 className="fr-card__title fr-text--md">
-                  <a href="#" onClick={(e) => { e.preventDefault(); go('marches'); }}>
+                  <Link href="/beneficiaire-marches">
                     Marchés actifs
-                  </a>
+                  </Link>
                 </h3>
                 <p className="fr-card__desc fr-text--sm">
                   Liste et carte des marchés encore réalisables et filtrés par vos clauses sociales.
@@ -96,9 +77,9 @@ const Component = () => {
             <article className="fr-card fr-enlarge-link">
               <div className="fr-card__body">
                 <h3 className="fr-card__title fr-text--md">
-                  <a href="#" onClick={(e) => { e.preventDefault(); go('annuaire'); }}>
+                  <Link href="/beneficiaire-annuaire">
                     Annuaire
-                  </a>
+                  </Link>
                 </h3>
                 <p className="fr-card__desc fr-text--sm">
                   Recherchez des pairs partageant des clauses communes (selon consentement).
@@ -110,6 +91,4 @@ const Component = () => {
       </section>
     </main>
   );
-};
-
-export default Component;
+}

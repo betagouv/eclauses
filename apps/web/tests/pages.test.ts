@@ -12,7 +12,7 @@ describe('registre des pages', () => {
   it('chaque page déclarée est rendue par le serveur ou chargée par PageHost, jamais les deux', () => {
     for (const page of PAGES.filter((p) => !dedicated.has(p.id))) {
       const inHost = host.includes(`import('./pages/${page.id}')`);
-      const inServer = server.includes(`'${page.id}':`);
+      const inServer = server.includes(`'${page.id}':`) || new RegExp(`\\b${page.id}: `).test(server);
       expect(inHost || inServer, `${page.id} : aucun rendu`).toBe(true);
       expect(inHost && inServer, `${page.id} : défini deux fois`).toBe(false);
     }

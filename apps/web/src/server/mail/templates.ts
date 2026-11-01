@@ -6,7 +6,7 @@ export interface Rendered {
   html: string;
 }
 
-const login = () => `${publicUrl()}?page=login`;
+const login = () => `${publicUrl()}/login`;
 
 export function resetPassword(url: string): Rendered {
   return {

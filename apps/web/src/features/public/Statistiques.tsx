@@ -1,16 +1,7 @@
-// @ts-nocheck : code repris du widget Grist (grist/page/statistiques), typé progressivement.
-'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
-import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { readTable } from '@/server/tables';
 
-const Component = () => {
-  const T = {
-    IMPACTS: 'Impacts',
-  };
-
+/** Statistiques d'usage et d'impact, rendues par le serveur : les indicateurs sont calculés en base au moment du rendu. */
+export async function Statistiques() {
   const C = {
     LABEL: 'Label',
     DESCRIPTION: 'Description',
@@ -21,96 +12,53 @@ const Component = () => {
   };
 
   const TYPE_ORDER = ['Utilisable', 'Utilisé', 'Utile', 'Impactant'];
-  const TYPE_BADGE_CLASS = {
+  const TYPE_BADGE_CLASS: Record<string, string> = {
     Utilisable: 'fr-badge--new fr-badge--no-icon',
     'Utilisé': 'fr-badge--info fr-badge--no-icon',
     Utile: 'fr-badge--success fr-badge--no-icon',
     Impactant: 'fr-badge--warning fr-badge--no-icon',
   };
-  const TYPE_DESCRIPTON = {
+  const TYPE_DESCRIPTON: Record<string, string> = {
     Utilisable: 'Ces indicateurs répondent à la question "Le produit est-il facile d\'utilisation" ?',
     'Utilisé': 'Ces indicateurs répondent à la question "Le produit est-il utilisé par une part importante de la cible" ?',
     Utile: 'Ces indicateurs répondent à la question "Le produit répond-il à un irritant pour nos utilisateurs" ?',
     Impactant: 'Ces indicateurs répondent à la question "Le produit répond-il à la politique publique" ?',
   }
 
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
-  const [impacts, setImpacts] = React.useState([]);
 
-  const normalizeType = React.useCallback((value) => {
+  const normalizeType = (value: unknown) => {
     const raw = String(value || '').trim().toLowerCase();
     if (raw === 'utilisable') return 'Utilisable';
     if (raw === 'utilisé' || raw === 'utilise') return 'Utilisé';
     if (raw === 'utile') return 'Utile';
     if (raw === 'impactant') return 'Impactant';
     return '';
-  }, []);
-
-  const parseColSpan = React.useCallback((value) => {
+  };
+  const parseColSpan = (value: unknown) => {
     const n = Number(value);
     if (n === 2) return 2;
     if (n === 3) return 3;
     return 1;
-  }, []);
-
-  const cardColClass = React.useCallback((colSpan) => {
+  };
+  const cardColClass = (colSpan: number) => {
     if (colSpan === 2) return 'fr-col-12 fr-col-lg-8';
     if (colSpan === 3) return 'fr-col-12';
     return 'fr-col-12 fr-col-md-6 fr-col-lg-4';
-  }, []);
+  };
 
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setErr(null);
-        const rows = await gristAPI.getData(T.IMPACTS).catch(() => []);
-        if (!mounted) return;
-        const prepared = (Array.isArray(rows) ? rows : [])
-          .map((r) => ({
-            id: r.id,
-            label: String(r[C.LABEL] || '').trim(),
-            description: String(r[C.DESCRIPTION] || '').trim(),
-            value: r[C.VALUE],
-            type: normalizeType(r[C.TYPE]),
-            colSpan: parseColSpan(r[C.COLSPAN]),
-            order: Number(r[C.ORDER]) || 9999,
-          }))
-          .filter((r) => (r.label || r.description || r.value != null) && TYPE_ORDER.includes(r.type))
-          .sort((a, b) => a.id - b.id);
-        setImpacts(prepared);
-      } catch (e) {
-        if (!mounted) return;
-        setErr(e?.message || 'Erreur de chargement des statistiques.');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <section className="fr-container fr-my-6w">
-        <div className="fr-loader" aria-label="Chargement" />
-        <p className="fr-text--sm fr-mt-1w">Chargement des statistiques…</p>
-      </section>
-    );
-  }
-
-  if (err) {
-    return (
-      <section className="fr-container fr-my-6w">
-        <div className="fr-alert fr-alert--error">
-          <p><strong>Erreur :</strong> {err}</p>
-        </div>
-      </section>
-    );
-  }
+  const rows = await readTable(null, 'Impacts').catch(() => []);
+  const impacts = rows
+    .map((r) => ({
+      id: r.id,
+      label: String(r[C.LABEL] || '').trim(),
+      description: String(r[C.DESCRIPTION] || '').trim(),
+      value: r[C.VALUE],
+      type: normalizeType(r[C.TYPE]),
+      colSpan: parseColSpan(r[C.COLSPAN]),
+      order: Number(r[C.ORDER]) || 9999,
+    }))
+    .filter((r) => (r.label || r.description || r.value != null) && TYPE_ORDER.includes(r.type))
+    .sort((a, b) => a.id - b.id);
 
   const sections = TYPE_ORDER.map((type) => ({
     type,
@@ -169,6 +117,4 @@ const Component = () => {
       )}
     </main>
   );
-};
-
-export default Component;
+}

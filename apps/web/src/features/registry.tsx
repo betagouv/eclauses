@@ -8,6 +8,18 @@ import { Infos } from './acheteur/Infos';
 import { Marches as AcheteurMarches } from './acheteur/Marches';
 import { Modification } from './acheteur/Modification';
 import { Statistiques } from './acheteur/Statistiques';
+import { Accessibilite } from './public/Accessibilite';
+import { Apropos } from './public/Apropos';
+import { Cgu } from './public/Cgu';
+import { DonneesPersonnelles } from './public/DonneesPersonnelles';
+import { InscriptionCandidat } from './public/InscriptionCandidat';
+import { Login } from './public/Login';
+import { MentionsLegales } from './public/MentionsLegales';
+import { MotDePasseOublie } from './public/MotDePasseOublie';
+import { ResetPassword } from './public/ResetPassword';
+import { Statistiques as StatistiquesPubliques } from './public/Statistiques';
+import { Support } from './public/Support';
+import { SupportContact } from './public/SupportContact';
 import { Annuaire } from './beneficiaire/Annuaire';
 import { BeneficiaireHome } from './beneficiaire/Home';
 import { Marches } from './beneficiaire/Marches';
@@ -17,7 +29,27 @@ import { Profil } from './beneficiaire/Profil';
  * Pages rendues par le serveur (le contenu est dans le HTML). Toute page absente d'ici garde l'ancien
  * mode : coquille serveur, puis chargement du code et des données dans le navigateur (`PageHost`).
  */
+/**
+ * `session` est toujours renseignée pour une page qui exige une connexion (le routeur redirige sinon) ; elle peut être
+ * absente pour une page publique.
+ */
 export type ServerPageProps = { session: ServerSession; query: Record<string, string | undefined> };
+export type PublicPageProps = { session: ServerSession | null; query: Record<string, string | undefined> };
+
+export const PUBLIC_SERVER_PAGES: Record<string, (props: PublicPageProps) => ReactNode | Promise<ReactNode>> = {
+  apropos: ({ session }) => <Apropos session={session} />,
+  accessibilite: () => <Accessibilite />,
+  cgu: () => <Cgu />,
+  'donnees-personnelles': () => <DonneesPersonnelles />,
+  'mentions-legales': () => <MentionsLegales />,
+  statistiques: () => <StatistiquesPubliques />,
+  support: ({ session }) => <Support session={session} />,
+  'support-contact': () => <SupportContact />,
+  login: ({ query }) => <Login query={query} />,
+  'mot-de-passe-oublie': () => <MotDePasseOublie />,
+  'reset-password': ({ query }) => <ResetPassword query={query} />,
+  'inscription-candidat': ({ query }) => <InscriptionCandidat query={query} />,
+};
 
 export const SERVER_PAGES: Record<string, (props: ServerPageProps) => ReactNode | Promise<ReactNode>> = {
   'acheteur-home': ({ session }) => <AcheteurHome session={session} />,

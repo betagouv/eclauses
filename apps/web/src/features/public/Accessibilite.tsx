@@ -1,12 +1,7 @@
-// @ts-nocheck : code repris du widget Grist (grist/page/accessibilite), typé progressivement.
-'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
-import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { BackToTop, PrintButton } from '@/components/PageActions';
 
-const Component = () => {
+/** Page statique rendue par le serveur (aucun JavaScript propre, sauf impression et retour en haut). */
+export function Accessibilite() {
   const toc = [
     { id: 'conformite', label: 'État de conformité' },
     { id: 'contenus-non-accessibles', label: 'Contenus non accessibles' },
@@ -23,9 +18,9 @@ const Component = () => {
             <p className="fr-text--sm fr-text-mention--grey">Établie le 15 juillet 2026</p>
           </div>
           <div className="fr-col-auto">
-            <button className="fr-btn fr-btn--secondary" onClick={() => window.print()}>
+            <PrintButton className="fr-btn fr-btn--secondary">
               Imprimer la page
-            </button>
+            </PrintButton>
           </div>
         </div>
       </header>
@@ -122,18 +117,12 @@ const Component = () => {
           </div>
 
           <div className="fr-mt-6w">
-            <a
-              className="fr-link fr-icon-arrow-up-s-line fr-link--icon-left"
-              href="#top"
-              onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            >
+            <BackToTop className="fr-link fr-icon-arrow-up-s-line fr-link--icon-left">
               Haut de page
-            </a>
+            </BackToTop>
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-export default Component;
+}

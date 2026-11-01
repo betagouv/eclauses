@@ -2,11 +2,11 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { useRouter } from 'next/navigation';
 
+/** Formulaire de contact du support (îlot). Le dépôt de pièce jointe reste une route HTTP : taille et type contrôlés en flux. */
 const Component = () => {
+  const router = useRouter();
   const [contactNom, setContactNom] = React.useState('');
   const [contactEmail, setContactEmail] = React.useState('');
   const [contactMessage, setContactMessage] = React.useState('');
@@ -23,9 +23,7 @@ const Component = () => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
-  const goSupport = () => {
-    if (gristAPI?.navigate) gristAPI.navigate('support');
-  };
+  const goSupport = () => router.push('/support');
 
   const submitContact = async (e) => {
     e.preventDefault();

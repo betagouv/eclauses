@@ -2,11 +2,10 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { inscrire, verifierEmailCandidat } from '@/server/actions/public';
 
-const Component = () => {
+/** Inscription d'un candidat à une consultation (îlot) : les lots proposés sont calculés par le serveur (`initial`). */
+const Component = ({ initial }) => {
   // ===== Tables & colonnes =====
   const TABLE = 'Repondants';
   const MARCHES = 'Marches';
@@ -34,7 +33,7 @@ const Component = () => {
   const isClosedStatus = (v) => ['Clause validée', 'Archivé'].includes(String(v || ''));
 
   // ===== State =====
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
   const [err, setErr]       = React.useState(null);
   const [msg, setMsg]       = React.useState(null);
   const [submitted, setSubmitted] = React.useState(false);
@@ -44,11 +43,11 @@ const Component = () => {
   const [verifiedEmail, setVerifiedEmail] = React.useState('');
   const [formErrors, setFormErrors] = React.useState({});
 
-  const [marcheId, setMarcheId] = React.useState(null);
-  const [marcheLabel, setMarcheLabel] = React.useState(null);
-  const [marcheValid, setMarcheValid] = React.useState(true);
-  const [lotOptions, setLotOptions] = React.useState([]);
-  const [selectedLotIds, setSelectedLotIds] = React.useState([]);
+  const [marcheId, setMarcheId] = React.useState(initial.marcheId);
+  const [marcheLabel, setMarcheLabel] = React.useState(initial.marcheLabel);
+  const [marcheValid, setMarcheValid] = React.useState(initial.marcheValid);
+  const [lotOptions, setLotOptions] = React.useState(initial.lotOptions);
+  const [selectedLotIds, setSelectedLotIds] = React.useState(initial.lotOptions.length === 1 ? [initial.lotOptions[0].id] : []);
 
   const [form, setForm] = React.useState({
     [COL.NOM]: '',
@@ -59,55 +58,7 @@ const Component = () => {
     [COL.SIRET]: '',
   });
 
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-
-      try {
-
-        const params = gristAPI.getQueryParams ? gristAPI.getQueryParams() : new URLSearchParams(window.location.search);
-        const raw = params.get('marche') || params.get('marche_');
-        const n = raw != null ? Number(raw) : null;
-        setMarcheId(Number.isFinite(n) ? n : null);
-        
-        const marches = await gristAPI.getData(MARCHES);
-        if (!alive) return;
-        const requested = (marches || []).find(r => r.id === n);
-        const parent = requested?.[COL.PARENT]
-          ? (marches || []).find(r => Number(r.id) === Number(requested[COL.PARENT]))
-          : requested;
-        if (parent && !parent[COL.PARENT]) {
-          const allChildren = (marches || []).filter(r => Number(r[COL.PARENT]) === Number(parent.id));
-          const children = allChildren
-            .filter((lot) => lot[COL.CLAUSE])
-            .filter((lot) => !isClosedStatus(lot[COL.STATUS]))
-            .sort((a, b) => String(a[COL.LOT] || '').localeCompare(String(b[COL.LOT] || ''), 'fr', { numeric: true, sensitivity: 'base' }));
-
-          const fallbackNonAllotted = allChildren.length === 0 && parent[COL.CLAUSE] && !isClosedStatus(parent[COL.STATUS])
-            ? [parent]
-            : [];
-          const options = children.length ? children : fallbackNonAllotted;
-
-          setMarcheLabel(parent[COL.INTITULE] || parent[COL.INTITULE_LOT] || `Marché #${parent.id}`);
-          setLotOptions(options);
-          setSelectedLotIds(options.length === 1 ? [options[0].id] : []);
-          setMarcheValid(options.length > 0);
-        } else {
-          setMarcheLabel(null);
-          setLotOptions([]);
-          setSelectedLotIds([]);
-          setMarcheValid(false);
-        }
-
-        setLoading(false);
-      } catch (e) {
-        if (!alive) return;
-        setMarcheValid(false);
-        setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  React.useEffect(() => { document.title = 'Inscription à une consultation - Eclauses'; }, []);
 
   function seedForm(rec) {
     setForm({
@@ -162,18 +113,9 @@ const Component = () => {
 
     try {
       setCheckingEmail(true);
-      const res = await fetch('/api/candidats/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          marcheId,
-          lotIds: selectedLotIds,
-          marcheIds: selectedLotIds,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || 'Erreur de vérification.');
+      const res = await verifierEmailCandidat(email, selectedLotIds);
+      if (!res.ok) throw new Error(res.message || 'Erreur de vérification.');
+      const data = { status: res.data };
 
       const status = String(data?.status || '').toLowerCase();
       if (status === 'exist') {
@@ -221,22 +163,17 @@ const Component = () => {
       return;
     }
 
-    const payload = {
-      [COL.NOM]:    form[COL.NOM]    || null,
-      [COL.PRENOM]: form[COL.PRENOM] || null,
-      [COL.EMAIL]:  String(form[COL.EMAIL] || '').trim().toLowerCase() || null,
-      [COL.TEL]:    form[COL.TEL]    || null,
-      [COL.RAISOC]: form[COL.RAISOC] || null,
-      [COL.SIRET]:  form[COL.SIRET]  || null,
-    };
-
-    const candList = selectedLotIds.length ? ['L', ...selectedLotIds] : [];
-
     try {
-      await gristAPI.addRecord(TABLE, {
-        ...payload,
-        [COL.CAND]: candList,
+      const res = await inscrire({
+        email: String(form[COL.EMAIL] || '').trim().toLowerCase(),
+        nom: form[COL.NOM] || '',
+        prenom: form[COL.PRENOM] || '',
+        telephone: form[COL.TEL] || null,
+        raisonSociale: form[COL.RAISOC] || '',
+        siret: form[COL.SIRET] || '',
+        marcheIds: selectedLotIds,
       });
+      if (!res.ok) throw new Error(res.message);
       setMsg("Votre inscription est enregistrée. Vous allez recevoir un e-mail pour initialiser votre mot de passe.");
       setSubmitted(true);
     } catch (e) {

@@ -2,33 +2,11 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import Link from 'next/link';
 
-const Component = () => {
-  function getNextRoute() {
-    try {
-      const params = gristAPI?.getQueryParams
-        ? gristAPI.getQueryParams()
-        : new URLSearchParams(window.location.search);
-      const raw = String(params?.get('next') || '').trim();
-      return raw || null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function appendNextToUrl(url, next) {
-    if (!url || !next) return url;
-    try {
-      const u = new URL(url, window.location.origin);
-      u.searchParams.set('next', next);
-      return u.toString();
-    } catch (_) {
-      return url;
-    }
-  }
+/** Formulaire de connexion (îlot) : `next` (page demandée avant la connexion) est fourni par le serveur. */
+const Component = ({ next: nextFromServer }) => {
+  const getNextRoute = () => nextFromServer || null;
 
   // --- UI state ---
   const [email, setEmail] = React.useState('');
@@ -36,20 +14,6 @@ const Component = () => {
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState(null);
   const [info, setInfo] = React.useState(null);
-
-  React.useEffect(() => {
-    const isAuthed = gristAPI?.isAuthenticated ? gristAPI.isAuthenticated() : !!gristAPI?.getAuth?.();
-    const next = getNextRoute();
-    if (isAuthed) {
-      if (next === 'home' && gristAPI?.navigate) {
-        gristAPI.navigate('home');
-      } else if (gristAPI?.goToDefault) {
-        gristAPI.goToDefault();
-      } else if (gristAPI?.navigate) {
-        gristAPI.navigate('home');
-      }
-    }
-  }, []);
 
   function emailLooksOk(v) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||'').trim());
@@ -131,17 +95,13 @@ const Component = () => {
 
       <div className="fr-mt-3w">
         <p>
-          <a href="#" data-nav="support-contact">
+          <Link href="/support-contact">
             Contacter le support pour demander la création de mon compte Eclauses
-          </a>
+          </Link>
         </p>
-        <button
-          className="fr-link"
-          type="button"
-          onClick={() => gristAPI?.navigate && gristAPI.navigate('mot-de-passe-oublie')}
-        >
+        <Link className="fr-link" href="/mot-de-passe-oublie">
           Mot de passe oublié ?
-        </button>
+        </Link>
       </div>
     </section>
   );

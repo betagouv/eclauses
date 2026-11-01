@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/AppShell';
-import { SERVER_PAGES } from '@/features/registry';
+import { PUBLIC_SERVER_PAGES, SERVER_PAGES } from '@/features/registry';
 import { PageHost } from '@/legacy/PageHost';
 import { pageById } from '@/legacy/pages';
 import { currentSession } from '@/server/http';
@@ -25,10 +25,12 @@ export default async function Page({ params, searchParams }: Props) {
   if (def.auth && !session) redirect(`/login?next=${def.id}`);
   if (def.role && !session?.roles.includes(def.role)) redirect('/');
 
-  const render = Object.hasOwn(SERVER_PAGES, def.id) ? SERVER_PAGES[def.id] : undefined;
+  const query = Object.fromEntries(Object.entries(await searchParams).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]));
+  const authed = Object.hasOwn(SERVER_PAGES, def.id) ? SERVER_PAGES[def.id] : undefined;
+  const open = Object.hasOwn(PUBLIC_SERVER_PAGES, def.id) ? PUBLIC_SERVER_PAGES[def.id] : undefined;
   return (
     <AppShell session={session} currentPage={def.id}>
-      {render && session ? await render({ session, query: Object.fromEntries(Object.entries(await searchParams).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])) }) : <PageHost id={def.id} session={session} env={publicEnv()} />}
+      {authed && session ? await authed({ session, query }) : open ? await open({ session, query }) : <PageHost id={def.id} session={session} env={publicEnv()} />}
     </AppShell>
   );
 }
