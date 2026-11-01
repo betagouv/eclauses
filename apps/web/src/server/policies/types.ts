@@ -1,4 +1,4 @@
-import type { Row } from '../grist/client';
+import type { Row } from '../compat/engine';
 import type { Session } from '../auth/session';
 
 /** Utilisateur connecté, ou `null` pour un visiteur anonyme. */

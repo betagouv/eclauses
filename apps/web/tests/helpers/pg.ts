@@ -20,10 +20,30 @@ export async function temporaryDatabase() {
   return {
     db,
     sql,
+    url: url.toString(),
     async drop() {
       await sql.end();
       await admin.unsafe(`drop database ${name} with (force)`);
       await admin.end();
+    },
+  };
+}
+
+/**
+ * Fait pointer `database()` du serveur sur une base jetable pour la durée du fichier de tests.
+ * À appeler dans `beforeAll` avant tout usage du serveur.
+ */
+export async function useTemporaryDatabase() {
+  const t = await temporaryDatabase();
+  const previous = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = t.url;
+  (globalThis as { __eclausesDb?: unknown }).__eclausesDb = { db: t.db, sql: t.sql };
+  return {
+    ...t,
+    async drop() {
+      delete (globalThis as { __eclausesDb?: unknown }).__eclausesDb;
+      process.env.DATABASE_URL = previous;
+      await t.drop();
     },
   };
 }

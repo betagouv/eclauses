@@ -1,4 +1,4 @@
-import type { Row } from './grist/client';
+import type { Row } from './compat/engine';
 import type { Actor } from './policies/types';
 import { policyFor } from './policies';
 import { HttpError } from './http';

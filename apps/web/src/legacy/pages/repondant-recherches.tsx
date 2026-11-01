@@ -446,7 +446,7 @@ const Component = () => {
             <div className="fr-grid-row fr-grid-row--gutters">
               {filteredBenefs.map((r) => {
                 const nomComplet = fullName(r);
-                const speList = asArray(r["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ');
+                const speList = asArray(r["Specialite_Libelles"]).filter((x)=>x!=='L').join(', ');
                 const sousSpec = r[B.SOUS_SPEC];
                 return (
                   <div key={r.id} className="fr-col-12 fr-col-md-6">
@@ -500,9 +500,9 @@ const Component = () => {
                     </div>
                   )}
                   <dl className="fr-description-list fr-mb-2w">
-                    {modalRow['gristHelper_Display2'] && (
+                    {modalRow['Formation_Libelle'] && (
                       <>
-                        <dt><strong>Formation</strong></dt><dd>{modalRow['gristHelper_Display2']}</dd>
+                        <dt><strong>Formation</strong></dt><dd>{modalRow['Formation_Libelle']}</dd>
                       </>
                     )}
                     {modalRow[B.ANNEE_DIP] && (
@@ -510,10 +510,10 @@ const Component = () => {
                         <dt className="fr-mt-2w"><strong>Année de diplôme</strong></dt><dd>{modalRow[B.ANNEE_DIP]}</dd>
                       </>
                     )}
-                    {asArray(modalRow["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ') && (
+                    {asArray(modalRow["Specialite_Libelles"]).filter((x)=>x!=='L').join(', ') && (
                       <>
                         <dt className="fr-mt-2w"><strong>Spécialité</strong></dt>
-                        <dd>{asArray(modalRow["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ')}</dd>
+                        <dd>{asArray(modalRow["Specialite_Libelles"]).filter((x)=>x!=='L').join(', ')}</dd>
                       </>
                     )}
                     {modalRow[B.SOUS_SPEC] && (
@@ -547,11 +547,11 @@ const Component = () => {
                     <h3 className="fr-h6 fr-mb-1w">Localisations</h3>
                     <p className="fr-text--sm fr-mb-1w"><strong>Départements</strong></p>
                     <p className="fr-text--sm">
-                      {asArray(modalRow["gristHelper_Display4"]).filter((x)=>x!=='L').join(', ') || '—'}
+                      {asArray(modalRow["Departement_Libelles"]).filter((x)=>x!=='L').join(', ') || '—'}
                     </p>
                     <p className="fr-text--sm fr-mt-2w"><strong>Régions de mobilité</strong></p>
                     <p className="fr-text--sm">
-                      {asArray(modalRow["gristHelper_Display5"]).filter((x)=>x!=='L').join(', ') || '—'}
+                      {asArray(modalRow["Region_Libelles"]).filter((x)=>x!=='L').join(', ') || '—'}
                     </p>
                   </div>
                 </div>

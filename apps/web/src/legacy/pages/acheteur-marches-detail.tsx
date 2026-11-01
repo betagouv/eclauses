@@ -901,9 +901,9 @@ const Component = () => {
                         <dt className="fr-mt-2w"><strong>Téléphone</strong></dt><dd>{benefDetail[B.TEL]}</dd>
                       </>
                     )}
-                    {benefDetail['gristHelper_Display2'] && (
+                    {benefDetail['Formation_Libelle'] && (
                       <>
-                        <dt className="fr-mt-2w"><strong>Formation</strong></dt><dd>{benefDetail['gristHelper_Display2']}</dd>
+                        <dt className="fr-mt-2w"><strong>Formation</strong></dt><dd>{benefDetail['Formation_Libelle']}</dd>
                       </>
                     )}
                     {benefDetail[B.ANNEE_DIP] && (
@@ -911,10 +911,10 @@ const Component = () => {
                         <dt className="fr-mt-2w"><strong>Année de diplôme</strong></dt><dd>{benefDetail[B.ANNEE_DIP]}</dd>
                       </>
                     )}
-                    {asArray(benefDetail['gristHelper_Display3']).filter((x)=>x !== 'L').join(', ') && (
+                    {asArray(benefDetail['Specialite_Libelles']).filter((x)=>x !== 'L').join(', ') && (
                       <>
                         <dt className="fr-mt-2w"><strong>Spécialité</strong></dt>
-                        <dd>{asArray(benefDetail['gristHelper_Display3']).filter((x)=>x !== 'L').join(', ')}</dd>
+                        <dd>{asArray(benefDetail['Specialite_Libelles']).filter((x)=>x !== 'L').join(', ')}</dd>
                       </>
                     )}
                     {benefDetail[B.SOUS_SPEC] && (
@@ -953,11 +953,11 @@ const Component = () => {
                     <h3 className="fr-h6 fr-mb-1w">Localisations</h3>
                     <p className="fr-text--sm fr-mb-1w"><strong>Départements</strong></p>
                     <p className="fr-text--sm">
-                      {asArray(benefDetail['gristHelper_Display4']).filter((x)=>x !== 'L').join(', ') || '—'}
+                      {asArray(benefDetail['Departement_Libelles']).filter((x)=>x !== 'L').join(', ') || '—'}
                     </p>
                     <p className="fr-text--sm fr-mt-2w"><strong>Régions de mobilité</strong></p>
                     <p className="fr-text--sm">
-                      {asArray(benefDetail['gristHelper_Display5']).filter((x)=>x !== 'L').join(', ') || '—'}
+                      {asArray(benefDetail['Region_Libelles']).filter((x)=>x !== 'L').join(', ') || '—'}
                     </p>
                   </div>
                 </div>

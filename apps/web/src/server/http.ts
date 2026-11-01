@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { GristError } from './grist/client';
 import { readSession, SESSION_COOKIE, type Session } from './auth/session';
 
 export class HttpError extends Error {
@@ -30,10 +29,6 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
   } catch (e) {
     if (e instanceof HttpError) {
       return NextResponse.json({ message: e.message, details: e.details }, { status: e.status });
-    }
-    if (e instanceof GristError) {
-      console.error('[grist]', e.message, JSON.stringify(e.body));
-      return NextResponse.json({ message: 'Le service de données est indisponible.' }, { status: 502 });
     }
     console.error('[erreur]', e);
     return NextResponse.json({ message: 'Erreur interne.' }, { status: 500 });

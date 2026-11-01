@@ -1,32 +1,26 @@
-import { grist } from '../config';
+import { eq, sql } from 'drizzle-orm';
+import { database } from '../db/client';
+import { beneficiaireADetruire, beneficiaireEligible, repondantADetruire } from '../db/expr';
+import { beneficiaires, repondants, utilisateurs, utilisateursAcheteurs } from '../db/schema';
 import type { Session } from './session';
 
-type Id = number | null;
-const asId = (v: unknown): Id => (typeof v === 'number' && v > 0 ? v : null);
-
 /**
- * Détermine les rôles d'une adresse e-mail. Reprend les règles d'`AuthLink.Roles` et de `loadAuth`
- * du widget : un bénéficiaire doit être éligible et ne pas être marqué « à supprimer », un répondant
- * ne doit pas être marqué « à supprimer ».
+ * Détermine les rôles d'un compte. Un bénéficiaire doit être éligible et ne pas être à supprimer ;
+ * un répondant ne doit pas être à supprimer ; un utilisateur acheteur n'a pas de condition.
  */
-export async function resolveIdentity(email: string): Promise<Session | null> {
-  const g = grist();
-  const mail = email.trim().toLowerCase();
-
-  // Les trois recherches sont indépendantes : on les lance en parallèle (≈ 3 fois plus rapide).
+export async function resolveIdentity(userId: number, email: string): Promise<Session | null> {
+  const db = database();
   const [[benef], [repondant], [acheteur]] = await Promise.all([
-    g.sql<{ id: number }>(
-      'SELECT id FROM Beneficiaires WHERE lower(Courriel) = ?1 AND COALESCE(Eligible,0) = 1 AND COALESCE(Doit_supprimer,0) = 0 LIMIT 1',
-      [mail],
-    ),
-    g.sql<{ id: number }>(
-      'SELECT id FROM Repondants WHERE lower(Email) = ?1 AND COALESCE(Doit_supprimer,0) = 0 LIMIT 1',
-      [mail],
-    ),
-    g.sql<{ id: number; Entite_de_rattachement: number }>(
-      'SELECT id, Entite_de_rattachement FROM Utilisateurs_Acheteurs WHERE lower(Email) = ?1 LIMIT 1',
-      [mail],
-    ),
+    db
+      .select({ id: beneficiaires.id })
+      .from(beneficiaires)
+      .where(sql`${beneficiaires.utilisateurId} = ${userId} and ${beneficiaireEligible} and not ${beneficiaireADetruire}`),
+    db
+      .select({ id: repondants.id })
+      .from(repondants)
+      .innerJoin(utilisateurs, eq(utilisateurs.id, repondants.utilisateurId))
+      .where(sql`${repondants.utilisateurId} = ${userId} and not ${repondantADetruire}`),
+    db.select({ id: utilisateursAcheteurs.id, entiteId: utilisateursAcheteurs.acheteurId }).from(utilisateursAcheteurs).where(eq(utilisateursAcheteurs.utilisateurId, userId)),
   ]);
 
   const roles: Session['roles'] = [];
@@ -36,11 +30,11 @@ export async function resolveIdentity(email: string): Promise<Session | null> {
   if (!roles.length) return null;
 
   return {
-    email: mail,
+    email: email.trim().toLowerCase(),
     roles,
-    beneficiaireId: asId(benef?.id),
-    repondantId: asId(repondant?.id),
-    acheteurId: asId(acheteur?.id),
-    acheteurEntiteId: asId(acheteur?.Entite_de_rattachement),
+    beneficiaireId: benef?.id ?? null,
+    repondantId: repondant?.id ?? null,
+    acheteurId: acheteur?.id ?? null,
+    acheteurEntiteId: acheteur?.entiteId ?? null,
   };
 }

@@ -777,7 +777,7 @@ const Component = () => {
                 <div className="fr-mb-3w">
                   <h3 className="fr-h6 fr-mt-3w fr-mb-2w">{aa}</h3>
                   {lots.length > 0 ? (
-                    <p className="fr-mt-3w">
+                    <div className="fr-mt-3w">
                     <strong>Etat des lots du marché :</strong>
                     <ul className="fr-mb-0">
 	                      {groups.map((group) => (
@@ -788,7 +788,7 @@ const Component = () => {
 	                        </li>
 	                      ))}
                     </ul>
-                    </p>
+                    </div>
                   ) : (
                     <>
                     <p className="fr-card__desc fr-text--sm">Fin d’exécution prévisionnelle : <strong>{dExecEnd ? formatDate(dExecEnd) : '—'}</strong></p>

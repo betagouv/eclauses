@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { grist } from '@/server/config';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
 import { resolveIdentity } from '@/server/auth/identity';
 import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession } from '@/server/auth/session';
+import { database } from '@/server/db/client';
+import { utilisateurs } from '@/server/db/schema';
 import { assertSameOrigin, clientIp, handle, HttpError, rateLimit } from '@/server/http';
+import { utilisateurParEmail } from '@/server/services/comptes';
 
 const body = z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(200) });
 
@@ -25,23 +28,16 @@ export function POST(req: Request) {
 
     rateLimit(`login:${clientIp(req)}:${mail}`);
 
-    const [user] = await grist().sql<{ id: number; Hash_Password: string | null }>(
-      'SELECT id, Hash_Password FROM Application_AuthUser WHERE lower(Email) = ?1 LIMIT 1',
-      [mail],
-    );
-    const check = await verifyPassword(user?.Hash_Password ?? (await dummy()), password);
+    const user = await utilisateurParEmail(mail);
+    const check = await verifyPassword(user?.motDePasseHash ?? (await dummy()), password);
     if (!user || !check.ok) throw new HttpError(401, GENERIC);
 
-    const session = await resolveIdentity(mail);
+    const session = await resolveIdentity(user.id, user.email);
     if (!session) throw new HttpError(401, GENERIC);
 
-    // Au premier passage, on remplace le SHA-256 sans sel par un hachage scrypt.
-    const fields: Record<string, unknown> = { Derniere_connexion: Math.floor(Date.now() / 1000) };
-    if (check.needsRehash) fields.Hash_Password = await hashPassword(password);
-    const persist = grist().updateRecords('Application_AuthUser', [{ id: user.id, fields }]);
-    // Le nouveau hachage doit être enregistré avant de répondre ; la date de connexion peut attendre.
-    if (check.needsRehash) await persist;
-    else persist.catch((e) => console.error('[login] date de connexion non enregistrée', e));
+    // Au premier passage, on remplace un hachage historique (SHA-256 sans sel) par scrypt.
+    const rehash = check.needsRehash ? { motDePasseHash: await hashPassword(password) } : {};
+    await database().update(utilisateurs).set({ derniereConnexionLe: new Date(), ...rehash }).where(eq(utilisateurs.id, user.id));
 
     const res = NextResponse.json(session);
     res.cookies.set(SESSION_COOKIE, await signSession(session), {

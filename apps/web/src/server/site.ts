@@ -1,5 +1,6 @@
-import { grist } from './config';
-import type { Row } from './grist/client';
+import { asc } from 'drizzle-orm';
+import { database } from './db/client';
+import { liens, parametres } from './db/schema';
 
 export interface SiteLink {
   label: string;
@@ -34,44 +35,34 @@ const FALLBACK: SiteConfig = {
 const TTL_MS = 5 * 60_000;
 let cache: { at: number; value: SiteConfig } | undefined;
 
-const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((x): x is number => typeof x === 'number') : []);
-const str = (v: unknown) => (typeof v === 'string' ? v : '');
+/** Vide le cache (après une modification depuis l'administration, et dans les tests). */
+export const resetSiteCache = () => {
+  cache = undefined;
+};
 
 /**
- * En-tête et pied de page : le contenu reste éditable dans Grist (tables `Application_Header`,
- * `Application_Footer` et `Application_Liens`), mis en cache quelques minutes.
+ * En-tête et pied de page : textes dans `parametres`, liens dans `liens` (par zone), mis en cache
+ * quelques minutes.
  */
 export async function siteConfig(): Promise<SiteConfig> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.value;
   try {
-    const g = grist();
-    const [[header], [footer], liens] = await Promise.all([
-      g.records('Application_Header', { limit: 1 }),
-      g.records('Application_Footer', { limit: 1 }),
-      g.records('Application_Liens'),
-    ]);
-    const byId = new Map<number, Row>(liens.map((l) => [l.id, l]));
-    const toLinks = (list: unknown): SiteLink[] =>
-      ids(list)
-        .map((id) => byId.get(id))
-        .filter((l): l is Row => !!l)
-        .sort((a, b) => Number(a.Ordre ?? 0) - Number(b.Ordre ?? 0))
-        .map((l) => ({
-          label: str(l.Label).trim(),
-          external: l.External === true || !!str(l.Url),
-          href: str(l.Url) || (str(l.Nav) && str(l.Nav) !== 'accueil' ? `/${str(l.Nav)}` : '/'),
-        }));
-
+    const db = database();
+    const [params, links] = await Promise.all([db.select().from(parametres), db.select().from(liens).orderBy(asc(liens.ordre), asc(liens.id))]);
+    const p = new Map(params.map((x) => [x.cle, x.valeur]));
+    const zone = (z: 'entete' | 'pied' | 'pied_bas'): SiteLink[] =>
+      links.filter((l) => l.zone === z).map((l) => ({ label: l.libelle.trim(), href: l.url, external: l.externe }));
+    const badge = p.get('site_badge_libelle');
     const value: SiteConfig = {
-      title: str(header?.Title) || FALLBACK.title,
-      tagline: str(header?.Tagline),
-      badge: str(header?.Badge_Label) ? { label: str(header!.Badge_Label), variant: str(header!.Badge_Variant) } : null,
-      logoHtml: str(header?.Entity_Logo) || FALLBACK.logoHtml,
-      headerLinks: toLinks(header?.Links),
-      footerLinks: toLinks(footer?.Links),
-      footerBottomLinks: toLinks(footer?.Bottom_Links),
-      footerDescription: str(footer?.Description),
-      footerCopyHtml: str(footer?.Copy),
+      title: p.get('site_titre') || FALLBACK.title,
+      tagline: p.get('site_accroche') ?? '',
+      badge: badge ? { label: badge, variant: p.get('site_badge_variante') ?? '' } : null,
+      logoHtml: p.get('site_logo_html') || FALLBACK.logoHtml,
+      headerLinks: zone('entete'),
+      footerLinks: zone('pied'),
+      footerBottomLinks: zone('pied_bas'),
+      footerDescription: p.get('pied_description') ?? '',
+      footerCopyHtml: p.get('pied_copyright_html') ?? '',
     };
     cache = { at: Date.now(), value };
     return value;

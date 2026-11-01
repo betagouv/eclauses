@@ -1,6 +1,4 @@
-import type { Row } from '../grist/client';
-import { grist } from '../config';
-import { decodeRows } from '../grist/schema';
+import type { Row } from '../compat/engine';
 import { esc } from './layout';
 
 /**
@@ -42,10 +40,10 @@ export function describeMarche(row: Row): MarcheInfo {
 }
 
 export async function loadMarcheInfo(id: number): Promise<MarcheInfo | null> {
-  const [row] = await grist().records('Marches', { filter: { id: [id] } });
-  if (!row) return null;
-  const [decoded] = await decodeRows('Marches', [row]);
-  return describeMarche(decoded!);
+  // Import tardif : `compat/marches` dépend de `mail/layout`, comme ce module.
+  const { marches } = await import('../compat/marches');
+  const row = await marches.byId(id);
+  return row ? describeMarche(row) : null;
 }
 
 /** Lignes « Marché / Lot / … » d'un courrier. */

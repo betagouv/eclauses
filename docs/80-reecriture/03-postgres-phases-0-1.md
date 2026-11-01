@@ -19,7 +19,7 @@ Branche `rewrite-postgres` (issue de `rewrite`). Cette étape pose la base et le
 | Grist | PostgreSQL |
 |---|---|
 | `Beneficiaires` | `beneficiaires` + `beneficiaire_specialites`, `_departements`, `_regions`, `_clauses` |
-| `Marches` | `marches` (parent/lots par `parent_id`) + `marche_specialites`, `marche_beneficiaires`, `candidatures` |
+| `Marches` | `marches` (parent/lots par `parent_id`) + `marche_specialites`, `candidatures` (les bénéficiaires d'un marché sont ses déclarations) |
 | `Acheteurs`, `Utilisateurs_Acheteurs` | `acheteurs`, `utilisateurs_acheteurs` |
 | `Repondants` | `repondants` (+ `candidatures`) |
 | `Invitation_Titulaire` | `invitations_titulaires` |

@@ -529,7 +529,7 @@ const Component = () => {
                           <h2 className="fr-card__title fr-text--md">
                             <a href="#" onClick={(e) => { e.preventDefault(); openModal(r); }}>{nomComplet}</a>
                           </h2>
-                        <p className="fr-card__desc"><strong>Spécialité : </strong>{asArray(r["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ') || '—'}</p>
+                        <p className="fr-card__desc"><strong>Spécialité : </strong>{asArray(r["Specialite_Libelles"]).filter((x)=>x!=='L').join(', ') || '—'}</p>
                         {sous_spec && (<p className="fr-card__desc"><strong>Sous-spécialité : </strong>{sous_spec}</p>)}
                         </div>
                       </article>
@@ -603,9 +603,9 @@ const Component = () => {
                         <dt className="fr-mt-2w"><strong>Téléphone</strong></dt><dd>{modalRow[COL.TEL]}</dd>
                       </>
                     )}
-                    {modalRow['gristHelper_Display2'] && (
+                    {modalRow['Formation_Libelle'] && (
                       <>
-                        <dt className="fr-mt-2w"><strong>Formation</strong></dt><dd>{modalRow['gristHelper_Display2']}</dd>
+                        <dt className="fr-mt-2w"><strong>Formation</strong></dt><dd>{modalRow['Formation_Libelle']}</dd>
                       </>
                     )}
                     {modalRow[COL.ANNEE_DIP] && (
@@ -613,10 +613,10 @@ const Component = () => {
                         <dt className="fr-mt-2w"><strong>Année de diplôme</strong></dt><dd>{modalRow[COL.ANNEE_DIP]}</dd>
                       </>
                     )}
-                    {asArray(modalRow["gristHelper_Display3"]).filter((x)=>x!=='L').length > 0 && (
+                    {asArray(modalRow["Specialite_Libelles"]).filter((x)=>x!=='L').length > 0 && (
                       <>
                         <dt className="fr-mt-2w"><strong>Spécialité</strong></dt>
-                        <dd>{asArray(modalRow["gristHelper_Display3"]).filter((x)=>x!=='L').join(', ')}</dd>
+                        <dd>{asArray(modalRow["Specialite_Libelles"]).filter((x)=>x!=='L').join(', ')}</dd>
                       </>
                     )}
                     {modalRow[COL.SOUS_SPEC] && (
@@ -655,11 +655,11 @@ const Component = () => {
                     <h3 className="fr-h6 fr-mb-1w">Localisations</h3>
                     <p className="fr-text--sm fr-mb-1w"><strong>Départements</strong></p>
                     <p className="fr-text--sm">
-                      {asArray(modalRow["gristHelper_Display4"]).filter((x)=>x!=='L').join(', ') || '—'}
+                      {asArray(modalRow["Departement_Libelles"]).filter((x)=>x!=='L').join(', ') || '—'}
                     </p>
                     <p className="fr-text--sm fr-mt-2w"><strong>Régions de mobilité</strong></p>
                     <p className="fr-text--sm">
-                      {asArray(modalRow["gristHelper_Display5"]).filter((x)=>x!=='L').join(', ') || '—'}
+                      {asArray(modalRow["Region_Libelles"]).filter((x)=>x!=='L').join(', ') || '—'}
                     </p>
                   </div>
                 </div>

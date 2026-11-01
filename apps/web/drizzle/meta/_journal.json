@@ -8,6 +8,20 @@
       "when": 1793560457998,
       "tag": "0000_schema_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793560768933,
+      "tag": "0001_retire_marche_beneficiaires",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793560956091,
+      "tag": "0002_impacts_indicateur_calcule",
+      "breakpoints": true
     }
   ]
 }

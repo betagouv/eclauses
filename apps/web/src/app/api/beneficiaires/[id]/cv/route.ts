@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
-import { config, grist } from '@/server/config';
+import { config } from '@/server/config';
 import { checkCv } from '@/server/cv';
 import { setOwnCv } from '@/server/beneficiaires';
+import { database } from '@/server/db/client';
+import { utilisateurs } from '@/server/db/schema';
+import { sql } from 'drizzle-orm';
 import { assertSameOrigin, handle, HttpError, requireSession } from '@/server/http';
+import { enregistrerFichier, supprimerFichier } from '@/server/services/fichiers';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -13,10 +17,7 @@ async function ownId(ctx: Ctx, sessionBenefId: number | null): Promise<number> {
   return id;
 }
 
-/**
- * Dépôt du CV : le serveur reçoit le fichier, le contrôle, l'envoie à Grist puis l'associe à la fiche,
- * en une seule opération. Plus de jeton Grist côté navigateur, plus de passage par n8n.
- */
+/** Dépôt du CV : le serveur reçoit le fichier, le contrôle, l'enregistre puis l'associe à la fiche. */
 export function POST(req: Request, ctx: Ctx) {
   return handle(async () => {
     assertSameOrigin(req);
@@ -35,9 +36,15 @@ export function POST(req: Request, ctx: Ctx) {
     const check = checkCv(bytes, file.name, max);
     if (!check.ok) throw new HttpError(422, check.reason ?? 'Fichier refusé.');
 
-    const attachmentId = await grist().uploadAttachment(new Blob([bytes], { type: check.mime }), check.fileName!);
-    await setOwnCv(session, id, attachmentId);
-    return NextResponse.json({ attachmentId });
+    const [user] = await database().select({ id: utilisateurs.id }).from(utilisateurs).where(sql`lower(${utilisateurs.email}) = ${session.email}`);
+    const fichier = await enregistrerFichier({ contenu: bytes, nom: check.fileName!, typeMime: check.mime!, usage: 'cv', utilisateurId: user?.id ?? null });
+    try {
+      await setOwnCv(session, id, fichier.id);
+    } catch (e) {
+      await supprimerFichier(fichier.id);
+      throw e;
+    }
+    return NextResponse.json({ attachmentId: fichier.id });
   });
 }
 
@@ -49,3 +56,4 @@ export function DELETE(req: Request, ctx: Ctx) {
     return NextResponse.json({ ok: true });
   });
 }
+

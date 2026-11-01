@@ -45,7 +45,10 @@ export const supportVideos = pgTable('support_videos', {
   modifieLe: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Indicateurs d'impact de la page d'accueil. La valeur affichée est la manuelle si elle existe, sinon l'automatique. */
+/**
+ * Indicateurs d'impact de la page d'accueil. La valeur affichée est la manuelle si elle existe, sinon
+ * celle de l'indicateur calculé `indicateur` (voir `services/indicateurs.ts`).
+ */
 export const impacts = pgTable('impacts', {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   gristId: integer().unique(),
@@ -53,7 +56,7 @@ export const impacts = pgTable('impacts', {
   description: text(),
   typeIndicateur: typeIndicateur().notNull(),
   valeurManuelle: text(),
-  valeurAutomatique: text(),
+  indicateur: text(),
   largeurColonnes: integer().notNull().default(1),
   ordre: integer().notNull().default(0),
 });

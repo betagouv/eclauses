@@ -1,85 +1,103 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { hasPostgres, useTemporaryDatabase } from './helpers/pg';
 
-type Row = { id: number } & Record<string, unknown>;
-const db: Record<string, Row[]> = {};
-const log: string[] = [];
+describe.skipIf(!hasPostgres)('tâches planifiées', () => {
+  let t: Awaited<ReturnType<typeof useTemporaryDatabase>>;
+  let jobs: typeof import('@/server/jobs');
+  let s: typeof import('@/server/db/schema');
+  let db: ReturnType<(typeof import('@/server/db/client'))['database']>;
+  const year = new Date().getFullYear();
 
-const fake = {
-  records: async (table: string, opts: { filter?: Record<string, unknown[]> } = {}) =>
-    structuredClone(
-      (db[table] ?? []).filter((r) => Object.entries(opts.filter ?? {}).every(([k, v]) => (v as unknown[]).includes(r[k]))),
-    ),
-  updateRecords: async (table: string, rows: { id: number; fields: Record<string, unknown> }[]) => {
-    for (const { id, fields } of rows) {
-      Object.assign(db[table]!.find((r) => r.id === id)!, fields);
-      log.push(`update ${table}#${id}`);
-    }
-  },
-  deleteRecords: async (table: string, ids: number[]) => {
-    db[table] = (db[table] ?? []).filter((r) => !ids.includes(r.id));
-    log.push(`delete ${table}#${ids.join(',')}`);
-  },
-  // Colonnes du schéma : tout est modifiable dans ce faux document.
-  columns: async (table: string) =>
-    Object.keys(Object.assign({}, ...(db[table] ?? []))).map((id) => ({ id, type: 'Text', isFormula: false })),
-};
-vi.mock('@/server/config', () => ({ grist: () => fake, config: () => ({}) }));
-const { JOBS } = await import('@/server/jobs');
-
-beforeEach(() => {
-  for (const k of Object.keys(db)) delete db[k];
-  log.length = 0;
-});
-
-describe('tâches de conservation des données', () => {
-  it('anonymise un bénéficiaire à supprimer et efface ses données personnelles', async () => {
-    db.Beneficiaires = [
-      { id: 1, NOM: 'Durand', Prenom: 'Léa', Courriel: 'lea@x.test', Telephone: '06', curriculum_vitae: ['L', 9], Autres_informations: 'x', Doit_supprimer: true },
-      { id: 2, NOM: 'Martin', Prenom: 'Paul', Courriel: 'paul@x.test', Doit_supprimer: false },
-    ];
-    for (const c of ['Formation', 'Annee_de_diplome', 'Specialite_ecole', 'Specialite', 'Sous_specialite', 'Intitule_du_memoire', 'Departement_de_residence', 'Regions_ou_vous_etes_mobile', 'Date_de_suppression']) db.Beneficiaires[0]![c] = 'x';
-    const res = await JOBS['anonymise-beneficiaires']!();
-    expect(res.processed).toBe(1);
-    const row = db.Beneficiaires![0]!;
-    expect(row.NOM).toBe('Beneficiaire #1');
-    expect(row.Courriel).toBeNull();
-    expect(row.Prenom).toBeNull();
-    expect(row.curriculum_vitae).toBeNull();
-    expect(typeof row.Date_de_suppression).toBe('string');
-    expect(db.Beneficiaires![1]!.NOM).toBe('Martin');
+  beforeAll(async () => {
+    t = await useTemporaryDatabase();
+    jobs = await import('@/server/jobs');
+    s = await import('@/server/db/schema');
+    db = (await import('@/server/db/client')).database();
+  });
+  afterAll(async () => {
+    await t?.drop();
+  });
+  beforeEach(async () => {
+    await t.sql.unsafe('truncate utilisateurs, beneficiaires, acheteurs, fichiers restart identity cascade');
   });
 
-  it('anonymise un répondant à supprimer et supprime son compte de connexion', async () => {
-    db.Repondants = [{ id: 7, Nom: 'Société', Email: 's@x.test', Telephone: '0', Raison_sociale: 'S', Siret: '1', Prenom: 'A', Date_de_suppression: null, Doit_supprimer: true, Account: 40 }];
-    db.Application_AuthUser = [{ id: 40, Email: 's@x.test' }, { id: 41, Email: 'autre@x.test' }];
-    await JOBS['anonymise-repondants']!();
-    expect(db.Repondants![0]!.Email).toBeNull();
-    expect(db.Application_AuthUser!.map((u) => u.id)).toEqual([41]);
+  const user = async (email: string, over: Partial<typeof s.utilisateurs.$inferInsert> = {}) =>
+    (await db.insert(s.utilisateurs).values({ email, motDePasseHash: 'x', ...over }).returning())[0]!;
+
+  it('anonymise les bénéficiaires de plus de 10 ans, supprime leur compte, garde la ligne', async () => {
+    const u = await user('vieux@benef.test');
+    const [vieux] = await db.insert(s.beneficiaires).values({ nom: 'Vieux', prenom: 'Paul', telephone: '0102', anneeDiplome: year - 11, utilisateurId: u.id }).returning();
+    const [recent] = await db.insert(s.beneficiaires).values({ nom: 'Récent', anneeDiplome: year - 1 }).returning();
+    const res = await jobs.JOBS['anonymise-beneficiaires']!();
+    expect(res.processed).toBe(1);
+    const [after] = await db.select().from(s.beneficiaires).where(eq(s.beneficiaires.id, vieux!.id));
+    expect(after).toMatchObject({ nom: `Beneficiaire #${vieux!.id}`, prenom: null, telephone: null, utilisateurId: null });
+    expect(after!.anonymiseLe).toBe(new Date().toISOString().slice(0, 10));
+    expect(await db.select().from(s.utilisateurs)).toHaveLength(0);
+    const [r] = await db.select().from(s.beneficiaires).where(eq(s.beneficiaires.id, recent!.id));
+    expect(r!.nom).toBe('Récent');
+    // Rejouée, la tâche ne retraite pas la ligne déjà anonymisée.
+    expect((await jobs.JOBS['anonymise-beneficiaires']!()).processed).toBe(0);
   });
 
-  it('supprime les comptes des bénéficiaires devenus non éligibles', async () => {
-    db.Beneficiaires = [{ id: 1, Eligible: false, Account: 50 }, { id: 2, Eligible: false, Account: 0 }];
-    db.Application_AuthUser = [{ id: 50 }, { id: 51 }];
-    const res = await JOBS['delete-ineligible-accounts']!();
-    expect(res.processed).toBe(1);
-    expect(db.Application_AuthUser!.map((u) => u.id)).toEqual([51]);
+  it('retire l’accès des bénéficiaires non éligibles sans supprimer leur fiche', async () => {
+    const u = await user('ancien@benef.test');
+    const ok = await user('ok@benef.test');
+    await db.insert(s.beneficiaires).values([
+      { nom: 'Ancien', anneeDiplome: year - 6, utilisateurId: u.id },
+      { nom: 'Éligible', anneeDiplome: year - 1, utilisateurId: ok.id },
+    ]);
+    await db.insert(s.sessions).values({ empreinte: 'e1', utilisateurId: u.id, expireLe: new Date(Date.now() + 3600_000) });
+    expect((await jobs.JOBS['delete-ineligible-accounts']!()).processed).toBe(1);
+    const [a] = await db.select().from(s.utilisateurs).where(eq(s.utilisateurs.id, u.id));
+    expect(a!.motDePasseHash).toBeNull();
+    expect(await db.select().from(s.sessions)).toHaveLength(0);
+    const [b] = await db.select().from(s.utilisateurs).where(eq(s.utilisateurs.id, ok.id));
+    expect(b!.motDePasseHash).toBe('x');
+    expect(await db.select().from(s.beneficiaires)).toHaveLength(2);
   });
 
-  it('archive uniquement les marchés validés à archiver', async () => {
-    db.Marches = [
-      { id: 1, Doit_archiver: true, Statut: 'Clause validée' },
-      { id: 2, Doit_archiver: true, Statut: 'En attente de publication' },
-    ];
-    const res = await JOBS['archive-marches']!();
-    expect(res.processed).toBe(1);
-    expect(db.Marches![0]!.Statut).toBe('Archivé');
-    expect(db.Marches![1]!.Statut).toBe('En attente de publication');
+  it('anonymise les répondants inactifs depuis plus de 5 ans', async () => {
+    const old = await user('vieux@rep.test', { motDePasseModifieLe: new Date(Date.now() - 6 * 365 * 86400_000) });
+    const fresh = await user('frais@rep.test', { motDePasseModifieLe: new Date() });
+    await db.insert(s.repondants).values([{ utilisateurId: old.id, nom: 'Vieux', siret: '123' }, { utilisateurId: fresh.id, nom: 'Frais' }]);
+    expect((await jobs.JOBS['anonymise-repondants']!()).processed).toBe(1);
+    const rows = await db.select().from(s.repondants);
+    const anon = rows.find((r) => r.anonymiseLe)!;
+    expect(anon).toMatchObject({ siret: null, utilisateurId: null });
+    expect(rows.find((r) => r.nom === 'Frais')!.utilisateurId).toBe(fresh.id);
   });
 
-  it('purge les demandes de lien expirées', async () => {
-    db.Application_Password_Reset = [{ id: 1, Expire: true }, { id: 2, Expire: false }];
-    const res = await JOBS['purge-resets']!();
-    expect(res.processed).toBe(1);
-    expect(db.Application_Password_Reset!.map((r) => r.id)).toEqual([2]);
+  it('archive les marchés validés terminés depuis plus de quatre ans et demi, pas les autres', async () => {
+    const [a] = await db.insert(s.acheteurs).values({ nom: 'A' }).returning();
+    const day = (years: number) => new Date(Date.now() - years * 365.25 * 86400_000).toISOString().slice(0, 10);
+    await db.insert(s.marches).values([
+      { acheteurId: a!.id, intitule: 'Ancien validé', statut: 'clause_validee', dateFinExecution: day(5) },
+      { acheteurId: a!.id, intitule: 'Récent validé', statut: 'clause_validee', dateFinExecution: day(2) },
+      { acheteurId: a!.id, intitule: 'Ancien non validé', statut: 'en_attente_declaration', dateFinExecution: day(5) },
+    ]);
+    expect((await jobs.JOBS['archive-marches']!()).processed).toBe(1);
+    const rows = await db.select().from(s.marches);
+    expect(Object.fromEntries(rows.map((m) => [m.intitule, m.statut]))).toEqual({
+      'Ancien validé': 'archive',
+      'Récent validé': 'clause_validee',
+      'Ancien non validé': 'en_attente_declaration',
+    });
+  });
+
+  it('purge les jetons expirés ou utilisés et les sessions expirées', async () => {
+    const u = await user('x@y.test');
+    await db.insert(s.jetonsAuth).values([
+      { utilisateurId: u.id, objectif: 'activation', empreinte: 'a', expireLe: new Date(Date.now() - 1000) },
+      { utilisateurId: u.id, objectif: 'activation', empreinte: 'b', expireLe: new Date(Date.now() + 86400_000) },
+    ]);
+    await db.insert(s.sessions).values([
+      { empreinte: 's1', utilisateurId: u.id, expireLe: new Date(Date.now() - 1000) },
+      { empreinte: 's2', utilisateurId: u.id, expireLe: new Date(Date.now() + 86400_000) },
+    ]);
+    expect((await jobs.JOBS['purge-resets']!()).processed).toBe(1);
+    expect((await jobs.JOBS['purge-sessions']!()).processed).toBe(1);
+    expect((await db.select().from(s.jetonsAuth)).map((j) => j.empreinte)).toEqual(['b']);
   });
 });

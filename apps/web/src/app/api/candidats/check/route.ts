@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { grist } from '@/server/config';
+import { database } from '@/server/db/client';
+import { candidatures, marches, repondants } from '@/server/db/schema';
 import { assertSameOrigin, clientIp, handle, HttpError, rateLimit } from '@/server/http';
-import { listIds } from '@/server/policies/common';
+import { utilisateurParEmail } from '@/server/services/comptes';
 
 const body = z.object({
   email: z.string().trim().email().max(320),
@@ -13,7 +15,7 @@ const body = z.object({
 
 /**
  * Avant l'inscription d'un candidat : son adresse est-elle déjà connue ? Si oui, les marchés choisis
- * sont ajoutés à sa liste de candidatures (comme le faisait le flux n8n) et la page n'a pas à créer de compte.
+ * sont ajoutés à ses candidatures et la page n'a pas à créer de compte.
  */
 export function POST(req: Request) {
   return handle(async () => {
@@ -21,19 +23,17 @@ export function POST(req: Request) {
     rateLimit(`candidat-check:${clientIp(req)}`, 20, 15 * 60_000);
     const parsed = body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new HttpError(400, 'Requête invalide.');
-    const email = parsed.data.email.toLowerCase();
     const wanted = [...new Set([...(parsed.data.lotIds ?? []), ...(parsed.data.marcheIds ?? [])])];
 
-    const [existing] = await grist().records('Repondants', { filter: { Email: [email] }, limit: 1 });
+    const user = await utilisateurParEmail(parsed.data.email);
+    const db = database();
+    const [existing] = user ? await db.select({ id: repondants.id }).from(repondants).where(eq(repondants.utilisateurId, user.id)) : [];
     if (!existing) return NextResponse.json({ status: 'new' });
 
     // Seuls les marchés publiés peuvent être ajoutés ainsi.
-    const published = wanted.length
-      ? (await grist().records('Marches', { filter: { id: wanted, Statut: ['En attente de notification'] } })).map((m) => m.id)
-      : [];
-    const next = [...new Set([...listIds(existing.Candidat_aux_marches), ...published])];
+    const published = wanted.length ? await db.select({ id: marches.id }).from(marches).where(and(inArray(marches.id, wanted), eq(marches.statut, 'en_attente_notification'))) : [];
     if (published.length) {
-      await grist().updateRecords('Repondants', [{ id: existing.id, fields: { Candidat_aux_marches: ['L', ...next] } }]);
+      await db.insert(candidatures).values(published.map((m) => ({ marcheId: m.id, repondantId: existing.id }))).onConflictDoNothing();
     }
     return NextResponse.json({ status: 'exist' });
   });

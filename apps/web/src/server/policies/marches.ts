@@ -1,12 +1,15 @@
-import type { Row } from '../grist/client';
-import type { Session } from '../auth/session';
-import { grist } from '../config';
-import { decodeRows, prepareFields } from '../grist/schema';
+import { eq } from 'drizzle-orm';
+import { marches as marchesTable } from '../compat/marches';
+import { utilisateurParEmail } from '../services/comptes';
+import { marcheModifie } from '../services/notifications';
+import type { Row } from '../compat/engine';
+import { database } from '../db/client';
+import { marches as marchesDb } from '../db/schema';
 import { HttpError } from '../http';
 import { assertOwnMarche, forbidden, isInvolved, marcheById, num, pick, requireActor, requireRole, wanted } from './common';
 import type { Actor, TablePolicy } from './types';
 
-/** Colonnes lisibles par un non-acheteur (règles d'accès du document Grist, onglet Marches). */
+/** Colonnes lisibles par un non-acheteur (anciennes règles d'accès du document Grist, onglet Marches). */
 const PUBLIC_COLUMNS = [
   'Date_de_notification_previsionnelle',
   'Latitude',
@@ -61,15 +64,12 @@ export function visibleColumns(actor: Actor, row: Row): readonly string[] | 'all
 /** Champs que l'acheteur ne saisit jamais : posés par le serveur à la création. */
 const SERVER_SET = new Set(['Acheteur', 'Creation_en_autonomie', 'Cree_par']);
 
-async function marchesWithLots(): Promise<Row[]> {
-  return decodeRows('Marches', await grist().records('Marches'));
-}
+const stripServerSet = (fields: Record<string, unknown>) => Object.fromEntries(Object.entries(fields).filter(([k]) => !SERVER_SET.has(k)));
 
 export const marches: TablePolicy = {
   async read(actor, { ids }) {
-    const rows = await marchesWithLots();
     const out: Row[] = [];
-    for (const row of rows) {
+    for (const row of await marchesTable.read({ ids })) {
       if (!wanted(ids, row)) continue;
       const cols = visibleColumns(actor, row);
       if (!cols) continue;
@@ -81,13 +81,15 @@ export const marches: TablePolicy = {
   async create(actor, fields) {
     const s = requireRole(actor, 'acheteur');
     if (!s.acheteurEntiteId) throw forbidden();
-    const clean = await prepareFields('Marches', stripServerSet(fields));
-    const withServer: Record<string, unknown> = { ...clean, Acheteur: s.acheteurEntiteId };
-    // Indicateur de statistiques : le marché a été créé depuis le front par l'acheteur, pas par un administrateur.
-    if (await hasColumn('Marches', 'Creation_en_autonomie')) withServer.Creation_en_autonomie = true;
-    if (await hasColumn('Marches', 'Cree_par')) withServer.Cree_par = s.email;
-    const [id] = await grist().addRecords('Marches', [withServer]);
-    return id!;
+    const user = await utilisateurParEmail(s.email);
+    // Le marché est créé depuis le front par l'acheteur : l'entité et l'indicateur de statistiques sont posés ici.
+    const id = await marchesTable.insert(stripServerSet(fields), undefined, {
+      acheteurId: s.acheteurEntiteId,
+      creationEnAutonomie: true,
+      creeParUtilisateurId: user?.id ?? null,
+    });
+    await marcheModifie(id);
+    return id;
   },
 
   async update(actor, id, fields) {
@@ -96,8 +98,8 @@ export const marches: TablePolicy = {
     if (!marche) throw new HttpError(404, 'Marché introuvable.');
 
     if (s.roles.includes('acheteur') && s.acheteurEntiteId && num(marche.Acheteur) === s.acheteurEntiteId) {
-      const clean = await prepareFields('Marches', stripServerSet(fields));
-      await grist().updateRecords('Marches', [{ id, fields: clean }]);
+      await marchesTable.update(id, stripServerSet(fields), undefined, { modifieLe: new Date() });
+      await marcheModifie(id);
       return;
     }
 
@@ -105,7 +107,8 @@ export const marches: TablePolicy = {
     if (s.roles.includes('repondant') && isInvolved(marche, s)) {
       const keys = Object.keys(fields);
       if (keys.length === 1 && keys[0] === 'Statut' && fields.Statut === 'Déclaration à valider') {
-        await grist().updateRecords('Marches', [{ id, fields: { Statut: 'Déclaration à valider' } }]);
+        await marchesTable.update(id, { Statut: 'Déclaration à valider' }, undefined, { modifieLe: new Date() });
+        await marcheModifie(id);
         return;
       }
     }
@@ -115,17 +118,12 @@ export const marches: TablePolicy = {
   async remove(actor, id) {
     const s = requireRole(actor, 'acheteur');
     await assertOwnMarche(s, id);
-    await grist().deleteRecords('Marches', [id]);
+    try {
+      await database().delete(marchesDb).where(eq(marchesDb.id, id));
+    } catch (e) {
+      // Un marché parent ne se supprime pas tant qu'il a des lots.
+      if ((e as { cause?: { code?: string } }).cause?.code === '23503') throw new HttpError(409, 'Supprimez d’abord les lots de ce marché.');
+      throw e;
+    }
   },
 };
-
-function stripServerSet(fields: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(fields).filter(([k]) => !SERVER_SET.has(k)));
-}
-
-async function hasColumn(table: string, col: string): Promise<boolean> {
-  const { columnsOf } = await import('../grist/schema');
-  return (await columnsOf(table)).has(col);
-}
-
-export type { Session };

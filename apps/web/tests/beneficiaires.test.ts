@@ -1,6 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-vi.mock('@/server/config', () => ({ grist: () => ({}), config: () => ({}) }));
 
 const { stripInternal, redact, isVisibleToOthers, CONSENT_ANNUAIRE, CONSENT_CONTACT } = await import('@/server/beneficiaires');
 
@@ -9,7 +8,6 @@ const base = {
   NOM: 'Durand',
   Courriel: 'a@b.fr',
   Telephone: '0102030405',
-  Clef_secrete: 'xxx',
   Commentaire: 'note interne',
   Missions_proposees: 'm',
   Eligible: true,
@@ -19,7 +17,6 @@ const base = {
 describe('politique Beneficiaires', () => {
   it('retire les colonnes internes', () => {
     const row = stripInternal({ ...base });
-    expect(row).not.toHaveProperty('Clef_secrete');
     expect(row).not.toHaveProperty('Commentaire');
     expect(row).not.toHaveProperty('Missions_proposees');
     expect(row.NOM).toBe('Durand');

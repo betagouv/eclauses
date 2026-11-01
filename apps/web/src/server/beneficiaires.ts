@@ -1,18 +1,20 @@
+import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { grist } from './config';
-import type { Row } from './grist/client';
+import type { Row } from './compat/engine';
+import { CONSENT_ANNUAIRE, CONSENT_CONTACT, beneficiaires as table } from './compat/specs';
+import { database } from './db/client';
+import { beneficiaires as beneficiairesDb } from './db/schema';
 import type { Session } from './auth/session';
 import { HttpError } from './http';
+import { supprimerFichier } from './services/fichiers';
 
-export const CONSENT_ANNUAIRE = 'Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur';
-export const CONSENT_CONTACT = 'Je_consens_a_etre_contacte_pour_rejoindre_des_groupements';
-export const CV_COLUMN = 'curriculum_vitae';
+export { CONSENT_ANNUAIRE, CONSENT_CONTACT };
 
 /** Coordonnées masquées tant que la personne n'a pas accepté d'être contactée. */
 const CONTACT_FIELDS = ['Courriel', 'Telephone'] as const;
 
 /** Colonnes internes (administration) : jamais renvoyées au navigateur, même pour sa propre fiche. */
-export const INTERNAL_COLUMNS = ['Clef_secrete', 'Commentaire', 'Missions_proposees'] as const;
+export const INTERNAL_COLUMNS = ['Commentaire', 'Missions_proposees'] as const;
 
 const truthy = (v: unknown) => v === true || v === 1 || v === '1';
 
@@ -22,8 +24,7 @@ export function stripInternal(row: Row): Row {
   return copy;
 }
 
-export const isVisibleToOthers = (row: Row) =>
-  truthy(row[CONSENT_ANNUAIRE]) && truthy(row.Eligible) && !truthy(row.Doit_supprimer);
+export const isVisibleToOthers = (row: Row) => truthy(row[CONSENT_ANNUAIRE]) && truthy(row.Eligible) && !truthy(row.Doit_supprimer);
 
 export function redact(row: Row): Row {
   if (truthy(row[CONSENT_CONTACT])) return row;
@@ -33,26 +34,20 @@ export function redact(row: Row): Row {
 }
 
 /**
- * Lecture de `Beneficiaires`. Remplace les règles d'accès (ACL) du document :
+ * Lecture des bénéficiaires :
  * - sa propre fiche, en entier ;
  * - les fiches des personnes qui consentent à figurer dans l'annuaire, avec les coordonnées masquées
- *   sauf consentement au contact. `ids` restreint la lecture (équivalent d'un `getData` ciblé).
+ *   sauf consentement au contact. `ids` restreint la lecture.
  */
 export async function readBeneficiaires(session: Session, ids?: number[]): Promise<Row[]> {
-  const g = grist();
   const own = session.beneficiaireId;
   const out: Row[] = [];
-
   if (own && (!ids || ids.includes(own))) {
-    out.push(...(await g.records('Beneficiaires', { filter: { id: [own] } })).map(stripInternal));
+    const row = await table.byId(own);
+    if (row) out.push(stripInternal(row));
   }
-
-  const others = await g.records('Beneficiaires', {
-    filter: { [CONSENT_ANNUAIRE]: [true], ...(ids ? { id: ids } : {}) },
-  });
-  for (const row of others) {
-    if (row.id !== own && isVisibleToOthers(row)) out.push(redact(stripInternal(row)));
-  }
+  const others = await table.read({ where: and(eq(beneficiairesDb.consentementAnnuaire, true), ...(own ? [sql`${beneficiairesDb.id} <> ${own}`] : [])), ids });
+  for (const row of others) if (isVisibleToOthers(row)) out.push(redact(stripInternal(row)));
   return out;
 }
 
@@ -83,52 +78,39 @@ const profileUpdate = z
   .partial()
   .strict();
 
-const LIST_FIELDS = ['Specialite', 'Departement_de_residence', 'Regions_ou_vous_etes_mobile'] as const;
-
 export async function updateOwnProfile(session: Session, id: number, input: unknown): Promise<void> {
   if (session.beneficiaireId !== id) throw new HttpError(403, 'Cette fiche ne vous appartient pas.');
-
   const parsed = profileUpdate.safeParse(input);
   if (!parsed.success) throw new HttpError(400, 'Données invalides.', parsed.error.flatten());
   const fields: Record<string, unknown> = { ...parsed.data };
 
   // L'adresse e-mail identifie la personne : elle ne se change pas depuis le profil.
   if ('Courriel' in fields) {
-    const [current] = await grist().records('Beneficiaires', { filter: { id: [id] } });
-    if (String(fields.Courriel).trim().toLowerCase() !== String(current?.Courriel ?? '').trim().toLowerCase()) {
+    if (String(fields.Courriel).trim().toLowerCase() !== session.email) {
       throw new HttpError(400, "L'adresse e-mail ne peut pas être modifiée depuis le profil.");
     }
     delete fields.Courriel;
   }
-
-  for (const f of LIST_FIELDS) {
-    const v = fields[f] as number[] | null | undefined;
-    if (Array.isArray(v)) fields[f] = ['L', ...v];
-  }
-  if ('Fiche_MAJ' in fields) fields.Fiche_MAJ = fields.Fiche_MAJ === true || fields.Fiche_MAJ === 1;
-
-  await grist().updateRecords('Beneficiaires', [{ id, fields }]);
+  await table.update(id, fields, undefined, { modifieLe: new Date() });
 }
 
-export async function setOwnCv(session: Session, id: number, attachmentId: number | null): Promise<void> {
+/** Associe (ou retire) le CV de la fiche ; l'ancien fichier est supprimé du stockage. */
+export async function setOwnCv(session: Session, id: number, fichierId: string | null): Promise<void> {
   if (session.beneficiaireId !== id) throw new HttpError(403, 'Cette fiche ne vous appartient pas.');
-  await grist().updateRecords('Beneficiaires', [
-    { id, fields: { [CV_COLUMN]: attachmentId ? ['L', attachmentId] : ['L'] } },
-  ]);
+  const db = database();
+  const [before] = await db.select({ cv: beneficiairesDb.cvFichierId }).from(beneficiairesDb).where(eq(beneficiairesDb.id, id));
+  await db.update(beneficiairesDb).set({ cvFichierId: fichierId, modifieLe: new Date() }).where(eq(beneficiairesDb.id, id));
+  if (before?.cv && before.cv !== fichierId) await supprimerFichier(before.cv);
 }
 
 /** Droit de lire un CV : le sien, ou celui d'une personne visible dans l'annuaire. */
-export async function canReadAttachment(session: Session, attachmentId: number): Promise<boolean> {
-  const rows = await grist().sql<{ id: number } & Record<string, unknown>>(
-    `SELECT b.id, b.${CONSENT_ANNUAIRE} AS annuaire, b.Eligible AS eligible, b.Doit_supprimer AS suppr
-       FROM Beneficiaires b
-      WHERE json_valid(b.${CV_COLUMN})
-        AND EXISTS (SELECT 1 FROM json_each(b.${CV_COLUMN}) WHERE value = ?1)`,
-    [attachmentId],
-  );
-  return rows.some(
-    (r) =>
-      r.id === session.beneficiaireId ||
-      (truthy(r.annuaire) && truthy(r.eligible) && !truthy(r.suppr)),
-  );
+export async function canReadCv(session: Session, fichierId: string): Promise<boolean> {
+  const [owner] = await database()
+    .select({ id: beneficiairesDb.id })
+    .from(beneficiairesDb)
+    .where(eq(beneficiairesDb.cvFichierId, fichierId));
+  if (!owner) return false;
+  if (owner.id === session.beneficiaireId) return true;
+  const row = await table.byId(owner.id);
+  return !!row && isVisibleToOthers(row);
 }

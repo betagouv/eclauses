@@ -104,7 +104,7 @@ export const gristAPI = {
     await json(await fetch(`/api/beneficiaires/${benefId}/cv`, { method: 'DELETE' }));
   },
 
-  attachmentUrl: (id: number): string => `/api/attachments/${id}`,
+  attachmentUrl: (id: number | string): string => `/api/attachments/${id}`,
 };
 
 export default gristAPI;

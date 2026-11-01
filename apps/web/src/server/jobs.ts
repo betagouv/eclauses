@@ -1,5 +1,10 @@
-import { grist } from './config';
-import { prepareFields } from './grist/schema';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { database } from './db/client';
+import { beneficiaireADetruire, beneficiaireEligible, repondantADetruire } from './db/expr';
+import { beneficiaires, marches, repondants, sessions, utilisateurs } from './db/schema';
+import { purgerJetons } from './services/comptes';
+import { supprimerFichier } from './services/fichiers';
+import { inviterBeneficiaires } from './services/notifications';
 
 export interface JobResult {
   job: string;
@@ -7,80 +12,105 @@ export interface JobResult {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-const truthy = (v: unknown) => v === true || v === 1 || v === '1';
 
-/** Supprime les demandes de lien (activation, mot de passe oublié) expirées ou utilisées. */
+/** Supprime les liens d'activation et de réinitialisation expirés ou utilisés. */
 async function purgeResets(): Promise<JobResult> {
-  const expired = (await grist().records('Application_Password_Reset', { filter: { Expire: [true] } })).map((r) => r.id);
-  if (expired.length) await grist().deleteRecords('Application_Password_Reset', expired);
-  return { job: 'purge-resets', processed: expired.length };
+  return { job: 'purge-resets', processed: await purgerJetons() };
 }
 
-/** Bénéficiaires dont la durée de conservation est dépassée : données personnelles effacées. */
+/** Efface les sessions expirées ou révoquées. */
+async function purgeSessions(): Promise<JobResult> {
+  const rows = await database().delete(sessions).where(sql`${sessions.expireLe} < now() or ${sessions.revoqueLe} is not null`).returning({ e: sessions.empreinte });
+  return { job: 'purge-sessions', processed: rows.length };
+}
+
+/** Bénéficiaires dont la durée de conservation est dépassée : données personnelles et compte effacés. */
 async function anonymiseBeneficiaires(): Promise<JobResult> {
-  const rows = (await grist().records('Beneficiaires', { filter: { Doit_supprimer: [true] } })).filter((r) => truthy(r.Doit_supprimer));
-  for (const row of rows) {
-    const fields = await prepareFields('Beneficiaires', {
-      NOM: `Beneficiaire #${row.id}`,
-      Prenom: null,
-      Formation: null,
-      Annee_de_diplome: null,
-      Specialite_ecole: null,
-      Specialite: null,
-      Sous_specialite: null,
-      Intitule_du_memoire: null,
-      Courriel: null,
-      Telephone: null,
-      Departement_de_residence: null,
-      Regions_ou_vous_etes_mobile: null,
-      curriculum_vitae: null,
-      Autres_informations: null,
-      Date_de_suppression: today(),
+  const db = database();
+  const rows = await db
+    .select({ id: beneficiaires.id, userId: beneficiaires.utilisateurId, cv: beneficiaires.cvFichierId })
+    .from(beneficiaires)
+    .where(and(beneficiaireADetruire, isNull(beneficiaires.anonymiseLe)));
+  for (const r of rows) {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(beneficiaires)
+        .set({
+          nom: `Beneficiaire #${r.id}`,
+          prenom: null,
+          telephone: null,
+          formationId: null,
+          autreFormation: null,
+          anneeDiplome: null,
+          specialiteEcole: null,
+          sousSpecialite: null,
+          intituleMemoire: null,
+          autresInformations: null,
+          cvFichierId: null,
+          utilisateurId: null,
+          anonymiseLe: today(),
+        })
+        .where(eq(beneficiaires.id, r.id));
+      if (r.userId) await tx.delete(utilisateurs).where(eq(utilisateurs.id, r.userId));
     });
-    await grist().updateRecords('Beneficiaires', [{ id: row.id, fields }]);
+    if (r.cv) await supprimerFichier(r.cv);
   }
   return { job: 'anonymise-beneficiaires', processed: rows.length };
 }
 
 /** Répondants à supprimer : données effacées et compte de connexion supprimé. */
 async function anonymiseRepondants(): Promise<JobResult> {
-  const rows = (await grist().records('Repondants', { filter: { Doit_supprimer: [true] } })).filter((r) => truthy(r.Doit_supprimer));
-  for (const row of rows) {
-    const fields = await prepareFields('Repondants', {
-      Nom: `Repondant #${row.id}`,
-      Email: null,
-      Telephone: null,
-      Raison_sociale: null,
-      Siret: null,
-      Prenom: null,
-      Date_de_suppression: today(),
+  const db = database();
+  const rows = await db
+    .select({ id: repondants.id, userId: repondants.utilisateurId })
+    .from(repondants)
+    .innerJoin(utilisateurs, eq(utilisateurs.id, repondants.utilisateurId))
+    .where(repondantADetruire);
+  for (const r of rows) {
+    await db.transaction(async (tx) => {
+      await tx.update(repondants).set({ nom: `Repondant #${r.id}`, prenom: null, telephone: null, raisonSociale: null, siret: null, utilisateurId: null, anonymiseLe: today() }).where(eq(repondants.id, r.id));
+      if (r.userId) await tx.delete(utilisateurs).where(eq(utilisateurs.id, r.userId));
     });
-    await grist().updateRecords('Repondants', [{ id: row.id, fields }]);
-    const account = Number(row.Account);
-    if (account > 0) await grist().deleteRecords('Application_AuthUser', [account]);
   }
   return { job: 'anonymise-repondants', processed: rows.length };
 }
 
-/** Bénéficiaires devenus non éligibles : leur compte de connexion est supprimé. */
+/** Bénéficiaires devenus non éligibles : leur accès est retiré (le compte perd son mot de passe, la fiche reste). */
 async function deleteIneligibleAccounts(): Promise<JobResult> {
-  const rows = await grist().records('Beneficiaires', { filter: { Eligible: [false] } });
-  const accounts = [...new Set(rows.map((r) => Number(r.Account)).filter((a) => a > 0))];
-  if (accounts.length) await grist().deleteRecords('Application_AuthUser', accounts);
-  return { job: 'delete-ineligible-accounts', processed: accounts.length };
+  const db = database();
+  const rows = await db
+    .select({ userId: utilisateurs.id })
+    .from(beneficiaires)
+    .innerJoin(utilisateurs, eq(utilisateurs.id, beneficiaires.utilisateurId))
+    .where(and(sql`not ${beneficiaireEligible}`, sql`${utilisateurs.motDePasseHash} is not null`));
+  for (const r of rows) {
+    await db.update(utilisateurs).set({ motDePasseHash: null }).where(eq(utilisateurs.id, r.userId));
+    await db.delete(sessions).where(eq(sessions.utilisateurId, r.userId));
+  }
+  return { job: 'delete-ineligible-accounts', processed: rows.length };
 }
 
 /** Marchés validés dont l'exécution est terminée depuis plus de quatre ans et demi : archivés. */
 async function archiveMarches(): Promise<JobResult> {
-  const rows = (await grist().records('Marches', { filter: { Doit_archiver: [true] } })).filter((r) => r.Statut === 'Clause validée');
-  for (const row of rows) await grist().updateRecords('Marches', [{ id: row.id, fields: { Statut: 'Archivé' } }]);
+  const rows = await database()
+    .update(marches)
+    .set({ statut: 'archive', modifieLe: new Date() })
+    .where(and(eq(marches.statut, 'clause_validee'), sql`${marches.dateFinExecution} + interval '4 years 6 months' < current_date`))
+    .returning({ id: marches.id });
   return { job: 'archive-marches', processed: rows.length };
+}
+
+/** Invitations à créer son espace, pour les bénéficiaires dont le compte n'est pas encore activé. */
+async function invitationsComptes(): Promise<JobResult> {
+  return { job: 'invitations-comptes', processed: await inviterBeneficiaires() };
 }
 
 export const JOBS: Record<string, () => Promise<JobResult>> = {
   'purge-resets': purgeResets,
+  'purge-sessions': purgeSessions,
   'anonymise-beneficiaires': anonymiseBeneficiaires,
   'anonymise-repondants': anonymiseRepondants,
   'delete-ineligible-accounts': deleteIneligibleAccounts,
   'archive-marches': archiveMarches,
+  'invitations-comptes': invitationsComptes,
 };

@@ -1,0 +1,1 @@
+DROP TABLE "marche_beneficiaires" CASCADE;

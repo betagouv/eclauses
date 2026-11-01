@@ -59,16 +59,6 @@ export const marcheSpecialites = pgTable(
   (t) => [primaryKey({ columns: [t.marcheId, t.specialiteId] })],
 );
 
-/** Bénéficiaires dont la participation au marché est validée par l'acheteur. */
-export const marcheBeneficiaires = pgTable(
-  'marche_beneficiaires',
-  {
-    marcheId: integer().notNull().references(() => marches.id, { onDelete: 'cascade' }),
-    beneficiaireId: integer().notNull().references(() => beneficiaires.id, { onDelete: 'cascade' }),
-  },
-  (t) => [primaryKey({ columns: [t.marcheId, t.beneficiaireId] }), index('marche_beneficiaires_benef_idx').on(t.beneficiaireId)],
-);
-
 /** Candidatures des répondants aux marchés. */
 export const candidatures = pgTable(
   'candidatures',

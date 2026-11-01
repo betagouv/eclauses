@@ -1,7 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Session } from '@/server/auth/session';
 
-vi.mock('@/server/config', () => ({ grist: () => ({}), config: () => ({}) }));
 const { visibleColumns } = await import('@/server/policies/marches');
 
 const session = (over: Partial<Session>): Session => ({
