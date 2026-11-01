@@ -121,7 +121,8 @@ export const declarationsBeneficiaires = pgTable(
   {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
     gristId: integer().unique(),
-    repondantId: integer().notNull().references(() => repondants.id, { onDelete: 'cascade' }),
+    // Vide quand l'équipe a saisi la déclaration elle-même (cas présent dans la production).
+    repondantId: integer().references(() => repondants.id, { onDelete: 'set null' }),
     marcheId: integer().notNull().references(() => marches.id, { onDelete: 'cascade' }),
     estBeneficiaireEclauses: boolean().notNull().default(false),
     beneficiaireId: integer().references(() => beneficiaires.id, { onDelete: 'set null' }),

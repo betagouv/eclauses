@@ -37,7 +37,8 @@ describe.skipIf(!hasPostgres)('notifications', () => {
   describe('publication d’un marché', () => {
     it('marché sans lot : bénéficiaires actifs prévenus, sans vocabulaire de lot, clause citée', async () => {
       await n.marcheModifie(base.parent.id);
-      expect(outbox.map((m) => m.to).sort()).toEqual(['a@benef.test', 'b@benef.test']);
+      // Tous les bénéficiaires rattachés à la clause (même fiche non à jour), comme en production.
+      expect(outbox.map((m) => m.to).sort()).toEqual(['a@benef.test', 'b@benef.test', 'c@benef.test']);
       const mail = outbox[0]!;
       expect(mail.subject).toBe('Eclauses - un nouveau marché avec clause sociale a été publié');
       const body = text(mail.html);
@@ -56,14 +57,14 @@ describe.skipIf(!hasPostgres)('notifications', () => {
     it('une modification ultérieure ne renvoie rien, même après redémarrage (mémoire en base)', async () => {
       await n.marcheModifie(base.parent.id);
       await n.marcheModifie(base.parent.id);
-      expect(outbox).toHaveLength(2);
+      expect(outbox).toHaveLength(3);
       const rows = await base.db.select().from(s.notificationsEnvoyees);
       expect(rows.map((r) => `${r.evenement}:${r.cle}`)).toContain(`marche-publie:${base.parent.id}`);
     });
 
     it('deux traitements simultanés n’envoient qu’une fois', async () => {
       await Promise.all([n.marcheModifie(base.parent.id), n.marcheModifie(base.parent.id)]);
-      expect(outbox).toHaveLength(2);
+      expect(outbox).toHaveLength(3);
     });
 
     it('un lot ou un marché déjà publié ne déclenche rien', async () => {
@@ -72,10 +73,28 @@ describe.skipIf(!hasPostgres)('notifications', () => {
       expect(outbox).toHaveLength(0);
     });
 
-    it('sans bénéficiaire actif : aucun courrier, aucune erreur', async () => {
-      await base.db.update(s.beneficiaires).set({ ficheAJour: false });
+    it('sans bénéficiaire rattaché : aucun courrier, aucune erreur', async () => {
+      await base.db.delete(s.beneficiaireClauses);
       await n.marcheModifie(base.parent.id);
       expect(outbox).toHaveLength(0);
+    });
+
+    it('les bénéficiaires hors durée de conservation ne sont pas prévenus', async () => {
+      await base.db.update(s.beneficiaires).set({ anneeDiplome: new Date().getFullYear() - 8 }).where(eq(s.beneficiaires.id, base.a.benef.id));
+      await n.marcheModifie(base.parent.id);
+      expect(outbox.map((m) => m.to).sort()).toEqual(['b@benef.test', 'c@benef.test']);
+    });
+
+    it('un marché alloti prévient les bénéficiaires des clauses de tous ses lots', async () => {
+      const [autre] = await base.db.insert(s.clausesSociales).values({ nom: 'Autre clause' }).returning();
+      const [u] = await base.db.insert(s.utilisateurs).values({ email: 'd@benef.test' }).returning();
+      const [d] = await base.db.insert(s.beneficiaires).values({ nom: 'D', utilisateurId: u!.id, anneeDiplome: new Date().getFullYear() - 1 }).returning();
+      await base.db.insert(s.beneficiaireClauses).values({ beneficiaireId: d!.id, clauseId: autre!.id });
+      await base.db.update(s.marches).set({ clauseId: null }).where(eq(s.marches.id, base.parent.id));
+      await lot('1', 'Maçonnerie');
+      await lot('2', 'Peinture', { clauseId: autre!.id });
+      await n.marcheModifie(base.parent.id);
+      expect(outbox.map((m) => m.to).sort()).toEqual(['a@benef.test', 'b@benef.test', 'c@benef.test', 'd@benef.test']);
     });
   });
 

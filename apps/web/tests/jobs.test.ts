@@ -66,9 +66,9 @@ describe.skipIf(!hasPostgres)('tâches planifiées', () => {
     expect(await db.select().from(s.beneficiaires)).toHaveLength(2);
   });
 
-  it('anonymise les répondants inactifs depuis plus de 5 ans', async () => {
-    const old = await user('vieux@rep.test', { motDePasseModifieLe: new Date(Date.now() - 6 * 365 * 86400_000) });
-    const fresh = await user('frais@rep.test', { motDePasseModifieLe: new Date() });
+  it('anonymise les répondants sans connexion depuis plus de 5 ans', async () => {
+    const old = await user('vieux@rep.test', { derniereConnexionLe: new Date(Date.now() - 6 * 365 * 86400_000) });
+    const fresh = await user('frais@rep.test', { derniereConnexionLe: new Date() });
     await db.insert(s.repondants).values([{ utilisateurId: old.id, nom: 'Vieux', siret: '123' }, { utilisateurId: fresh.id, nom: 'Frais' }]);
     expect((await jobs.JOBS['anonymise-repondants']!()).processed).toBe(1);
     const rows = await db.select().from(s.repondants);

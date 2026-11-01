@@ -51,6 +51,11 @@ export const INDICATEURS: Record<string, () => Promise<string>> = {
     const [{ n }] = await database().select({ n: count() }).from(s.marches).where(eq(s.marches.statut, 'clause_validee'));
     return String(n);
   },
+  /** Bénéficiaires ayant au moins une déclaration (« profils uniques » de bénéficiaires d'un marché). */
+  async beneficiaires_uniques() {
+    const [{ n }] = await database().select({ n: sql<number>`count(distinct ${s.declarationsBeneficiaires.beneficiaireId})::int` }).from(s.declarationsBeneficiaires);
+    return String(n);
+  },
   async beneficiaires_commande_publique() {
     const [{ n }] = await database().select({ n: count() }).from(s.declarationsBeneficiaires);
     return String(n);

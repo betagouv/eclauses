@@ -177,7 +177,7 @@ describe.skipIf(!hasPostgres)('accès aux données (forme des pages et droits)',
       const [other] = await base.db.insert(s.repondants).values({ nom: 'Autre' }).returning();
       const rows = await tables.readTable(repondant(), 'Repondants');
       expect(rows.map((r) => r.id)).toEqual([base.titulaire.id]);
-      expect(rows[0]).toMatchObject({ Email: 'titulaire@societe.test', Label: 'Entreprise Z (Z <titulaire@societe.test>)' });
+      expect(rows[0]).toMatchObject({ Email: 'titulaire@societe.test', Label: 'Entreprise Z' });
       await tables.updateRow(repondant(), 'Repondants', base.titulaire.id, { Telephone: '0102', Email: 'Titulaire@societe.test' });
       expect(await rejects(tables.updateRow(repondant(), 'Repondants', base.titulaire.id, { Email: 'autre@x.test' }))).toBe(400);
       expect(await rejects(tables.updateRow(repondant(), 'Repondants', other!.id, { Telephone: '1' }))).toBe(403);
@@ -203,6 +203,15 @@ describe.skipIf(!hasPostgres)('accès aux données (forme des pages et droits)',
       expect(outbox.map((m) => m.to)).toEqual(['a@benef.test']);
       const [m] = await tables.readTable(acheteur(), 'Marches', [base.parent.id]);
       expect(m!.Beneficiaires).toEqual([declId]);
+    });
+
+    it('une déclaration saisie par l’équipe (sans répondant) est lisible par l’acheteur du marché, pas par un répondant', async () => {
+      const [d] = await base.db.insert(s.declarationsBeneficiaires).values({ marcheId: base.parent.id, beneficiaireId: base.a.benef.id, statut: 'valide' }).returning();
+      const mine = await tables.readTable(acheteur(), 'Declarations_Beneficiaires');
+      expect(mine.find((x) => x.id === d!.id)).toMatchObject({ Repondant: 0, Statut: 'validé' });
+      expect(await tables.readTable(repondant(), 'Declarations_Beneficiaires')).toHaveLength(0);
+      const [m] = await tables.readTable(acheteur(), 'Marches', [base.parent.id]);
+      expect(m!.Beneficiaires).toEqual([d!.id]);
     });
 
     it('un non-titulaire ne déclare pas ; le refus exige un motif et prévient le titulaire', async () => {

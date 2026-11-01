@@ -12,5 +12,5 @@ export const beneficiaireEligible = sql<boolean>`coalesce(${beneficiaires.dateDi
 /** Données à effacer 10 ans après la diplomation. */
 export const beneficiaireADetruire = sql<boolean>`coalesce(${beneficiaires.dateDiplomation} + interval '10 years' < current_date, false)`;
 
-/** Répondant inactif depuis 5 ans (dernière mise à jour du mot de passe). */
-export const repondantADetruire = sql<boolean>`coalesce(${utilisateurs.motDePasseModifieLe} + interval '5 years' < now(), false) and ${repondants.anonymiseLe} is null`;
+/** Répondant dont la dernière connexion remonte à plus de 5 ans (règle de la production ; jamais connecté = conservé). */
+export const repondantADetruire = sql<boolean>`coalesce(${utilisateurs.derniereConnexionLe} + interval '5 years' < now(), false) and ${repondants.anonymiseLe} is null`;

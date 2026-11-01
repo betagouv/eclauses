@@ -67,7 +67,7 @@ async function computeMarches(rows: Row[]): Promise<void> {
   const repLabel = (id: number | null) => {
     const r = reps.find((x) => x.id === id);
     if (!r) return '';
-    return r.raisonSociale ? `${r.raisonSociale} (${r.nom ?? ''} ${r.prenom ?? ''}${r.email ? `<${r.email}>)` : ''}` : (r.nom ?? '');
+    return r.raisonSociale || r.email || '';
   };
   const intitulePropre = (m: (typeof all)[number]): string => {
     if (!m.parentId) return m.intitule;

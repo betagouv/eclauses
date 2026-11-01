@@ -1,9 +1,10 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import * as compat from '../compat/others';
 import { marches, EVENT_PUBLIE } from '../compat/marches';
 import * as specs from '../compat/specs';
 import { database } from '../db/client';
-import { beneficiaires, invitationsTitulaires, marches as marchesTable, repondants, utilisateurs } from '../db/schema';
+import { beneficiaireADetruire, beneficiaireEligible } from '../db/expr';
+import { beneficiaireClauses, beneficiaires, invitationsTitulaires, marches as marchesTable, repondants, utilisateurs } from '../db/schema';
 import { describeMarche, loadMarcheInfo } from '../mail/describe';
 import * as t from '../mail/templates';
 import { sendMail } from '../mail/transport';
@@ -38,16 +39,33 @@ const emailsUtilisateursAcheteurs = async (ids: number[]) =>
 
 /* ------------------------------------------------------------------ Marchés ------------- */
 
-/** Publication d'un marché parent : prévenir les bénéficiaires actifs de la clause. */
+/**
+ * Destinataires d'une publication : les bénéficiaires rattachés à l'une des clauses du marché (celle du
+ * marché et celles de ses lots), comme `Beneficiaires_actifs_publication` en production, avec une
+ * adresse e-mail et encore dans leur durée de conservation (éligibles, non à supprimer).
+ */
+export async function destinatairesPublication(clauseIds: number[]): Promise<string[]> {
+  if (!clauseIds.length) return [];
+  const rows = await database()
+    .selectDistinct({ email: utilisateurs.email })
+    .from(beneficiaireClauses)
+    .innerJoin(beneficiaires, eq(beneficiaires.id, beneficiaireClauses.beneficiaireId))
+    .innerJoin(utilisateurs, eq(utilisateurs.id, beneficiaires.utilisateurId))
+    .where(and(inArray(beneficiaireClauses.clauseId, clauseIds), beneficiaireEligible, sql`not ${beneficiaireADetruire}`));
+  return rows.map((r) => r.email).filter((e) => e.includes('@'));
+}
+
+/** Publication d'un marché parent : prévenir les bénéficiaires des clauses concernées. */
 async function marchePublie(id: number) {
   const row = await marches.byId(id);
   if (!row || row.Doit_Notifier_Publication !== true) return;
-  const clauseId = Number(row.Clauses_sociales_parent_ou_enfants) || Number(row.Clauses_sociales);
-  if (!clauseId) return;
+  const clauseIds = [...new Set([Number(row.Clauses_sociales), ...(row.Clauses_sociales_lots as number[])].filter(Boolean))];
+  if (!clauseIds.length) return;
   if (!(await reserver(EVENT_PUBLIE, id))) return;
 
+  const clauseId = Number(row.Clauses_sociales_parent_ou_enfants) || clauseIds[0]!;
   const [clause] = await specs.clauses.read({ ids: [clauseId] });
-  const recipients = [...new Set(((clause?.Beneficiaires_Actif as string[]) ?? []).filter((e) => e.includes('@')))];
+  const recipients = await destinatairesPublication(clauseIds);
   const alloti = Number(row.Nb_lots) > 0;
   const lots = alloti
     ? ((row.Lots_Detail as Record<string, unknown>[]) ?? []).map((l) => ({

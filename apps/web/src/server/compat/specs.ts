@@ -86,7 +86,7 @@ export const clauses = new LegacyTable({
     const ids = rows.map((r) => r.id);
     const [marchesRows, links] = await Promise.all([
       db.select({ id: s.marches.id, clauseId: s.marches.clauseId }).from(s.marches).where(inArray(s.marches.clauseId, ids)),
-      // Bénéficiaires « actifs » : rattachés à la clause et dont la fiche est à jour.
+      // Rattachés à la clause (tous) ; les « actifs » ont en plus une fiche à jour.
       db
         .select({ clauseId: s.beneficiaireClauses.clauseId, id: s.beneficiaires.id, email: s.utilisateurs.email })
         .from(s.beneficiaireClauses)
@@ -98,9 +98,10 @@ export const clauses = new LegacyTable({
     const actifIds = new Set(actives.map((a) => a.id));
     for (const row of rows) {
       row.Marches = marchesRows.filter((m) => m.clauseId === row.id).map((m) => m.id);
-      const mine = links.filter((l) => l.clauseId === row.id && actifIds.has(l.id));
-      row.Beneficiaires = mine.map((l) => l.id);
-      row.Beneficiaires_Actif = mine.map((l) => l.email).filter((e): e is string => !!e);
+      // Comme en production : `Beneficiaires` = tous les rattachés, `Beneficiaires_Actif` = e-mails des fiches à jour.
+      const attached = links.filter((l) => l.clauseId === row.id);
+      row.Beneficiaires = attached.map((l) => l.id);
+      row.Beneficiaires_Actif = attached.filter((l) => actifIds.has(l.id)).map((l) => l.email).filter((e): e is string => !!e);
       row.Documents = [];
     }
   },
@@ -170,10 +171,8 @@ export const repondants = new LegacyTable({
       row.Email = email;
       row.Account = r.utilisateurId ?? 0;
       row.Titulaire_aux_marches = titulaires.filter((m) => m.titulaireId === row.id).map((m) => m.id);
-      // Même libellé que la formule `Label` de Grist.
-      row.Label = r.raisonSociale
-        ? `${r.raisonSociale} (${r.nom ?? ''} ${r.prenom ?? ''}${email ? `<${email}>)` : ''}`
-        : (r.nom ?? '');
+      // Même libellé que la formule `Label` de la production : raison sociale, sinon adresse e-mail.
+      row.Label = r.raisonSociale || email;
     }
   },
 });

@@ -8,6 +8,7 @@
 import { sql } from 'drizzle-orm';
 import { database } from '../src/server/db/client';
 import * as s from '../src/server/db/schema';
+import { repondantADetruire } from '../src/server/db/expr';
 import { GristClient, type Row } from '../src/server/grist/client';
 import * as specs from '../src/server/compat/specs';
 import * as others from '../src/server/compat/others';
@@ -34,7 +35,9 @@ const M = {
 let total = 0;
 let diffs = 0;
 const shown: Record<string, number> = {};
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+// Les espaces de début et de fin sont retirés à l'import : on ne les compare pas.
+const norm = (v: unknown): unknown => (typeof v === 'string' ? v.trim() : v);
+const same = (a: unknown, b: unknown) => JSON.stringify(norm(a)) === JSON.stringify(norm(b));
 const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((x): x is number => typeof x === 'number') : []);
 const toNew = (m: Map<number, number>, v: unknown) => ids(v).map((x) => m.get(x) ?? -x).sort((a, b) => a - b);
 const one = (m: Map<number, number>, v: unknown) => (typeof v === 'number' && v > 0 ? (m.get(v) ?? -v) : 0);
@@ -46,7 +49,18 @@ function check(table: string, field: string, grid: number, expected: unknown, ac
   diffs++;
   const k = `${table}.${field}`;
   shown[k] = (shown[k] ?? 0) + 1;
-  if (shown[k]! <= 3) console.log(`ÉCART ${k} (ligne Grist ${grid}) : Grist ${JSON.stringify(expected)} ≠ PostgreSQL ${JSON.stringify(actual)}`);
+  if (shown[k]! > 3) return;
+  // Listes longues (adresses) : on ne détaille que les différences, avec l'adresse masquée.
+  if (Array.isArray(expected) && Array.isArray(actual) && expected.length > 8) {
+    const mask = (x: unknown) => String(x).replace(/^(.{2}).*(@.*)$/, '$1***$2');
+    const a = new Set(expected.map(String));
+    const b = new Set(actual.map(String));
+    const missing = [...a].filter((x) => !b.has(x));
+    const extra = [...b].filter((x) => !a.has(x));
+    console.log(`ÉCART ${k} (ligne Grist ${grid}) : Grist ${expected.length} éléments, PostgreSQL ${actual.length} ; absents de PostgreSQL : ${missing.length} ${JSON.stringify(missing.slice(0, 5).map(mask))} ; en plus : ${extra.length} ${JSON.stringify(extra.slice(0, 5).map(mask))}`);
+    return;
+  }
+  console.log(`ÉCART ${k} (ligne Grist ${grid}) : Grist ${JSON.stringify(expected)} ≠ PostgreSQL ${JSON.stringify(actual)}`);
 }
 
 // --- Marchés -----------------------------------------------------------------------------------
@@ -87,23 +101,33 @@ for (const r of gm) {
   t('Doit_archiver', bool(r.Doit_archiver), c.Doit_archiver);
   t('Acheteur_Nom', r.Acheteur_Nom, c.Acheteur_Nom);
   t('Titulaire_Label', r.Titulaire_Label ?? '', c.Titulaire_Label);
-  t('Acheteur_Utilisateurs_Acheteurs', toNew(M.utilisateursAcheteurs, r.Acheteur_Utilisateurs_Acheteurs), [...(c.Acheteur_Utilisateurs_Acheteurs as number[])].sort((a, b) => a - b));
+  // Les utilisateurs acheteurs sans e-mail ne sont pas importés (ils ne peuvent pas se connecter).
+  t('Acheteur_Utilisateurs_Acheteurs', toNew(M.utilisateursAcheteurs, r.Acheteur_Utilisateurs_Acheteurs).filter((x) => x > 0), [...(c.Acheteur_Utilisateurs_Acheteurs as number[])].sort((a, b) => a - b));
   t('Date_Limite_de_Remise_des_Offres', typeof r.Date_Limite_de_Remise_des_Offres === 'number' ? r.Date_Limite_de_Remise_des_Offres : null, c.Date_Limite_de_Remise_des_Offres);
 }
 
 // --- Bénéficiaires, répondants, clauses --------------------------------------------------------
 const cb = new Map((await specs.beneficiaires.read()).map((r) => [r.id, r]));
-for (const r of await g.records('Beneficiaires')) {
+const grBenef = await g.records('Beneficiaires');
+const mailCount = new Map<string, number>();
+for (const r of grBenef) {
+  const e = typeof r.Courriel === 'string' ? r.Courriel.trim().toLowerCase() : '';
+  if (e) mailCount.set(e, (mailCount.get(e) ?? 0) + 1);
+}
+for (const r of grBenef) {
   const c = cb.get(M.beneficiaires.get(r.id) ?? 0);
   if (!c) {
     check('Beneficiaires', 'présence', r.id, true, false);
     continue;
   }
-  const hasMail = typeof r.Courriel === 'string' && r.Courriel.includes('@');
+  // Un même e-mail sur deux fiches : la seconde est importée sans compte (doublon signalé par l'import).
+  const key = typeof r.Courriel === 'string' ? r.Courriel.trim().toLowerCase() : '';
+  const duplicate = (mailCount.get(key) ?? 0) > 1;
+  const hasMail = key.includes('@') && !duplicate;
   check('Beneficiaires', 'Eligible', r.id, bool(r.Eligible), c.Eligible);
   check('Beneficiaires', 'Doit_supprimer', r.id, bool(r.Doit_supprimer), c.Doit_supprimer);
   if (hasMail) check('Beneficiaires', 'Courriel', r.id, String(r.Courriel).trim().toLowerCase(), c.Courriel);
-  check('Beneficiaires', 'Compte_active', r.id, bool(r.Compte_active), c.Compte_active);
+  if (!duplicate) check('Beneficiaires', 'Compte_active', r.id, bool(r.Compte_active), c.Compte_active);
   check('Beneficiaires', 'Annee_de_diplome', r.id, String(r.Annee_de_diplome ?? ''), c.Annee_de_diplome);
 }
 const cr = new Map((await specs.repondants.read()).map((r) => [r.id, r]));
@@ -113,7 +137,8 @@ for (const r of await g.records('Repondants')) {
     check('Repondants', 'présence', r.id, true, false);
     continue;
   }
-  check('Repondants', 'Doit_supprimer', r.id, false, false);
+  const [flag] = await db.select({ d: repondantADetruire }).from(s.repondants).leftJoin(s.utilisateurs, sql`${s.utilisateurs.id} = ${s.repondants.utilisateurId}`).where(sql`${s.repondants.id} = ${c.id}`);
+  check('Repondants', 'Doit_supprimer', r.id, bool(r.Doit_supprimer), flag?.d ?? false);
   check('Repondants', 'Label', r.id, r.Label ?? '', c.Label);
   check('Repondants', 'Titulaire_aux_marches', r.id, toNew(M.marches, r.Titulaire_aux_marches), [...(c.Titulaire_aux_marches as number[])].sort((a, b) => a - b));
 }
@@ -138,7 +163,8 @@ for (const r of await g.records('Declarations_Beneficiaires')) {
   check('Declarations', 'Statut', r.id, r.Statut, c.Statut);
   check('Declarations', 'Email_envoi', r.id, (r.Email_envoi ?? '') || '', c.Email_envoi);
   check('Declarations', 'Marche_Intitule_propre', r.id, r.Marche_Intitule_propre, c.Marche_Intitule_propre);
-  check('Declarations', 'Marche_Lot_Label', r.id, r.Marche_Lot_Label ?? '', c.Marche_Lot_Label);
+  // Cette colonne n'existe que dans le DEV.
+  if ('Marche_Lot_Label' in r) check('Declarations', 'Marche_Lot_Label', r.id, r.Marche_Lot_Label ?? '', c.Marche_Lot_Label);
 }
 const ci = new Map((await others.impacts.read()).map((r) => [String(r.Label), r]));
 for (const r of await g.records('Impacts')) {

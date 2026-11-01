@@ -49,3 +49,46 @@ Réponses aux points laissés ouverts en phase 1 : `Marches.Suivi` est vide dans
 - **Import de PROD** : non lancé (la lecture de PROD est permise, l'écriture n'est jamais dans PROD ; l'import vers une base de production demande une validation et une fenêtre de bascule).
 - **Bascule** : plan de coupure, gel de Grist, courriers, DNS et reprise des mots de passe sont à écrire avec l'équipe (phase 9).
 - **Fichiers de la PROD sur S3** : le pilote est prêt et testé sur MinIO, pas sur Scaleway.
+
+## Import de la PROD (lecture seule) et ce qu'il a révélé
+
+Le document PROD (`<ID du document PROD>`) a été lu en **lecture seule** et copié dans une base locale distincte (`eclauses_prod_copy`, port 5434), ses CV dans `apps/web/var/fichiers-prod` (ignoré par git). Ces deux emplacements contiennent des **données personnelles réelles** : à supprimer quand l'essai est terminé (`docker exec eclauses-db-1 psql -U eclauses -d postgres -c "drop database eclauses_prod_copy"` et suppression du dossier).
+
+| Table | Grist PROD | PostgreSQL | Remarque |
+|---|---|---|---|
+| Bénéficiaires | 365 | 365 | 64 sans e-mail (sans compte), 2 doublons d'e-mail |
+| Marchés | 33 | 33 | parents et lots |
+| Déclarations | 15 | 15 | dont 3 saisies par l'équipe, sans répondant |
+| Intérêts | 64 | 64 | |
+| CV | 59 | 59 | tous copiés (en DEV, 43 sur 50 étaient illisibles) |
+| Acheteurs / utilisateurs acheteurs | 126 / 56 | 126 / 54 | 2 utilisateurs sans e-mail non importés |
+| Répondants | 16 | 16 | |
+| Comptes de connexion | 128 | 122 adresses utilisées | les autres n'ont pas de profil ou sont des doublons d'adresse |
+
+### Les formules ne sont pas les mêmes en DEV et en PROD
+
+La comparaison automatique des deux documents montre 18 formules différentes et des dizaines de colonnes propres à l'un ou à l'autre. Le code a été aligné sur la **PROD**, qui est ce que le nouveau système remplace :
+
+| Sujet | DEV | PROD (retenu) |
+|---|---|---|
+| Libellé d'un répondant (`Label`) | raison sociale + nom + e-mail | raison sociale, sinon e-mail |
+| Répondant à supprimer | 5 ans après la dernière mise à jour du compte | 5 ans après la **dernière connexion** (jamais connecté : conservé) |
+| `Clauses_sociales.Beneficiaires` | seulement les fiches à jour | **tous** les bénéficiaires rattachés (la liste « actifs » reste filtrée) |
+| Destinataires d'une publication | bénéficiaires actifs | tous les rattachés aux clauses du marché et de ses lots |
+| Durée des liens par courrier | 24 h | 30 jours pour tous |
+
+Deux écarts volontaires par rapport à la PROD, à valider :
+- **Publication** : en plus du rattachement, un destinataire doit avoir une adresse, être éligible et ne pas être à supprimer (la PROD écrit aussi aux bénéficiaires hors durée de conservation).
+- **Liens de réinitialisation** : 24 h (activation : 30 jours), car un lien de mot de passe qui dure un mois est un risque inutile.
+
+### Défaut du modèle trouvé et corrigé
+
+Trois déclarations de la PROD n'ont **pas de répondant** (saisies par l'équipe) : la colonne était obligatoire. Migration `0004` (colonne facultative), lecture adaptée, test ajouté. Un nouvel indicateur (« profils uniques de bénéficiaires ») a aussi été ajouté.
+
+### Parité
+
+2815 comparaisons entre ce que la PROD calcule et ce que le nouveau code calcule : **1 écart expliqué** (l'adresse d'un bénéficiaire en doublon, importé sans compte). Les différences de présentation tolérées sont les mêmes qu'en DEV, plus le retrait des espaces de fin de texte.
+
+### À savoir sur l'outillage
+
+Le processus d'import ne se terminait pas seul après la fin du travail (connexions HTTP persistantes vers Grist) : il sort maintenant explicitement. **Ne jamais lancer deux imports `--replace` en même temps sur la même base** : le second vide les tables du premier.

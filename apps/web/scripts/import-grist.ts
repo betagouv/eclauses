@@ -356,8 +356,9 @@ async function main() {
   const declRows: Record<string, unknown>[] = [];
   for (const r of await read('Declarations_Beneficiaires')) {
     const m = must(marches, r.Marche, 'Déclaration', r.id);
-    const rep = must(repondants, r.Repondant, 'Déclaration', r.id);
-    if (!m || !rep) continue;
+    // Déclaration saisie par l'équipe : pas de répondant, c'est normal.
+    const rep = ref(r.Repondant) ? must(repondants, r.Repondant, 'Déclaration', r.id) : null;
+    if (!m || (ref(r.Repondant) && !rep)) continue;
     declRows.push({ gristId: r.id, repondantId: rep, marcheId: m, estBeneficiaireEclauses: bool(r.Est_beneficiaire_eclauses), beneficiaireId: mapped(beneficiaires, r.Beneficiaire), nom: text(r.Nom), prenom: text(r.Prenom), email: text(r.Email), statut: codeFromLabel(STATUT_DECLARATION_LABELS, r.Statut) ?? 'declare', creeLe: when(r.Cree_le) ?? new Date() });
   }
   const declarations = await upsert('Declarations_Beneficiaires', s.declarationsBeneficiaires, declRows);
@@ -423,6 +424,7 @@ async function main() {
     'Candidats / titulaires actifs': 'repondants_actifs',
     'Activation des clauses sociales': 'clauses_activees',
     'Bénéficiaires de commande publique': 'beneficiaires_commande_publique',
+    'Nombre de profils uniques de bénéficiaires': 'beneficiaires_uniques',
   };
   const TYPES: Record<string, 'utilisable' | 'utilise' | 'utile' | 'impactant'> = { Utilisable: 'utilisable', Utilisé: 'utilise', Utile: 'utile', Impactant: 'impactant' };
   await upsert('Impacts', s.impacts, (await read('Impacts')).map((r) => {
@@ -504,4 +506,8 @@ main()
     console.error('Échec de l’import :', e instanceof Error ? e.message : e);
     process.exitCode = 1;
   })
-  .finally(() => pg.end());
+  .finally(async () => {
+    await pg.end();
+    // Les connexions HTTP persistantes vers Grist peuvent retenir le processus : tout est terminé, on sort.
+    process.exit(process.exitCode ?? 0);
+  });
