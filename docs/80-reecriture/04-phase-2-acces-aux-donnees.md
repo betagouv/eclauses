@@ -31,8 +31,7 @@ Branche `rewrite-postgres`. L'application ne lit et n'écrit plus dans Grist : t
 
 ## Pas encore fait ou à savoir
 
-- **Sessions** : toujours des JWT de 24 h qui portent les identifiants. Une session créée avant le changement de base reste valide et pointe sur d'anciens identifiants ; les sessions révocables arrivent en phase 3.
-- **Limiteur de débit** toujours en mémoire (phase 3).
+- **Sessions et limiteur de débit** : traités en phase 3 ([05](05-phase-3-sessions.md)).
 - **Déclencheurs** : les courriers partent quand une page écrit. Un changement fait directement en base (ou plus tard depuis l'administration) devra appeler les mêmes fonctions de `services/notifications.ts`.
 - **Pages non vérifiées une à une** : les 29 pages se chargent, seules celles listées ci-dessus ont été parcourues ; les parcours d'écriture complets passent par les tests d'intégration, pas par le navigateur.
 - **Docker** : l'image ne lance pas encore les migrations et n'a pas de volume de fichiers (phase 8).

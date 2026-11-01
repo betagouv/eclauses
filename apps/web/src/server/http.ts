@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { sql } from 'drizzle-orm';
+import { database } from './db/client';
 import { readSession, SESSION_COOKIE, type Session } from './auth/session';
 
 export class HttpError extends Error {
@@ -50,16 +52,17 @@ export function assertSameOrigin(req: Request): void {
 export const clientIp = (req: Request): string =>
   req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-/** Limiteur en mémoire (une seule instance) : `max` essais par `windowMs` et par clé. */
-export function rateLimit(key: string, max = 8, windowMs = 15 * 60_000): void {
-  const now = Date.now();
-  const entry = attempts.get(key);
-  if (!entry || entry.resetAt < now) {
-    attempts.set(key, { count: 1, resetAt: now + windowMs });
-    return;
-  }
-  entry.count += 1;
-  if (entry.count > max) throw new HttpError(429, 'Trop de tentatives, réessayez plus tard.');
+/**
+ * Limiteur partagé entre instances (compteur en base) : `max` essais par `windowMs` et par clé. Le
+ * compteur est incrémenté de façon atomique ; la fenêtre redémarre à son expiration.
+ */
+export async function rateLimit(key: string, max = 8, windowMs = 15 * 60_000): Promise<void> {
+  const rows = await database().execute<{ compteur: number }>(sql`
+    insert into limites_debit (cle, compteur, fin_fenetre)
+    values (${key}, 1, now() + ${windowMs} * interval '1 millisecond')
+    on conflict (cle) do update set
+      compteur = case when limites_debit.fin_fenetre < now() then 1 else limites_debit.compteur + 1 end,
+      fin_fenetre = case when limites_debit.fin_fenetre < now() then now() + ${windowMs} * interval '1 millisecond' else limites_debit.fin_fenetre end
+    returning compteur`);
+  if (Number(rows[0]?.compteur) > max) throw new HttpError(429, 'Trop de tentatives, réessayez plus tard.');
 }

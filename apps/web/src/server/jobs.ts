@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { database } from './db/client';
 import { beneficiaireADetruire, beneficiaireEligible, repondantADetruire } from './db/expr';
-import { beneficiaires, marches, repondants, sessions, utilisateurs } from './db/schema';
+import { beneficiaires, limitesDebit, marches, repondants, sessions, utilisateurs } from './db/schema';
 import { purgerJetons } from './services/comptes';
 import { supprimerFichier } from './services/fichiers';
 import { inviterBeneficiaires } from './services/notifications';
@@ -18,10 +18,11 @@ async function purgeResets(): Promise<JobResult> {
   return { job: 'purge-resets', processed: await purgerJetons() };
 }
 
-/** Efface les sessions expirées ou révoquées. */
+/** Efface les sessions expirées ou révoquées et les compteurs du limiteur échus. */
 async function purgeSessions(): Promise<JobResult> {
   const rows = await database().delete(sessions).where(sql`${sessions.expireLe} < now() or ${sessions.revoqueLe} is not null`).returning({ e: sessions.empreinte });
-  return { job: 'purge-sessions', processed: rows.length };
+  const counters = await database().delete(limitesDebit).where(sql`${limitesDebit.finFenetre} < now()`).returning({ k: limitesDebit.cle });
+  return { job: 'purge-sessions', processed: rows.length + counters.length };
 }
 
 /** Bénéficiaires dont la durée de conservation est dépassée : données personnelles et compte effacés. */

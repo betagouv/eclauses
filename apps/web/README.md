@@ -6,7 +6,7 @@ Next.js (App Router) et TypeScript, avec **PostgreSQL** (Drizzle) pour les donn�
 
 ```bash
 npm install                                                       # à la racine du dépôt
-cp apps/web/.env.example apps/web/.env.local                      # renseigner POSTGRES_PASSWORD, DATABASE_URL, SESSION_SECRET
+cp apps/web/.env.example apps/web/.env.local                      # renseigner POSTGRES_PASSWORD, DATABASE_URL
 docker compose --env-file apps/web/.env.local up -d db            # PostgreSQL 16 sur 127.0.0.1:5434
 npm run db:migrate -w apps/web                                    # applique les migrations (apps/web/drizzle)
 npx tsx apps/web/scripts/seed-dev.ts                              # données de démonstration (base locale uniquement)

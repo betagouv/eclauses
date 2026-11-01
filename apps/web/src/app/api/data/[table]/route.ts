@@ -24,7 +24,7 @@ export function POST(req: Request, ctx: Ctx) {
   return handle(async () => {
     assertSameOrigin(req);
     const actor = await currentSession();
-    if (!actor) rateLimit(`create:${clientIp(req)}`, 10, 10 * 60_000);
+    if (!actor) await rateLimit(`create:${clientIp(req)}`, 10, 10 * 60_000);
     const { table } = await ctx.params;
     const id = await createRow(actor, table, await req.json().catch(() => null));
     return NextResponse.json({ id });

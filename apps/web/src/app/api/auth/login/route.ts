@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { hashPassword, verifyPassword } from '@/server/auth/password';
 import { resolveIdentity } from '@/server/auth/identity';
-import { SESSION_COOKIE, SESSION_TTL_SECONDS, signSession } from '@/server/auth/session';
+import { SESSION_COOKIE, SESSION_TTL_SECONDS, createSession } from '@/server/auth/session';
 import { database } from '@/server/db/client';
 import { utilisateurs } from '@/server/db/schema';
 import { assertSameOrigin, clientIp, handle, HttpError, rateLimit } from '@/server/http';
@@ -26,7 +26,7 @@ export function POST(req: Request) {
     const { email, password } = parsed.data;
     const mail = email.toLowerCase();
 
-    rateLimit(`login:${clientIp(req)}:${mail}`);
+    await rateLimit(`login:${clientIp(req)}:${mail}`);
 
     const user = await utilisateurParEmail(mail);
     const check = await verifyPassword(user?.motDePasseHash ?? (await dummy()), password);
@@ -40,7 +40,7 @@ export function POST(req: Request) {
     await database().update(utilisateurs).set({ derniereConnexionLe: new Date(), ...rehash }).where(eq(utilisateurs.id, user.id));
 
     const res = NextResponse.json(session);
-    res.cookies.set(SESSION_COOKIE, await signSession(session), {
+    res.cookies.set(SESSION_COOKIE, await createSession(user.id), {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',

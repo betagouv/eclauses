@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { database } from '../db/client';
-import { jetonsAuth, utilisateurs } from '../db/schema';
+import { jetonsAuth, sessions, utilisateurs } from '../db/schema';
 import { hashPassword } from '../auth/password';
 import { publicUrl } from '../mail/layout';
 
@@ -81,6 +81,8 @@ export async function consommerJeton(jeton: string, motDePasse: string): Promise
       .returning({ id: jetonsAuth.id });
     if (!pris.length) return false;
     await tx.update(utilisateurs).set({ motDePasseHash: hash, motDePasseModifieLe: new Date() }).where(eq(utilisateurs.id, etat.utilisateurId!));
+    // Un nouveau mot de passe ferme toutes les sessions ouvertes (une personne qui l'avait volé est déconnectée).
+    await tx.update(sessions).set({ revoqueLe: new Date() }).where(and(eq(sessions.utilisateurId, etat.utilisateurId!), isNull(sessions.revoqueLe)));
     return true;
   });
 }

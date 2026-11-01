@@ -77,3 +77,10 @@ export const notificationsEnvoyees = pgTable(
   },
   (t) => [uniqueIndex('notifications_evenement_cle_unique').on(t.evenement, t.cle)],
 );
+
+/** Compteurs du limiteur de débit : un par clé (action + adresse IP et/ou e-mail), partagés entre instances. */
+export const limitesDebit = pgTable('limites_debit', {
+  cle: text().primaryKey(),
+  compteur: integer().notNull(),
+  finFenetre: timestamp({ withTimezone: true }).notNull(),
+});

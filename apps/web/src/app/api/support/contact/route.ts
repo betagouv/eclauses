@@ -18,7 +18,7 @@ const ATTACHMENT_EXTENSIONS = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'txt'
 export function POST(req: Request) {
   return handle(async () => {
     assertSameOrigin(req);
-    rateLimit(`support:${clientIp(req)}`, 5, 15 * 60_000);
+    await rateLimit(`support:${clientIp(req)}`, 5, 15 * 60_000);
 
     const form = await req.formData().catch(() => null);
     const parsed = body.safeParse({ nom: form?.get('nom'), email: form?.get('email'), message: form?.get('message') });

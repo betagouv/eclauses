@@ -20,7 +20,7 @@ const body = z.object({
 export function POST(req: Request) {
   return handle(async () => {
     assertSameOrigin(req);
-    rateLimit(`candidat-check:${clientIp(req)}`, 20, 15 * 60_000);
+    await rateLimit(`candidat-check:${clientIp(req)}`, 20, 15 * 60_000);
     const parsed = body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new HttpError(400, 'Requête invalide.');
     const wanted = [...new Set([...(parsed.data.lotIds ?? []), ...(parsed.data.marcheIds ?? [])])];

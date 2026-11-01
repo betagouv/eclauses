@@ -7,7 +7,6 @@ const schema = z.object({
   GRIST_DOC_ID: z.string().min(10).optional(),
   GRIST_API_KEY: z.string().min(20).optional(),
   DATABASE_URL: z.string().url(),
-  SESSION_SECRET: z.string().min(32),
   CV_MAX_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
 });
 

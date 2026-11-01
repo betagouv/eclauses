@@ -116,6 +116,8 @@ check('répondant : pas d’accès aux invitations', (await r.data('Invitation_T
 
 // --- Lien de réinitialisation ---------------------------------------------------------------
 const user = await utilisateurParEmail('demo.discret@example.test');
+const stale = new Client();
+await stale.login('demo.discret@example.test', pw('SEED_DISCRET_PASSWORD'));
 const { jeton } = await creerJeton(user!.id, 'reinitialisation');
 const state = await (await anon.call(`/api/auth/reset?token=${jeton}`)).json();
 check('lien valide reconnu', state.valid === true && state.type === 'reset');
@@ -123,10 +125,27 @@ check('mot de passe trop court refusé', (await anon.call('/api/auth/reset', { m
 const newPassword = `Nouveau-${Date.now()}`;
 check('nouveau mot de passe accepté', (await anon.call('/api/auth/reset', { method: 'POST', json: { token: jeton, password: newPassword } })).status === 200);
 check('lien à usage unique', (await anon.call('/api/auth/reset', { method: 'POST', json: { token: jeton, password: newPassword } })).status === 400);
+const meOf = async (c: Client) => ((await (await c.call('/api/auth/me')).json()) as { session: unknown }).session;
+check('session ouverte avant la réinitialisation fermée par le nouveau mot de passe', (await meOf(stale)) === null);
 check('connexion avec le nouveau mot de passe', (await new Client().login('demo.discret@example.test', newPassword)).status === 200);
 // On remet le mot de passe de démonstration pour que le script soit rejouable.
 const { hashPassword } = await import('../src/server/auth/password');
 await pg`update utilisateurs set mot_de_passe_hash = ${await hashPassword(pw('SEED_DISCRET_PASSWORD'))} where id = ${user!.id}`;
+
+// --- Déconnexion et limiteur ------------------------------------------------------------------
+const out = new Client();
+await out.login('demo.beneficiaire@example.test', pw('SEED_BENEFICIAIRE_PASSWORD'));
+const keep = out.cookie;
+check('session valide avant déconnexion', (await meOf(out)) !== null);
+await out.call('/api/auth/logout', { method: 'POST' });
+const replay = new Client();
+replay.cookie = keep;
+check('cookie rejoué après déconnexion : refusé (révocation serveur)', (await meOf(replay)) === null);
+const brute = new Client();
+let blocked = 0;
+for (let i = 0; i < 10; i++) if ((await brute.login('victime@example.org', `essai-${i}`)).status === 429) blocked++;
+check('trop d’essais de connexion : limité (429)', blocked > 0, `${blocked} refus`);
+await pg`delete from limites_debit`;
 
 // --- Tâches planifiées -----------------------------------------------------------------------
 check('tâches sans secret : 401', (await anon.call('/api/jobs/all', { method: 'POST' })).status === 401);

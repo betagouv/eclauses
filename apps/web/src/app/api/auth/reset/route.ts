@@ -8,7 +8,7 @@ const body = z.object({ token: z.string().trim().min(20).max(128), password: z.s
 /** Lien reçu par courrier : vérifier le jeton sans le consommer (la page l'affiche avant de demander le mot de passe). */
 export function GET(req: Request) {
   return handle(async () => {
-    rateLimit(`reset-check:${clientIp(req)}`, 30, 15 * 60_000);
+    await rateLimit(`reset-check:${clientIp(req)}`, 30, 15 * 60_000);
     const etat = await etatJeton(new URL(req.url).searchParams.get('token') ?? '');
     return NextResponse.json({
       valid: etat.valide,
@@ -24,7 +24,7 @@ export function GET(req: Request) {
 export function POST(req: Request) {
   return handle(async () => {
     assertSameOrigin(req);
-    rateLimit(`reset:${clientIp(req)}`, 10, 15 * 60_000);
+    await rateLimit(`reset:${clientIp(req)}`, 10, 15 * 60_000);
     const parsed = body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) throw new HttpError(400, 'Le mot de passe doit contenir au moins 8 caractères.');
     if (!(await consommerJeton(parsed.data.token, parsed.data.password))) throw new HttpError(400, 'Lien invalide ou expiré.');
