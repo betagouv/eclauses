@@ -52,3 +52,32 @@ export async function compteAdmin(userId: number, estAdmin: boolean): Promise<Ac
 export async function compteMfa(userId: number): Promise<ActionResult<null>> {
   return attempt(async () => (await reinitialiserMfa(await requireAdmin(), userId), null));
 }
+
+/* ------------------------------------------------------------------ Fusion ------------------ */
+
+import { apercu, fusionner, type Apercu, type TypeFusion } from '../admin/fusion';
+
+const typeFusion = (t: string): TypeFusion => {
+  if (t !== 'beneficiaire' && t !== 'repondant') throw Object.assign(new Error('Type inconnu.'), { status: 400 });
+  return t;
+};
+export async function fusionApercu(type: string, conserveId: number, supprimeId: number): Promise<ActionResult<Apercu>> {
+  return attempt(async () => {
+    await requireAdmin();
+    return apercu(typeFusion(type), Number(conserveId), Number(supprimeId));
+  });
+}
+export async function fusionExecuter(type: string, conserveId: number, supprimeId: number): Promise<ActionResult<{ deplaces: Record<string, number> }>> {
+  return attempt(async () => fusionner(await requireAdmin(), typeFusion(type), Number(conserveId), Number(supprimeId)));
+}
+
+/* ------------------------------------------------------------------ Tâches ------------------ */
+
+import { lancerTache } from '../admin/pilotage';
+
+export async function lancerTacheAdmin(nom: string): Promise<ActionResult<{ processed: number }>> {
+  return attempt(async () => {
+    const res = await lancerTache(await requireAdmin(), String(nom));
+    return { processed: res.processed };
+  });
+}
