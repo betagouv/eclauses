@@ -1,13 +1,15 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/acheteur-marches-declaration), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif « Déclarer un marché » : le serveur lit l'entité et les référentiels (`initial`). Le marché
+// et ses lots sont créés par une seule Server Action, en une transaction, avec les mêmes contrôles côté serveur.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { useRouter } from 'next/navigation';
+import ComboBox from '@/legacy/components/ComboBox';
+import helpers from '@/legacy/components/helpers';
+import { declarer } from '@/server/actions/acheteur';
 
-const Component = () => {
-  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
+const Component = ({ initial }) => {
+  const router = useRouter();
 
   const T = {
     UA: 'Utilisateurs_Acheteurs',
@@ -34,7 +36,7 @@ const Component = () => {
     PARENT: 'Marche_parent',
   };
 
-  const { toOptions, parseDate } = gristAPI.helpers;
+  const { toOptions, parseDate } = helpers;
   const toOptionsWithTooltip = (rows) => toOptions(rows || []).map((opt) => {
     const row = (rows || []).find((r) => String(r.id) === String(opt.value));
     return { ...opt, tooltip: row?.Tooltip || '' };
@@ -76,12 +78,12 @@ const Component = () => {
     [M.ADR]: '',
   });
 
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
-  const [org, setOrg] = React.useState(null);
-  const [rows, setRows] = React.useState([]);
-  const [optsClauses, setOptsClauses] = React.useState([]);
-  const [optsSpecs, setOptsSpecs] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
+  const [org, setOrg] = React.useState(initial.org);
+  const [rows, setRows] = React.useState(initial.marches);
+  const [optsClauses, setOptsClauses] = React.useState(() => toOptions(initial.clauses));
+  const [optsSpecs, setOptsSpecs] = React.useState(() => toOptionsWithTooltip(initial.specialites));
 
   const [creating, setCreating] = React.useState(false);
   const [newErrors, setNewErrors] = React.useState({});
@@ -99,48 +101,7 @@ const Component = () => {
     [M.STATUS]: '',
   });
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setErr(null);
-        const auth = gristAPI.getAuth();
-        const roles = Array.isArray(auth?.roles) ? auth.roles : [];
-        if (!auth || !roles.includes('acheteur') || !auth.acheteurId) {
-          setErr("Accès refusé : rôle 'acheteur' requis.");
-          return;
-        }
-
-        const uaRows = await gristAPI.getData(T.UA);
-        const me = uaRows.find(r => r.id === auth.acheteurId);
-        if (!me?.Entite_de_rattachement) {
-          setErr("Votre compte n'est rattaché à aucune entité acheteuse.");
-          return;
-        }
-
-        const achRows = await gristAPI.getData(T.ACH);
-        const entite = achRows.find(a => a.id === me.Entite_de_rattachement);
-        if (!entite) {
-          setErr("Entité acheteuse introuvable.");
-          return;
-        }
-        setOrg(entite);
-
-        const [c, specs, ms] = await Promise.all([
-          gristAPI.getData(T.C),
-          gristAPI.getData(T.SPECS).catch(() => []),
-          gristAPI.getData(T.M).catch(() => []),
-        ]);
-        setOptsClauses(toOptions(c || []));
-        setOptsSpecs(toOptionsWithTooltip(specs || []));
-        setRows(ms || []);
-      } catch (e) {
-        setErr(e.message || 'Chargement impossible.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  React.useEffect(() => { document.title = 'Déclarer un marché - Eclauses'; }, []);
 
   const updateNewLot = (idx, updates) => {
     setNewLots((prev) => prev.map((lot, i) => i === idx ? { ...lot, ...updates } : lot));
@@ -148,34 +109,6 @@ const Component = () => {
   const addNewLot = () => setNewLots((prev) => [...prev, emptyLotForm()]);
   const removeNewLot = (idx) => setNewLots((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx));
   const resetNewLots = () => setNewLots([emptyLotForm()]);
-
-  const recordIdFromAddResult = (result) => {
-    if (typeof result === 'number' && Number.isFinite(result)) return result;
-    if (typeof result === 'string' && result && Number.isFinite(Number(result))) return Number(result);
-    if (Array.isArray(result)) {
-      for (const item of result) {
-        const id = recordIdFromAddResult(item);
-        if (id) return id;
-      }
-    }
-    if (result && typeof result === 'object') {
-      return recordIdFromAddResult(result.id ?? result.rowId ?? result.recordId);
-    }
-    return null;
-  };
-  async function addMarcheAndGetId(payload) {
-    const beforeIds = new Set((rows || []).map((r) => r.id));
-    const result = await gristAPI.addRecord(T.M, payload);
-    const directId = recordIdFromAddResult(result);
-    if (directId) return directId;
-
-    const afterRows = await gristAPI.getData(T.M);
-    const created = (afterRows || [])
-      .filter((r) => !beforeIds.has(r.id))
-      .sort((a, b) => Number(b.id) - Number(a.id))[0];
-    if (created?.id) return created.id;
-    throw new Error("Marché créé, mais impossible de récupérer son identifiant pour créer les lots.");
-  }
 
   async function createMarche() {
     if (!org) return;
@@ -223,38 +156,29 @@ const Component = () => {
       return;
     }
 
+    const ids = (v) => (Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
     const payload = {
-      [M.INTITULE]: newForm[M.INTITULE] || null,
-      [M.CLAUSE]: !newIsAllotted && newForm[M.CLAUSE] ? Number(newForm[M.CLAUSE]) : null,
-      [M.SPECS]: !newIsAllotted ? toRefList(newForm[M.SPECS]) : null,
-      [M.ADR]: !newIsAllotted ? (newForm[M.ADR] || null) : null,
-      [M.PUB]: newForm[M.PUB] || null,
-      [M.DLRO]: newForm[M.DLRO] || null,
-      [M.DNOTPREV]: newForm[M.DNOTPREV] || null,
-      [M.ACHETEUR]: org.id,
-      [M.STATUS]: 'En attente de publication',
+      intitule: newForm[M.INTITULE] || '',
+      datePublication: newForm[M.PUB] || null,
+      dateLimiteOffres: newForm[M.DLRO] || '',
+      dateNotificationPrevisionnelle: newForm[M.DNOTPREV] || '',
+      clauseId: !newIsAllotted && newForm[M.CLAUSE] ? Number(newForm[M.CLAUSE]) : null,
+      specialiteIds: !newIsAllotted ? ids(newForm[M.SPECS]) : null,
+      lieu: !newIsAllotted ? (newForm[M.ADR] || '') : null,
+      lots: lots.map((lot) => ({
+        numero: lot[M.LOT] || '',
+        intitule: lot[M.INTITULE_LOT] || '',
+        clauseId: Number(lot[M.CLAUSE]),
+        specialiteIds: ids(lot[M.SPECS]),
+        lieu: lot[M.ADR] || '',
+      })),
     };
 
     try {
       setCreating(true);
-      const parentId = await addMarcheAndGetId(payload);
-      for (const lot of lots) {
-        await gristAPI.addRecord(T.M, {
-          [M.INTITULE]: newForm[M.INTITULE] || null,
-          [M.PARENT]: parentId,
-          [M.ACHETEUR]: org.id,
-          [M.INTITULE_LOT]: lot[M.INTITULE_LOT] || null,
-          [M.LOT]: lot[M.LOT] || null,
-          [M.CLAUSE]: lot[M.CLAUSE] ? Number(lot[M.CLAUSE]) : null,
-          [M.SPECS]: toRefList(lot[M.SPECS]),
-          [M.ADR]: lot[M.ADR] || null,
-          [M.PUB]: newForm[M.PUB] || null,
-          [M.DLRO]: newForm[M.DLRO] || null,
-          [M.DNOTPREV]: newForm[M.DNOTPREV] || null,
-          [M.STATUS]: 'En attente de publication',
-        });
-      }
-      if (gristAPI.navigate) gristAPI.navigate('acheteur-marches');
+      const res = await declarer(payload);
+      if (!res.ok) throw new Error(res.message);
+      router.push('/acheteur-marches');
     } catch (e) {
       setErr(e.message || "Échec de création du marché.");
     } finally {
@@ -275,7 +199,7 @@ const Component = () => {
     return (
       <section className="fr-container fr-my-6w">
         <div className="fr-alert fr-alert--error fr-mb-3w"><p><strong>Erreur :</strong> {err}</p></div>
-        <button className="fr-btn fr-btn--secondary" onClick={() => gristAPI.navigate && gristAPI.navigate('acheteur-marches')}>
+        <button className="fr-btn fr-btn--secondary" onClick={() => router.push('/acheteur-marches')}>
           Retour aux marchés
         </button>
       </section>
@@ -292,7 +216,7 @@ const Component = () => {
           </p>
         </div>
         <div className="fr-col-auto">
-          <button className="fr-btn fr-btn--sm fr-btn--secondary fr-icon-arrow-left-line fr-btn--icon-left" onClick={() => gristAPI.navigate && gristAPI.navigate('acheteur-marches')}>
+          <button className="fr-btn fr-btn--sm fr-btn--secondary fr-icon-arrow-left-line fr-btn--icon-left" onClick={() => router.push('/acheteur-marches')}>
             Retour aux marchés
           </button>
         </div>
@@ -471,7 +395,7 @@ const Component = () => {
             <button className="fr-btn" onClick={createMarche} disabled={creating}>
               {creating ? 'Création…' : 'Créer le marché'}
             </button>
-            <button className="fr-btn fr-btn--secondary" onClick={() => gristAPI.navigate && gristAPI.navigate('acheteur-marches')} disabled={creating}>
+            <button className="fr-btn fr-btn--secondary" onClick={() => router.push('/acheteur-marches')} disabled={creating}>
               Annuler
             </button>
           </div>

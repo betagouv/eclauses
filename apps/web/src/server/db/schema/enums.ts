@@ -2,6 +2,7 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 
 /** Valeurs stables en base ; les libellés affichés vivent dans `labels.ts`. */
 export const statutMarche = pgEnum('statut_marche', [
+  'en_attente_publication',
   'en_attente_notification',
   'en_attente_declaration',
   'declaration_a_valider',
@@ -9,7 +10,7 @@ export const statutMarche = pgEnum('statut_marche', [
   'archive',
 ]);
 
-export const statutDeclaration = pgEnum('statut_declaration', ['declare', 'valide']);
+export const statutDeclaration = pgEnum('statut_declaration', ['declare', 'valide', 'brouillon']);
 
 export const statutInvitation = pgEnum('statut_invitation', ['en_attente', 'traitee']);
 

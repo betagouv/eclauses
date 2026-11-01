@@ -1,16 +1,12 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/acheteur-infos), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif de « Mes informations » (acheteur) : le serveur lit la fiche de l'entité et la passe en `initial`.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import helpers from '@/legacy/components/helpers';
+import { enregistrerEntite } from '@/server/actions/acheteur';
 
-const Component = () => {
-  // --- Contexte widget ---
-  const auth = gristAPI.getAuth ? gristAPI.getAuth() : null;
-  const H = (typeof helpers !== 'undefined') ? helpers : {};
-  const { includesI, emailLooksOk } = H;
+const Component = ({ initial, session }) => {
+  const { includesI, emailLooksOk } = helpers;
 
   const TABLE = 'Acheteurs';
 
@@ -27,15 +23,13 @@ const Component = () => {
   ];
 
   // --- State ---
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
+  const [loading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
   const [msg, setMsg] = React.useState(null);
 
-  const [rows, setRows] = React.useState([]);
-  const [rowId, setRowId] = React.useState(null);
-
-  const [colMap, setColMap] = React.useState({});     // { ORGANISME: 'Organisme', EMAIL:'Email', ... }
-  const [form, setForm] = React.useState({});         // valeurs éditables pour les colonnes trouvées
+  const [rowId] = React.useState(initial.rec ? initial.rec.id : null);
+  const [colMap] = React.useState(() => (initial.rec ? pickColumns(initial.rec) : {}));
+  const [form, setForm] = React.useState(() => (initial.rec ? seedFormFrom(initial.rec, pickColumns(initial.rec)) : {}));
 
   // --- Helpers ---
   function pickColumns(sample) {
@@ -60,63 +54,7 @@ const Component = () => {
     setForm(prev => ({ ...prev, [colName]: value }));
   }
 
-  // --- Load ---
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setErr(null);
-        setMsg(null);
-
-        if (!auth || !(auth.role === 'acheteur' || auth.acheteurId)) {
-          throw new Error("Accès réservé aux acheteurs. Connectez-vous avec un compte acheteur.");
-        }
-
-        const data = await gristAPI.getData(TABLE);
-        const list = Array.isArray(data) ? data : [];
-        if (!mounted) return;
-        setRows(list);
-
-        // Sélection de la ligne à éditer
-        let rec = null;
-
-        // 1) par ID de l'entité depuis l'auth (`acheteurId` est l'identifiant de l'utilisateur, pas de l'entité)
-        if (auth.acheteurEntiteId != null) {
-          rec = list.find(r => r.id === auth.acheteurEntiteId) || null;
-        }
-
-        // 2) fallback par email
-        if (!rec && auth.email) {
-          const low = String(auth.email).toLowerCase();
-          rec = list.find(r => String(r.Email || r.Courriel || '').toLowerCase() === low) || null;
-        }
-
-        // 3) s'il n'y a qu'une seule ligne
-        if (!rec && list.length === 1) {
-          rec = list[0];
-        }
-
-        if (!rec) {
-          throw new Error("Impossible d’identifier votre fiche acheteur. Vérifiez l’association de votre compte.");
-        }
-
-        setRowId(rec.id);
-
-        const map = pickColumns(rec);
-        setColMap(map);
-
-        const seeded = seedFormFrom(rec, map);
-        setForm(seeded);
-      } catch (e) {
-        if (mounted) setErr(e.message || 'Erreur de chargement');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => { mounted = false; };
-  }, []);
+  React.useEffect(() => { document.title = 'Mes informations - Eclauses'; }, []);
 
   async function save() {
     if (!rowId) return;
@@ -134,7 +72,8 @@ const Component = () => {
     Object.values(colMap).forEach(col => { updates[col] = form[col] ?? null; });
 
     try {
-      await gristAPI.updateRecord(TABLE, rowId, updates);
+      const res = await enregistrerEntite(updates);
+      if (!res.ok) throw new Error(res.message);
       setMsg("Informations enregistrées avec succès.");
     } catch (e) {
       setErr(e.message || "Échec de l’enregistrement.");
@@ -160,7 +99,7 @@ const Component = () => {
   }
 
   const emailCol = colMap.EMAIL;
-  const emailVal = emailCol ? (form[emailCol] || '') : (auth?.email || '');
+  const emailVal = emailCol ? (form[emailCol] || '') : (session.email || '');
 
   return (
     <section className="fr-container fr-my-6w">

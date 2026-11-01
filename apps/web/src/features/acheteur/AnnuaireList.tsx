@@ -1,13 +1,12 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/acheteur-annuaire), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif de l'annuaire acheteur : le serveur lit les fiches visibles, les marchés de l'entité, les
+// clauses et les référentiels et les passe en `initial`.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import ComboBox from '@/legacy/components/ComboBox';
+import { attachmentUrl } from '@/lib/urls';
 
-const Component = () => {
-  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
+const Component = ({ initial }) => {
   // ===== Tables / colonnes
   const TABLE = {
     UA: 'Utilisateurs_Acheteurs',
@@ -98,19 +97,22 @@ const Component = () => {
   }
 
   // ===== State
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr]         = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr]         = React.useState(initial.error);
 
-  const [benefRows, setBenefRows]     = React.useState([]);
-  const [clausesRows, setClausesRows] = React.useState([]);
-  const [marchesRows, setMarchesRows] = React.useState([]);
-  const [deptsRows, setDeptsRows]     = React.useState([]);
-  const [regionsRows, setRegionsRows] = React.useState([]);
-  const [specOptions, setSpecOptions] = React.useState([]);
+  const [benefRows, setBenefRows]     = React.useState(initial.beneficiaires);
+  const [clausesRows, setClausesRows] = React.useState(initial.clauses);
+  const [marchesRows, setMarchesRows] = React.useState(initial.marches);
+  const [deptsRows, setDeptsRows]     = React.useState(initial.departements);
+  const [regionsRows, setRegionsRows] = React.useState(initial.regions);
+  const [specOptions, setSpecOptions] = React.useState(() => {
+    const specKey = pickLabelField(initial.specialites);
+    return initial.specialites.map(r => ({ value: r.id, label: String(r[specKey] ?? r.id), tooltip: r.Tooltip || '' }));
+  });
   const [selectedSpecIds, setSelectedSpecIds] = React.useState([]);
-  const [acheteurEntiteId, setAcheteurEntiteId] = React.useState(null);
+  const [acheteurEntiteId, setAcheteurEntiteId] = React.useState(initial.org ? initial.org.id : null);
 
-  const [validClauseIdSet, setValidClauseIdSet] = React.useState(new Set());
+  const [validClauseIdSet, setValidClauseIdSet] = React.useState(() => new Set(initial.clauses.map(r => r.id)));
   const [search, setSearch] = React.useState('');
   const [onlyConsent, setOnlyConsent] = React.useState(true);
   const [tab, setTab] = React.useState('liste'); // 'liste' | 'residences' | 'mobilites'
@@ -136,61 +138,10 @@ const Component = () => {
   const [cvPreviewError, setCvPreviewError] = React.useState(null);
   const cvPreviewObjectUrlRef = React.useRef(null);
 
-  // ===== Load
+  // ===== Cartes : Leaflet se charge dans le navigateur, après l'affichage de la liste =====
   React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true); setErr(null);
-
-        const auth = gristAPI.getAuth ? gristAPI.getAuth() : null;
-        const roles = Array.isArray(auth?.roles) ? auth.roles : [];
-        if (!auth || !roles.includes('acheteur') || !auth.acheteurId) {
-          throw new Error("Accès refusé : rôle 'acheteur' requis.");
-        }
-
-        const [uaRows, achRows, benef, cls, marches, depts, regs, specs] = await Promise.all([
-          gristAPI.getData(TABLE.UA).catch(() => []),
-          gristAPI.getData(TABLE.ACH).catch(() => []),
-          gristAPI.getData(TABLE.BENEF),
-          gristAPI.getData(TABLE.CLAUSES).catch(() => []),
-          gristAPI.getData(TABLE.MARCHES),
-          gristAPI.getData(TABLE.DEPTS).catch(() => []),
-          gristAPI.getData(TABLE.REGIONS).catch(() => []),
-          gristAPI.getData(TABLE.SPECS).catch(() => []),
-        ]);
-
-        if (!alive) return;
-
-        const me = (uaRows || []).find(r => r.id === auth.acheteurId);
-        if (!me?.Entite_de_rattachement) {
-          throw new Error("Votre compte n'est rattaché à aucune entité acheteuse.");
-        }
-        const entite = (achRows || []).find(a => a.id === me.Entite_de_rattachement);
-        if (!entite) {
-          throw new Error('Entité acheteuse introuvable.');
-        }
-
-        setAcheteurEntiteId(entite.id);
-        setBenefRows(Array.isArray(benef) ? benef : []);
-        setClausesRows(Array.isArray(cls) ? cls : []);
-        setMarchesRows(Array.isArray(marches) ? marches : []);
-        setDeptsRows(Array.isArray(depts) ? depts : []);
-        setRegionsRows(Array.isArray(regs) ? regs : []);
-        setValidClauseIdSet(new Set((cls || []).map(r => r.id)));
-        const specKey = pickLabelField(specs || []);
-        setSpecOptions((specs || []).map(r => ({ value: r.id, label: String(r[specKey] ?? r.id), tooltip: r.Tooltip || '' })));
-
-        // Précharge Leaflet pour les cartes
-        loadLeaflet().catch(() => {});
-      } catch (e) {
-        if (!alive) return;
-        setErr(e.message || 'Erreur de chargement');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
+    document.title = 'Annuaire - Eclauses';
+    loadLeaflet().catch(() => {});
   }, []);
 
   // ===== Clauses de l’acheteur (depuis ses marchés)
@@ -489,7 +440,7 @@ const Component = () => {
   // ===== Modale fiche =====
   async function openModal(row) {
     const cv = row[COL.CV]?.filter((x)=>x!=='L')[0];
-    row.cv_url = cv === undefined ? undefined : gristAPI.attachmentUrl(cv);
+    row.cv_url = cv === undefined ? undefined : attachmentUrl(cv);
 
     setModalRow(row); setModalOpen(true);
   }

@@ -1,6 +1,7 @@
 /** Libellés affichés pour les valeurs d'énumération stockées en base. */
 
 export const STATUT_MARCHE_LABELS = {
+  en_attente_publication: 'En attente de publication',
   en_attente_notification: 'En attente de notification',
   en_attente_declaration: 'En attente de déclaration des bénéficiaires',
   declaration_a_valider: 'Déclaration à valider',
@@ -8,7 +9,7 @@ export const STATUT_MARCHE_LABELS = {
   archive: 'Archivé',
 } as const;
 
-export const STATUT_DECLARATION_LABELS = { declare: 'déclaré', valide: 'validé' } as const;
+export const STATUT_DECLARATION_LABELS = { declare: 'déclaré', valide: 'validé', brouillon: 'brouillon' } as const;
 
 export const CATEGORIE_ACHETEUR_LABELS = {
   administration_centrale: 'Administration centrale',

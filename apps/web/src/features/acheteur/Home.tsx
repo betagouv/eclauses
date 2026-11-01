@@ -1,38 +1,14 @@
-// @ts-nocheck : code repris du widget Grist (grist/page/acheteur-home), typé progressivement.
-'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
-import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { and, count, eq } from 'drizzle-orm';
+import Link from 'next/link';
+import type { ServerSession } from '@/legacy/gristAPI';
+import { database } from '@/server/db/client';
+import { marches } from '@/server/db/schema';
 
-const Component = () => {
-  const [toValidateCount, setToValidateCount] = React.useState(0);
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const auth = gristAPI.getAuth ? gristAPI.getAuth() : null;
-        if (!auth?.acheteurId) return;
-        const [uaRows, achRows, marches] = await Promise.all([
-          gristAPI.getData('Utilisateurs_Acheteurs'),
-          gristAPI.getData('Acheteurs'),
-          gristAPI.getData('Marches'),
-        ]);
-        const me = (uaRows || []).find((r) => r.id === auth.acheteurId);
-        const org = (achRows || []).find((a) => a.id === me?.Entite_de_rattachement);
-        if (!org) return;
-        const count = (marches || []).filter((m) =>
-          Number(m.Acheteur) === Number(org.id) &&
-          String(m.Statut || '') === 'Déclaration à valider'
-        ).length;
-        setToValidateCount(count);
-      } catch (e) {
-        console.warn('acheteur-home alert load failed', e);
-      }
-    })();
-  }, []);
-
+/** Accueil de l'espace acheteur, rendu par le serveur : l'alerte « déclarations à valider » est comptée en base. */
+export async function AcheteurHome({ session }: { session: ServerSession }) {
+  const [{ n: toValidateCount }] = session.acheteurEntiteId
+    ? await database().select({ n: count() }).from(marches).where(and(eq(marches.acheteurId, session.acheteurEntiteId), eq(marches.statut, 'declaration_a_valider')))
+    : [{ n: 0 }];
   return (
     <>
       <section className="fr-container fr-my-6w">
@@ -43,7 +19,7 @@ const Component = () => {
             <p>
               Vous avez {toValidateCount} déclaration{toValidateCount > 1 ? 's' : ''} de bénéficiaires à valider.
               {' '}
-              <a href="#" data-nav="acheteur-marches" className="fr-link">Voir mes marchés</a>
+              <Link href="/acheteur-marches" className="fr-link">Voir mes marchés</Link>
             </p>
           </div>
         )}
@@ -53,7 +29,7 @@ const Component = () => {
             <div className="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-5">
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
-                  <h3 className="fr-tile__title"><a data-nav="acheteur-marches" href="#">Mes marchés</a></h3>
+                  <h3 className="fr-tile__title"><Link href="/acheteur-marches">Mes marchés</Link></h3>
                   <p className="fr-tile__desc">Déclarez et suivez un marché couvert par une clause sociale.</p>
                 </div>
               </div>
@@ -72,7 +48,7 @@ const Component = () => {
             <div className="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-6">
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
-                  <h3 className="fr-tile__title"><a data-nav="acheteur-annuaire" href="#">Annuaire des bénéficiaires</a></h3>
+                  <h3 className="fr-tile__title"><Link href="/acheteur-annuaire">Annuaire des bénéficiaires</Link></h3>
                   <p className="fr-tile__desc">Consulter l'annuaire des bénéficiaires des clauses sociales.</p>
                 </div>
               </div>
@@ -91,6 +67,4 @@ const Component = () => {
       </section>
     </>
   );
-};
-
-export default Component;
+}

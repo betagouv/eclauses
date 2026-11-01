@@ -1,12 +1,16 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/acheteur-marches-detail), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif « Détail d'un marché » (acheteur) : le serveur lit le marché (`?id=` dans l'adresse), ses lots,
+// déclarations, refus et invitations (`initial`). Invitation, relance, validation et refus sont des Server Actions
+// (services de `marches-acheteur`), qui mettent à jour les statuts du lot et du marché parent en une transaction.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { useRouter } from 'next/navigation';
+import helpers from '@/legacy/components/helpers';
+import { attachmentUrl } from '@/lib/urls';
+import { inviter, lireTables, refuser, relancer, valider } from '@/server/actions/acheteur';
 
-const Component = () => {
+const Component = ({ initial, session }) => {
+  const router = useRouter();
   const T = {
     UA: 'Utilisateurs_Acheteurs',
     ACH: 'Acheteurs',
@@ -60,7 +64,7 @@ const Component = () => {
   const DB = { MARCHE: 'Marche', STATUT: 'Statut' };
   const REFUS = { MARCHE: 'Marche', REFUSE_LE: 'Refuse_le', REFUSE_PAR: 'Refuse_par', RAISON: 'Raison' };
 
-  const { toOptions, parseDate, formatDate } = gristAPI.helpers;
+  const { toOptions, parseDate, formatDate } = helpers;
   const toOptionsWithTooltip = (rows) => toOptions(rows || []).map((opt) => {
     const row = (rows || []).find((r) => String(r.id) === String(opt.value));
     return { ...opt, tooltip: row?.Tooltip || '' };
@@ -90,24 +94,23 @@ const Component = () => {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
   const RELANCE_DELAY_DAYS = (() => {
-    const raw = gristAPI.getEnv ? gristAPI.getEnv('RELANCE_TITULAIRE_DELAY_DAYS', '7') : '7';
-    const n = Number(raw);
+    const n = Number(initial.relanceDelayDays);
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 7;
   })();
 
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
   const [msg, setMsg] = React.useState(null);
-  const [org, setOrg] = React.useState(null);
-  const [acheteurUserId, setAcheteurUserId] = React.useState(null);
-  const [rows, setRows] = React.useState([]);
-  const [optsClauses, setOptsClauses] = React.useState([]);
-  const [optsSpecs, setOptsSpecs] = React.useState([]);
-  const [declRows, setDeclRows] = React.useState([]);
-  const [refusRows, setRefusRows] = React.useState([]);
-  const [benefRows, setBenefRows] = React.useState([]);
-  const [invRows, setInvRows] = React.useState([]);
-  const [marcheId, setMarcheId] = React.useState(null);
+  const [org, setOrg] = React.useState(initial.org);
+  const [acheteurUserId, setAcheteurUserId] = React.useState(session.acheteurId);
+  const [rows, setRows] = React.useState(initial.marches);
+  const [optsClauses, setOptsClauses] = React.useState(() => toOptions(initial.clauses));
+  const [optsSpecs, setOptsSpecs] = React.useState(() => toOptionsWithTooltip(initial.specialites));
+  const [declRows, setDeclRows] = React.useState(initial.declarations);
+  const [refusRows, setRefusRows] = React.useState(initial.refus);
+  const [benefRows, setBenefRows] = React.useState(initial.beneficiaires);
+  const [invRows, setInvRows] = React.useState(initial.invitations);
+  const [marcheId, setMarcheId] = React.useState(initial.marcheId);
   const [inviteFor, setInviteFor] = React.useState(null);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [inviteExecEnd, setInviteExecEnd] = React.useState('');
@@ -131,7 +134,7 @@ const Component = () => {
   const cvPreviewObjectUrlRef = React.useRef(null);
   const declModalBodyRef = React.useRef(null);
 
-  const goBack = () => gristAPI.navigate && gristAPI.navigate('acheteur-marches');
+  const goBack = () => router.push('/acheteur-marches');
   const rowById = React.useMemo(() => new Map((rows || []).map((r) => [r.id, r])), [rows]);
   const marche = rowById.get(marcheId);
   const benefMap = React.useMemo(() => new Map((benefRows || []).map((b) => [b.id, b])), [benefRows]);
@@ -219,63 +222,18 @@ const Component = () => {
     return (declRows || []).filter((d) => Number(d[DB.MARCHE]) === Number(row?.id));
   };
 
-  async function load() {
-    setLoading(true); setErr(null);
-    try {
-      const auth = gristAPI.getAuth();
-      const roles = Array.isArray(auth?.roles) ? auth.roles : [];
-      if (!auth || !roles.includes('acheteur') || !auth.acheteurId) throw new Error("Accès refusé : rôle 'acheteur' requis.");
-      const rawId = (() => { try { return sessionStorage.getItem('acheteurMarcheDetailId'); } catch (_) { return ''; } })();
-      const id = Number(rawId);
-      if (!Number.isFinite(id)) throw new Error('Aucun marché sélectionné.');
-      setMarcheId(id);
-      const [uaRows, achRows, clauses, specs, ms, db, refus, bens, invs] = await Promise.all([
-        gristAPI.getData(T.UA),
-        gristAPI.getData(T.ACH),
-        gristAPI.getData(T.C),
-        gristAPI.getData(T.SPECS).catch(() => []),
-        gristAPI.getData(T.M),
-        gristAPI.getData(T.DB).catch(() => []),
-        gristAPI.getData(T.REFUS).catch(() => []),
-        gristAPI.getData(T.BEN).catch(() => []),
-        gristAPI.getData(T.INV).catch(() => []),
-      ]);
-      const me = (uaRows || []).find((r) => r.id === auth.acheteurId);
-      const entite = (achRows || []).find((a) => a.id === me?.Entite_de_rattachement);
-      if (!entite) throw new Error('Entité acheteuse introuvable.');
-      const row = (ms || []).find((r) => Number(r.id) === id);
-      if (!row || Number(row[M.ACHETEUR]) !== Number(entite.id)) throw new Error('Marché introuvable ou non rattaché à votre entité.');
-      setOrg(entite);
-      setAcheteurUserId(auth.acheteurId);
-      setRows(ms || []);
-      setOptsClauses(toOptions(clauses || []));
-      setOptsSpecs(toOptionsWithTooltip(specs || []));
-      setDeclRows(db || []);
-      setRefusRows(refus || []);
-      setBenefRows(bens || []);
-      setInvRows(invs || []);
-    } catch (e) {
-      setErr(e.message || 'Chargement impossible.');
-    } finally {
-      setLoading(false);
-    }
-  }
-  React.useEffect(() => { load(); }, []);
+  React.useEffect(() => { document.title = 'Détail du marché - Eclauses'; }, []);
 
   async function reloadData() {
-    const [ms, db, refus, bens, invs] = await Promise.all([
-      gristAPI.getData(T.M),
-      gristAPI.getData(T.DB).catch(() => []),
-      gristAPI.getData(T.REFUS).catch(() => []),
-      gristAPI.getData(T.BEN).catch(() => []),
-      gristAPI.getData(T.INV).catch(() => []),
-    ]);
-    setRows(ms || []);
-    setDeclRows(db || []);
-    setRefusRows(refus || []);
-    setBenefRows(bens || []);
-    setInvRows(invs || []);
-    return { rows: ms || [], invitations: invs || [] };
+    const res = await lireTables([T.M, T.DB, T.REFUS, T.BEN, T.INV]);
+    if (!res.ok) throw new Error(res.message);
+    const { [T.M]: ms = [], [T.DB]: db = [], [T.REFUS]: refus = [], [T.BEN]: bens = [], [T.INV]: invs = [] } = res.data;
+    setRows(ms);
+    setDeclRows(db);
+    setRefusRows(refus);
+    setBenefRows(bens);
+    setInvRows(invs);
+    return { rows: ms, invitations: invs };
   }
 
   async function inviteTitulaire(row) {
@@ -287,14 +245,9 @@ const Component = () => {
     }
     try {
       setInviting(true); setErr(null); setMsg(null);
-      await gristAPI.addRecord(T.INV, { Marche: row.id, Email: normalizedEmail });
-      await gristAPI.updateRecord(T.M, row.id, { [M.STATUS]: 'En attente de déclaration des bénéficiaires', [M.EXEC_END]: inviteExecEnd || null });
-      const parent = row[M.PARENT] ? rowById.get(Number(row[M.PARENT])) : null;
-      if (parent) {
-        const invitationsWithCurrent = [...invRows, { [INV.MARCHE]: row.id }];
-        const allInvited = getLotsForParent(parent).every((lot) => hasInvitationInRows(lot, invitationsWithCurrent));
-        if (allInvited) await gristAPI.updateRecord(T.M, parent.id, { [M.STATUS]: 'En attente de déclaration des bénéficiaires' });
-      }
+      // Invitation, statut du lot ou marché et statut du marché parent : mis à jour ensemble, côté serveur.
+      const res = await inviter(row.id, { email: normalizedEmail, dateFinExecution: inviteExecEnd || null });
+      if (!res.ok) throw new Error(res.message);
       setInviteFor(null);
       setInviteEmail('');
       setInviteExecEnd('');
@@ -312,16 +265,8 @@ const Component = () => {
     if (!row?.id || !canRelanceTitulaire(row)) return;
     try {
       setRelancingId(row.id); setErr(null); setMsg(null);
-      const res = await fetch('/api/titulaires/relance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ marche_id: row.id }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || `Relance impossible (${res.status}).`);
-      const nowStr = ymd(new Date());
-      await Promise.all((invRows || [])
-        .filter((inv) => Number(inv[INV.MARCHE]) === Number(row.id))
-        .map((inv) => gristAPI.updateRecord(T.INV, inv.id, { [INV.LAST_REMINDER]: nowStr })));
+      const res = await relancer(row.id);
+      if (!res.ok) throw new Error(res.message);
       setRelancedId(row.id);
       setTimeout(() => setRelancedId(null), 2500);
       setMsg('La relance a été envoyée.');
@@ -346,15 +291,8 @@ const Component = () => {
     }
     try {
       setValidating(true); setErr(null); setMsg(null);
-      for (const d of getDeclsFor(row)) {
-        await gristAPI.updateRecord(T.DB, d.id, { Statut: 'validé' });
-      }
-      await gristAPI.updateRecord(T.M, row.id, { [M.STATUS]: 'Clause validée' });
-      const parent = row[M.PARENT] ? rowById.get(Number(row[M.PARENT])) : null;
-      if (parent) {
-        const allValidated = getLotsForParent(parent).every((lot) => Number(lot.id) === Number(row.id) || String(lot[M.STATUS] || '') === 'Clause validée');
-        if (allValidated) await gristAPI.updateRecord(T.M, parent.id, { [M.STATUS]: 'Clause validée' });
-      }
+      const res = await valider(row.id);
+      if (!res.ok) throw new Error(res.message);
       setDeclFor(null);
       setDeclConfirmations({});
       setMsg('Déclaration validée.');
@@ -395,16 +333,8 @@ const Component = () => {
     }
     try {
       setRefusing(true); setErr(null); setMsg(null);
-      await gristAPI.addRecord(T.REFUS, {
-        [REFUS.MARCHE]: row.id,
-        [REFUS.REFUSE_LE]: new Date().toISOString(),
-        [REFUS.REFUSE_PAR]: acheteurUserId || null,
-        [REFUS.RAISON]: reason,
-      });
-      for (const d of decls) {
-        await gristAPI.updateRecord(T.DB, d.id, { [DB.STATUT]: 'brouillon' });
-      }
-      await gristAPI.updateRecord(T.M, row.id, { [M.STATUS]: 'En attente de déclaration des bénéficiaires' });
+      const res = await refuser(row.id, { raison: reason });
+      if (!res.ok) throw new Error(res.message);
       closeRefuseDeclaration();
       setMsg('La déclaration a été refusée. Le titulaire peut la corriger.');
       await reloadData();
@@ -462,7 +392,7 @@ const Component = () => {
     const detail = { ...row };
     // Les CV sont désormais identifiés par un identifiant opaque (pas un entier) : on ne le convertit pas.
     const cv = asArray(detail[B.CV]).filter((x) => x !== 'L' && x != null && x !== '')[0];
-    detail.cv_url = cv ? gristAPI.attachmentUrl(cv) : undefined;
+    detail.cv_url = cv ? attachmentUrl(cv) : undefined;
     setBenefDetail(detail);
   }
   function closeCvPreview() {

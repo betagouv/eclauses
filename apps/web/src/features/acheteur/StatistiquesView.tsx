@@ -2,11 +2,9 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import helpers from '@/legacy/components/helpers';
 
-const Component = () => {
+const Component = ({ initial }) => {
   // === Tables & colonnes ===
   const TABLE = {
     UA: 'Utilisateurs_Acheteurs',
@@ -25,69 +23,19 @@ const Component = () => {
     CLAUSE: 'Clauses_sociales', // ref -> Clauses_sociales
   };
 
-  const { toOptions, pickLabelField, parseDate, formatDate, daysLeft } = gristAPI.helpers;
+  const { toOptions, pickLabelField, parseDate, formatDate, daysLeft } = helpers;
 
   // === State ===
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
 
-  const [userUA, setUserUA] = React.useState(null);     // ligne Utilisateurs_Acheteurs
-  const [org, setOrg] = React.useState(null);           // ligne Acheteurs (entité)
-  const [marches, setMarches] = React.useState([]);     // marchés de l'entité
-  const [clauses, setClauses] = React.useState([]);     // référentiel clauses
-  const [optsClauses, setOptsClauses] = React.useState([]);
+  const [userUA, setUserUA] = React.useState(initial.ua);     // ligne Utilisateurs_Acheteurs
+  const [org, setOrg] = React.useState(initial.org);           // ligne Acheteurs (entité)
+  const [marches, setMarches] = React.useState(initial.marches);     // marchés de l'entité
+  const [clauses, setClauses] = React.useState(initial.clauses);     // référentiel clauses
+  const [optsClauses, setOptsClauses] = React.useState(() => toOptions(initial.clauses));
 
-  // === Load (strict: nécessite auth + rôle acheteur) ===
-  React.useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setErr(null);
-
-        const auth = gristAPI.getAuth();
-        const roles = Array.isArray(auth?.roles) ? auth.roles : [];
-        if (!auth || !roles.includes('acheteur') || !auth.acheteurId) {
-          setErr("Accès refusé : rôle 'acheteur' requis.");
-          setLoading(false);
-          return;
-        }
-
-        // 1) Récupère l'utilisateur acheteur (UA) et son entité d'attache
-        const uaRows = await gristAPI.getData(TABLE.UA);
-        const ua = uaRows.find(r => r.id === auth.acheteurId) || null;
-        if (!ua || !ua.Entite_de_rattachement) {
-          setErr("Ce compte n'est rattaché à aucune entité acheteuse.");
-          setLoading(false);
-          return;
-        }
-        setUserUA(ua);
-
-        // 2) Entité acheteur
-        const achRows = await gristAPI.getData(TABLE.ACH);
-        const entite = achRows.find(r => r.id === ua.Entite_de_rattachement) || null;
-        if (!entite) {
-          setErr("Entité acheteuse introuvable.");
-          setLoading(false);
-          return;
-        }
-        setOrg(entite);
-
-        // 3) Référentiel clauses
-        const clausesRows = await gristAPI.getData(TABLE.C).catch(() => []);
-        setClauses(Array.isArray(clausesRows) ? clausesRows : []);
-        setOptsClauses(toOptions(clausesRows || []));
-
-        // 4) Marchés de cette entité
-        const ms = await gristAPI.getData(TABLE.M);
-        const my = (ms || []).filter(m => m[COL_M.ACHETEUR] === entite.id);
-        setMarches(my);
-      } catch (e) {
-        setErr(e.message || 'Erreur de chargement');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  React.useEffect(() => { document.title = 'Statistiques - Eclauses'; }, []);
 
   // === Derivations ===
   const todayStart = React.useMemo(() => {

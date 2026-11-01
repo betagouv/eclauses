@@ -1,12 +1,14 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/acheteur-marches), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif de « Mes marchés » (acheteur) : le serveur lit les marchés de l'entité, les invitations et
+// les clauses et les passe en `initial`. Les écritures sont des Server Actions (services de `marches-acheteur`).
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { useRouter } from 'next/navigation';
+import helpers from '@/legacy/components/helpers';
+import { inviter, lireTables, publier, relancer, supprimer } from '@/server/actions/acheteur';
 
-const Component = () => {
+const Component = ({ initial }) => {
+  const router = useRouter();
   // ===== Tables / Colonnes (strict) =====
   const T = {
     UA: 'Utilisateurs_Acheteurs',
@@ -44,7 +46,7 @@ const Component = () => {
     LAST_REMINDER: 'Derniere_relance_le',
   };
 
-  const { toOptions, parseDate, formatDate } = gristAPI.helpers;
+  const { toOptions, parseDate, formatDate } = helpers;
 
   const ymd = (v) => {
     if (!v) return '';
@@ -72,20 +74,19 @@ const Component = () => {
     return d ? formatDate(d) : '—';
   };
   const RELANCE_DELAY_DAYS = (() => {
-    const raw = gristAPI.getEnv ? gristAPI.getEnv('RELANCE_TITULAIRE_DELAY_DAYS', '7') : '7';
-    const n = Number(raw);
+    const n = Number(initial.relanceDelayDays);
     return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 7;
   })();
 
   // ===== State =====
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
 
-  const [org, setOrg] = React.useState(null);
-  const [rows, setRows] = React.useState([]);
+  const [org, setOrg] = React.useState(initial.org);
+  const [rows, setRows] = React.useState(initial.marches);
 
-  const [optsClauses, setOptsClauses] = React.useState([]);
-  const [invRows, setInvRows] = React.useState([]);
+  const [optsClauses, setOptsClauses] = React.useState(() => toOptions(initial.clauses));
+  const [invRows, setInvRows] = React.useState(initial.invitations);
   const [msg, setMsg] = React.useState(null);
   const [copiedId, setCopiedId] = React.useState(null);
   const [relancingId, setRelancingId] = React.useState(null);
@@ -120,47 +121,7 @@ const Component = () => {
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteRowItem, setDeleteRowItem] = React.useState(null);
 
-  React.useEffect(() => {
-    (async () => {
-      setLoading(true); setErr(null);
-      const auth = gristAPI.getAuth();
-      const roles = Array.isArray(auth?.roles) ? auth.roles : [];
-      if (!auth || !roles.includes('acheteur') || !auth.acheteurId) {
-        setErr("Accès refusé : rôle 'acheteur' requis.");
-        setLoading(false);
-        return;
-      }
-
-      const uaRows = await gristAPI.getData(T.UA);
-      const me = uaRows.find(r => r.id === auth.acheteurId);
-      if (!me?.Entite_de_rattachement) {
-        setErr("Votre compte n'est rattaché à aucune entité acheteuse.");
-        setLoading(false);
-        return;
-      }
-      const achRows = await gristAPI.getData(T.ACH);
-      const entite = achRows.find(a => a.id === me.Entite_de_rattachement);
-      if (!entite) {
-        setErr("Entité acheteuse introuvable.");
-        setLoading(false);
-        return;
-      }
-      setOrg(entite);
-
-      const c = await gristAPI.getData(T.C);
-      setOptsClauses(toOptions(c || []));
-
-      const [ms, invs] = await Promise.all([
-        gristAPI.getData(T.M),
-        gristAPI.getData(T.INV).catch(() => []),
-      ]);
-      const mine = (ms || []).filter(m => m[M.ACHETEUR] === entite.id);
-      setRows(mine);
-      setInvRows(invs || []);
-
-      setLoading(false);
-    })();
-  }, []);
+  React.useEffect(() => { document.title = 'Mes marchés - Eclauses'; }, []);
 
   const clauseLabel = React.useCallback((id) => {
     const o = optsClauses.find(x => x.value === id);
@@ -291,21 +252,8 @@ const Component = () => {
       setMsg(null);
       setRelancingId(row.id);
 
-      const res = await fetch('/api/titulaires/relance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ marche_id: row.id }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `Relance impossible (${res.status}).`);
-      }
-
-      const invites = getInvitationRowsForMarche(row);
-      if (invites.length) {
-        const nowStr = ymd(new Date());
-        await Promise.all(invites.map((inv) => gristAPI.updateRecord(T.INV, inv.id, { [INV.LAST_REMINDER]: nowStr })));
-      }
+      const res = await relancer(row.id);
+      if (!res.ok) throw new Error(res.message);
 
       setRelancedId(row.id);
       setTimeout(() => setRelancedId(null), 2500);
@@ -446,13 +394,13 @@ const Component = () => {
 
   // ===== CRUD =====
   async function reloadMine() {
-    const [ms, invs] = await Promise.all([
-      gristAPI.getData(T.M),
-      gristAPI.getData(T.INV).catch(() => []),
-    ]);
-    setRows((ms || []).filter(m => m[M.ACHETEUR] === org.id));
-    setInvRows(invs || []);
-    return { marches: ms || [], invitations: invs || [] };
+    const res = await lireTables([T.M, T.INV]);
+    if (!res.ok) throw new Error(res.message);
+    const ms = res.data[T.M] || [];
+    const invs = res.data[T.INV] || [];
+    setRows(ms.filter(m => m[M.ACHETEUR] === org.id));
+    setInvRows(invs);
+    return { marches: ms, invitations: invs };
   }
 
   function openPubModal(row) {
@@ -484,20 +432,8 @@ const Component = () => {
       return;
     }
     try {
-      const fixedLink = raw ? (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`) : '';
-      await gristAPI.updateRecord(T.M, marcheId, {
-        [M.PUB]: pubDate,
-        [M.LIEN_DOCS]: fixedLink || null,
-        [M.STATUS]: 'En attente de notification',
-      });
-      const lots = getLotsForParent(rowById.get(marcheId) || pubMarche);
-      for (const lot of lots) {
-        await gristAPI.updateRecord(T.M, lot.id, {
-          [M.PUB]: pubDate,
-          [M.LIEN_DOCS]: fixedLink || null,
-          [M.STATUS]: 'En attente de notification',
-        });
-      }
+      const res = await publier(marcheId, { datePublication: pubDate, lien: raw });
+      if (!res.ok) throw new Error(res.message);
       setMsg("Publication déclarée. Retrouvez ce marché dans l'onglet 'Consultation et passation'.");
       closePubModal();
       await reloadMine();
@@ -552,25 +488,13 @@ const Component = () => {
     }
     try {
       setInviting(true);
-      // ⬇️ Remplace InitLink par Invitation_Titulaire : Grist génère le Token
-      await gristAPI.addRecord(T.INV, { Marche: marcheId, Email: normalizedEmail });
-      const invitationsWithCurrent = [...(invRows || []), { [INV.MARCHE]: marcheId }];
+      // L'invitation, le statut du marché ou du lot et celui du marché parent sont mis à jour ensemble, côté serveur.
+      const res = await inviter(marcheId, { email: normalizedEmail, dateFinExecution: inviteExecEnd || null });
+      if (!res.ok) throw new Error(res.message);
       const invitedRow = inviteForRow || rowById.get(marcheId);
       const parentId = invitedRow?.[M.PARENT];
       const parentRow = parentId ? rowById.get(Number(parentId)) : null;
-
-      if (!parentRow) {
-        await gristAPI.updateRecord(T.M, marcheId, { [M.STATUS]: 'En attente de déclaration des bénéficiaires', [M.EXEC_END]: inviteExecEnd || null });
-      } else {
-        await gristAPI.updateRecord(T.M, marcheId, { [M.STATUS]: 'En attente de déclaration des bénéficiaires', [M.EXEC_END]: inviteExecEnd || null });
-        const lots = getLotsForParent(parentRow);
-        const allLotsInvited = lots.length > 0 && lots.every((lot) => hasInvitationInRows(lot, invitationsWithCurrent));
-        if (allLotsInvited) {
-          await gristAPI.updateRecord(T.M, parentRow.id, { [M.STATUS]: 'En attente de déclaration des bénéficiaires' });
-        } else if (parentRow[M.STATUS] === 'En attente de déclaration des bénéficiaires') {
-          await gristAPI.updateRecord(T.M, parentRow.id, { [M.STATUS]: 'En attente de notification' });
-        }
-      }
+      const invitationsWithCurrent = [...(invRows || []), { [INV.MARCHE]: marcheId }];
       setInviteMsg("Le titulaire a été déclaré et invité à rejoindre Eclauses.");
       const refreshed = await reloadMine();
       if (parentRow) {
@@ -597,13 +521,11 @@ const Component = () => {
 
   function goToDetailMarche(row) {
     if (!row?.id) return;
-    try { sessionStorage.setItem('acheteurMarcheDetailId', String(row.id)); } catch (_) {}
-    if (gristAPI.navigate) gristAPI.navigate('acheteur-marches-detail');
+    router.push(`/acheteur-marches-detail?id=${row.id}`);
   }
   function goToEditMarche(row) {
     if (!row?.id) return;
-    try { sessionStorage.setItem('acheteurMarcheEditId', String(row.id)); } catch (_) {}
-    if (gristAPI.navigate) gristAPI.navigate('acheteur-marches-modification');
+    router.push(`/acheteur-marches-modification?id=${row.id}`);
   }
 
   function openDeleteModal(row) {
@@ -621,10 +543,8 @@ const Component = () => {
     try {
       setDeletingId(id);
       const lots = getLotsForParent(deleteRowItem);
-      for (const lot of lots) {
-        await gristAPI.deleteRecord(T.M, lot.id);
-      }
-      await gristAPI.deleteRecord(T.M, id);
+      const res = await supprimer(id);
+      if (!res.ok) throw new Error(res.message);
       const deletedIds = new Set([id, ...lots.map(l => l.id)]);
       setRows(rows.filter(r => !deletedIds.has(r.id)));
       closeDeleteModal();
@@ -868,7 +788,7 @@ const Component = () => {
           </div>
         </div>
         <div className="fr-col-12 fr-col-md-6">
-          <button className="fr-btn fr-icon-add-line fr-btn--icon-left" onClick={()=>gristAPI.navigate && gristAPI.navigate('acheteur-marches-declaration')}>
+          <button className="fr-btn fr-icon-add-line fr-btn--icon-left" onClick={()=>router.push('/acheteur-marches-declaration')}>
             Déclarer un marché
           </button>
         </div>

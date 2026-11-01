@@ -9,14 +9,14 @@ import { publicEnv } from '@/server/env';
 
 export const dynamic = 'force-dynamic';
 
-type Props = { params: Promise<{ page: string }> };
+type Props = { params: Promise<{ page: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const def = pageById((await params).page);
   return { title: def ? `${def.title} - Eclauses` : 'Eclauses' };
 }
 
-export default async function Page({ params }: Props) {
+export default async function Page({ params, searchParams }: Props) {
   const { page } = await params;
   const def = pageById(page);
   if (!def || def.id === 'accueil') notFound();
@@ -28,7 +28,7 @@ export default async function Page({ params }: Props) {
   const render = Object.hasOwn(SERVER_PAGES, def.id) ? SERVER_PAGES[def.id] : undefined;
   return (
     <AppShell session={session} currentPage={def.id}>
-      {render && session ? await render({ session }) : <PageHost id={def.id} session={session} env={publicEnv()} />}
+      {render && session ? await render({ session, query: Object.fromEntries(Object.entries(await searchParams).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])) }) : <PageHost id={def.id} session={session} env={publicEnv()} />}
     </AppShell>
   );
 }

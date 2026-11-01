@@ -1,13 +1,16 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/acheteur-marches-modification), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif « Modifier un marché » : le serveur lit le marché (identifié par `?id=` dans l'adresse), son
+// entité et les référentiels (`initial`). L'enregistrement (marché, ajout, mise à jour et suppression de lots) est
+// une seule Server Action, en une transaction.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { useRouter } from 'next/navigation';
+import ComboBox from '@/legacy/components/ComboBox';
+import helpers from '@/legacy/components/helpers';
+import { modifier } from '@/server/actions/acheteur';
 
-const Component = () => {
-  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
+const Component = ({ initial }) => {
+  const router = useRouter();
 
   const T = {
     UA: 'Utilisateurs_Acheteurs',
@@ -34,7 +37,7 @@ const Component = () => {
     LOTS: 'Lots',
   };
 
-  const { toOptions, parseDate, formatDate } = gristAPI.helpers;
+  const { toOptions, parseDate, formatDate } = helpers;
   const toOptionsWithTooltip = (rows) => toOptions(rows || []).map((opt) => {
     const row = (rows || []).find((r) => String(r.id) === String(opt.value));
     return { ...opt, tooltip: row?.Tooltip || '' };
@@ -72,23 +75,20 @@ const Component = () => {
     .map((x) => (typeof x === 'number' ? x : Number(x)))
     .filter((x) => Number.isFinite(x));
 
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
-  const [org, setOrg] = React.useState(null);
-  const [rows, setRows] = React.useState([]);
-  const [optsClauses, setOptsClauses] = React.useState([]);
-  const [optsSpecs, setOptsSpecs] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
+  const [org, setOrg] = React.useState(initial.org);
+  const [rows, setRows] = React.useState(initial.marches);
+  const [optsClauses, setOptsClauses] = React.useState(() => toOptions(initial.clauses));
+  const [optsSpecs, setOptsSpecs] = React.useState(() => toOptionsWithTooltip(initial.specialites));
 
-  const [marcheId, setMarcheId] = React.useState(null);
-  const [editForm, setEditForm] = React.useState({});
-  const [editLots, setEditLots] = React.useState([]);
-  const [editIsAllotted, setEditIsAllotted] = React.useState(false);
+  const [marcheId, setMarcheId] = React.useState(initial.marcheId);
   const [editingLotKey, setEditingLotKey] = React.useState(null);
   const [deletedLotIds, setDeletedLotIds] = React.useState([]);
   const [errors, setErrors] = React.useState({});
   const [saving, setSaving] = React.useState(false);
 
-  const goBack = () => gristAPI.navigate && gristAPI.navigate('acheteur-marches');
+  const goBack = () => router.push('/acheteur-marches');
 
   const compareByLot = (a, b) => {
     const lotA = String(a?.[M.LOT] ?? '').trim();
@@ -136,85 +136,30 @@ const Component = () => {
     return labels.length ? labels.join(', ') : '—';
   };
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setErr(null);
-        const auth = gristAPI.getAuth();
-        const roles = Array.isArray(auth?.roles) ? auth.roles : [];
-        if (!auth || !roles.includes('acheteur') || !auth.acheteurId) {
-          setErr("Accès refusé : rôle 'acheteur' requis.");
-          return;
-        }
+  // Formulaire initial, calculé par le serveur et le navigateur de la même façon (calcul pur).
+  const initialRow = initial.marcheId ? (initial.marches || []).find((r) => Number(r.id) === Number(initial.marcheId)) : null;
+  const initialLots = initialRow && !initial.error ? getLotsForParent(initialRow, initial.marches) : [];
+  const initialFallback = initialRow ? {
+    [M.INTITULE]: initialRow[M.INTITULE] || '',
+    [M.PUB]: ymd(initialRow[M.PUB]),
+    [M.DLRO]: ymd(initialRow[M.DLRO]),
+    [M.DNOTPREV]: ymd(initialRow[M.DNOTPREV]),
+    [M.STATUS]: initialRow[M.STATUS] || 'En attente de publication',
+  } : {};
+  const [editForm, setEditForm] = React.useState(() => (initialRow && !initial.error ? {
+    [M.INTITULE]: initialRow[M.INTITULE] || '',
+    [M.CLAUSE]: initialRow[M.CLAUSE] || '',
+    [M.SPECS]: asRefIds(initialRow[M.SPECS]),
+    [M.ADR]: initialRow[M.ADR] || '',
+    [M.PUB]: ymd(initialRow[M.PUB]),
+    [M.DLRO]: ymd(initialRow[M.DLRO]),
+    [M.DNOTPREV]: ymd(initialRow[M.DNOTPREV]),
+    [M.EXEC_END]: ymd(initialRow[M.EXEC_END]),
+  } : {}));
+  const [editLots, setEditLots] = React.useState(() => initialLots.map((lot) => lotToForm(lot, initialFallback)));
+  const [editIsAllotted, setEditIsAllotted] = React.useState(initialLots.length > 0);
 
-        const rawId = (() => {
-          try { return sessionStorage.getItem('acheteurMarcheEditId'); } catch (_) { return ''; }
-        })();
-        const id = Number(rawId);
-        if (!Number.isFinite(id)) {
-          setErr('Aucun marché sélectionné pour modification.');
-          return;
-        }
-        setMarcheId(id);
-
-        const uaRows = await gristAPI.getData(T.UA);
-        const me = uaRows.find(r => r.id === auth.acheteurId);
-        if (!me?.Entite_de_rattachement) {
-          setErr("Votre compte n'est rattaché à aucune entité acheteuse.");
-          return;
-        }
-
-        const [achRows, c, specs, ms] = await Promise.all([
-          gristAPI.getData(T.ACH),
-          gristAPI.getData(T.C),
-          gristAPI.getData(T.SPECS).catch(() => []),
-          gristAPI.getData(T.M),
-        ]);
-        const entite = achRows.find(a => a.id === me.Entite_de_rattachement);
-        if (!entite) {
-          setErr("Entité acheteuse introuvable.");
-          return;
-        }
-        setOrg(entite);
-        setOptsClauses(toOptions(c || []));
-        setOptsSpecs(toOptionsWithTooltip(specs || []));
-        setRows(ms || []);
-
-        const row = (ms || []).find(r => Number(r.id) === id);
-        if (!row || Number(row[M.ACHETEUR]) !== Number(entite.id)) {
-          setErr('Marché introuvable ou non rattaché à votre entité.');
-          return;
-        }
-
-        setEditForm({
-          [M.INTITULE]: row[M.INTITULE] || '',
-          [M.CLAUSE]: row[M.CLAUSE] || '',
-          [M.SPECS]: asRefIds(row[M.SPECS]),
-          [M.ADR]: row[M.ADR] || '',
-          [M.PUB]: ymd(row[M.PUB]),
-          [M.DLRO]: ymd(row[M.DLRO]),
-          [M.DNOTPREV]: ymd(row[M.DNOTPREV]),
-          [M.EXEC_END]: ymd(row[M.EXEC_END]),
-        });
-
-        const lots = getLotsForParent(row, ms || []);
-        const fallback = {
-          [M.INTITULE]: row[M.INTITULE] || '',
-          [M.PUB]: ymd(row[M.PUB]),
-          [M.DLRO]: ymd(row[M.DLRO]),
-          [M.DNOTPREV]: ymd(row[M.DNOTPREV]),
-          [M.STATUS]: row[M.STATUS] || 'En attente de publication',
-        };
-        setEditIsAllotted(lots.length > 0);
-        setEditLots(lots.map((lot) => lotToForm(lot, fallback)));
-      } catch (e) {
-        setErr(e.message || 'Chargement impossible.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  React.useEffect(() => { document.title = 'Modifier le marché - Eclauses'; }, []);
 
   const updateEditLot = (key, updates) => {
     setEditLots((prev) => prev.map((lot) => lot._key === key ? { ...lot, ...updates } : lot));
@@ -298,44 +243,28 @@ const Component = () => {
 
     try {
       setSaving(true);
-      const updates = {
-        [M.INTITULE]: editForm[M.INTITULE] || null,
-        [M.PUB]: editForm[M.PUB] || null,
-        [M.DLRO]: editForm[M.DLRO] || null,
-        [M.DNOTPREV]: editForm[M.DNOTPREV] || null,
-        [M.CLAUSE]: editIsAllotted ? null : (editForm[M.CLAUSE] ? Number(editForm[M.CLAUSE]) : null),
-        [M.SPECS]: editIsAllotted ? null : toRefList(editForm[M.SPECS]),
-        [M.ADR]: editIsAllotted ? null : (editForm[M.ADR] || null),
-      };
-
-      await gristAPI.updateRecord(T.M, marcheId, updates);
-
-      for (const lotId of deletedLotIds) {
-        await gristAPI.deleteRecord(T.M, lotId);
-      }
-      if (editIsAllotted) {
-        for (const lot of editLots) {
-          const lotPayload = {
-            [M.INTITULE]: editForm[M.INTITULE] || null,
-            [M.PARENT]: marcheId,
-            [M.ACHETEUR]: org.id,
-            [M.INTITULE_LOT]: lot[M.INTITULE_LOT] || null,
-            [M.LOT]: lot[M.LOT] || null,
-            [M.CLAUSE]: lot[M.CLAUSE] ? Number(lot[M.CLAUSE]) : null,
-            [M.SPECS]: toRefList(lot[M.SPECS]),
-            [M.ADR]: lot[M.ADR] || null,
-            [M.PUB]: editForm[M.PUB] || null,
-            [M.DLRO]: editForm[M.DLRO] || null,
-            [M.DNOTPREV]: editForm[M.DNOTPREV] || null,
-            [M.STATUS]: lot[M.STATUS] || 'En attente de publication',
-          };
-          if (lot._isNew || !lot.id) {
-            await gristAPI.addRecord(T.M, lotPayload);
-          } else {
-            await gristAPI.updateRecord(T.M, lot.id, lotPayload);
-          }
-        }
-      }
+      const ids = (v) => asRefIds(v).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+      const res = await modifier(marcheId, {
+        intitule: editForm[M.INTITULE] || '',
+        datePublication: editForm[M.PUB] || null,
+        dateLimiteOffres: editForm[M.DLRO] || '',
+        dateNotificationPrevisionnelle: editForm[M.DNOTPREV] || '',
+        clauseId: editIsAllotted ? null : (editForm[M.CLAUSE] ? Number(editForm[M.CLAUSE]) : null),
+        specialiteIds: editIsAllotted ? null : ids(editForm[M.SPECS]),
+        lieu: editIsAllotted ? null : (editForm[M.ADR] || ''),
+        lots: editIsAllotted
+          ? editLots.map((lot) => ({
+              id: lot._isNew || !lot.id ? null : lot.id,
+              numero: lot[M.LOT] || '',
+              intitule: lot[M.INTITULE_LOT] || '',
+              clauseId: Number(lot[M.CLAUSE]),
+              specialiteIds: ids(lot[M.SPECS]),
+              lieu: lot[M.ADR] || '',
+            }))
+          : [],
+        lotsSupprimes: deletedLotIds,
+      });
+      if (!res.ok) throw new Error(res.message);
       goBack();
     } catch (e) {
       setErr(e.message || 'Échec de la sauvegarde.');
