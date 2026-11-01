@@ -23,6 +23,15 @@ npm run typecheck -w apps/web
 npx tsx apps/web/scripts/smoke.ts   # parcours HTTP de bout en bout contre une instance démarrée (BASE_URL, 3100 par défaut) et la base seedée
 ```
 
+Stockage S3 : `docker compose --env-file apps/web/.env.local --profile s3 up -d minio` puis les variables `S3_TEST_*` (voir `.env.example`) activent la partie S3 du test de contrat.
+
+## Importer les données de Grist
+
+```bash
+npx tsx apps/web/scripts/import-grist.ts --replace     # Grist (GRIST_DOC_ID, lecture seule) -> base locale ; rejouable sans --replace
+npx tsx apps/web/scripts/verify-import.ts              # compare les formules de Grist avec celles du nouveau code (0 écart attendu)
+```
+
 Sans `DATABASE_URL`, les tests d'intégration sont ignorés. Ils n'écrivent jamais dans la base de développement elle-même.
 
 ## Docker
@@ -31,7 +40,7 @@ Sans `DATABASE_URL`, les tests d'intégration sont ignorés. Ils n'écrivent jam
 docker compose --env-file apps/web/.env.local up -d --build   # base + application, http://localhost:3200
 ```
 
-L'image tourne en utilisateur non root, système de fichiers en lecture seule, sans capacité Linux, sonde de santé sur `/api/health`. **À faire (phase 8)** : appliquer les migrations au démarrage et monter un volume pour les fichiers (`STORAGE_LOCAL_DIR`).
+L'image applique les migrations au démarrage, garde les fichiers dans le volume `fichiers` (`/data/fichiers`, ou `STORAGE_DRIVER=s3`), tourne en utilisateur non root, système de fichiers en lecture seule, sans capacité Linux, sonde de santé sur `/api/health`.
 
 ## Organisation
 

@@ -22,3 +22,4 @@ dev-bug.csv
 .codex
 **/.DS_Store
 **/*.tsbuildinfo
+apps/web/var

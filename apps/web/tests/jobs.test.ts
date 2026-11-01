@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { hasPostgres, useTemporaryDatabase } from './helpers/pg';
@@ -9,7 +12,11 @@ describe.skipIf(!hasPostgres)('tâches planifiées', () => {
   let db: ReturnType<(typeof import('@/server/db/client'))['database']>;
   const year = new Date().getFullYear();
 
+  let dir: string;
   beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'eclauses-jobs-'));
+    process.env.STORAGE_DRIVER = 'local';
+    process.env.STORAGE_LOCAL_DIR = dir;
     t = await useTemporaryDatabase();
     jobs = await import('@/server/jobs');
     s = await import('@/server/db/schema');
@@ -17,6 +24,7 @@ describe.skipIf(!hasPostgres)('tâches planifiées', () => {
   });
   afterAll(async () => {
     await t?.drop();
+    await rm(dir, { recursive: true, force: true });
   });
   beforeEach(async () => {
     await t.sql.unsafe('truncate utilisateurs, beneficiaires, acheteurs, fichiers restart identity cascade');
@@ -99,5 +107,17 @@ describe.skipIf(!hasPostgres)('tâches planifiées', () => {
     expect((await jobs.JOBS['purge-resets']!()).processed).toBe(1);
     expect((await jobs.JOBS['purge-sessions']!()).processed).toBe(1);
     expect((await db.select().from(s.jetonsAuth)).map((j) => j.empreinte)).toEqual(['b']);
+  });
+
+  it('supprime les fichiers jamais rattachés à une fiche, garde ceux d’un CV et les dépôts récents', async () => {
+    const { enregistrerFichier, lireFichier } = await import('@/server/services/fichiers');
+    const mk = (nom: string) => enregistrerFichier({ contenu: new Uint8Array([1, 2, 3]), nom, typeMime: 'application/pdf', usage: 'cv', utilisateurId: null });
+    const [orphelin, recent, utilise] = [await mk('orphelin.pdf'), await mk('recent.pdf'), await mk('utilise.pdf')];
+    await db.insert(s.beneficiaires).values({ nom: 'A', cvFichierId: utilise.id });
+    await t.sql.unsafe(`update fichiers set cree_le = now() - interval '2 days' where id in ('${orphelin.id}', '${utilise.id}')`);
+    expect((await jobs.JOBS['purge-fichiers']!()).processed).toBe(1);
+    expect(await lireFichier(orphelin.id)).toBeNull();
+    expect(await lireFichier(recent.id)).not.toBeNull();
+    expect(await lireFichier(utilise.id)).not.toBeNull();
   });
 });

@@ -15,6 +15,7 @@
     "port:page": "node scripts/port-page.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
     "@gouvfr/dsfr": "^1.14.1",
     "drizzle-orm": "^0.45.4",
     "next": "^16.4.3",

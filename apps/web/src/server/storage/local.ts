@@ -14,12 +14,13 @@ export class LocalFileStore implements FileStore {
 
   /** Chemin absolu d'une clé, en refusant toute sortie du dossier racine. */
   private path(cle: string): string {
+    if (!cle || cle.startsWith('/') || cle.includes('\0') || cle.split('/').includes('..')) throw new Error('Clé de fichier invalide.');
     const full = resolve(join(this.root, cle));
     if (!full.startsWith(this.root + sep)) throw new Error('Clé de fichier invalide.');
     return full;
   }
 
-  async put(cle: string, contenu: Uint8Array): Promise<void> {
+  async put(cle: string, contenu: Uint8Array, _typeMime?: string): Promise<void> {
     const target = this.path(cle);
     await mkdir(dirname(target), { recursive: true });
     // Écriture dans un fichier temporaire puis renommage : jamais de fichier à moitié écrit.

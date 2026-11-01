@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { database } from './db/client';
 import { beneficiaireADetruire, beneficiaireEligible, repondantADetruire } from './db/expr';
-import { beneficiaires, limitesDebit, marches, repondants, sessions, utilisateurs } from './db/schema';
+import { beneficiaires, fichiers, limitesDebit, marches, repondants, sessions, utilisateurs } from './db/schema';
 import { purgerJetons } from './services/comptes';
 import { supprimerFichier } from './services/fichiers';
 import { inviterBeneficiaires } from './services/notifications';
@@ -101,6 +101,16 @@ async function archiveMarches(): Promise<JobResult> {
   return { job: 'archive-marches', processed: rows.length };
 }
 
+/** Fichiers déposés mais jamais rattachés à une fiche (dépôt interrompu) depuis plus d'un jour : supprimés. */
+async function purgeFichiers(): Promise<JobResult> {
+  const orphelins = await database()
+    .select({ id: fichiers.id })
+    .from(fichiers)
+    .where(and(sql`${fichiers.creeLe} < now() - interval '1 day'`, sql`not exists (select 1 from beneficiaires b where b.cv_fichier_id = ${fichiers.id})`));
+  for (const f of orphelins) await supprimerFichier(f.id);
+  return { job: 'purge-fichiers', processed: orphelins.length };
+}
+
 /** Invitations à créer son espace, pour les bénéficiaires dont le compte n'est pas encore activé. */
 async function invitationsComptes(): Promise<JobResult> {
   return { job: 'invitations-comptes', processed: await inviterBeneficiaires() };
@@ -113,5 +123,6 @@ export const JOBS: Record<string, () => Promise<JobResult>> = {
   'anonymise-repondants': anonymiseRepondants,
   'delete-ineligible-accounts': deleteIneligibleAccounts,
   'archive-marches': archiveMarches,
+  'purge-fichiers': purgeFichiers,
   'invitations-comptes': invitationsComptes,
 };
