@@ -1,0 +1,3475 @@
+{
+  "id": "42eb09b2-67cf-4f25-b004-13db0b68bdf7",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.fichiers": {
+      "name": "fichiers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cle": {
+          "name": "cle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom_original": {
+          "name": "nom_original",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type_mime": {
+          "name": "type_mime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "taille": {
+          "name": "taille",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sha256": {
+          "name": "sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usage": {
+          "name": "usage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cree_par_utilisateur_id": {
+          "name": "cree_par_utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fichiers_cree_par_utilisateur_id_utilisateurs_id_fk": {
+          "name": "fichiers_cree_par_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "fichiers",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "cree_par_utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "fichiers_cle_unique": {
+          "name": "fichiers_cle_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "cle"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.jetons_auth": {
+      "name": "jetons_auth",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "jetons_auth_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "utilisateur_id": {
+          "name": "utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "objectif": {
+          "name": "objectif",
+          "type": "objectif_jeton",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "empreinte": {
+          "name": "empreinte",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expire_le": {
+          "name": "expire_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "utilise_le": {
+          "name": "utilise_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "jetons_auth_utilisateur_idx": {
+          "name": "jetons_auth_utilisateur_idx",
+          "columns": [
+            {
+              "expression": "utilisateur_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "jetons_auth_utilisateur_id_utilisateurs_id_fk": {
+          "name": "jetons_auth_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "jetons_auth",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "jetons_auth_empreinte_unique": {
+          "name": "jetons_auth_empreinte_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "empreinte"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notifications_envoyees": {
+      "name": "notifications_envoyees",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "notifications_envoyees_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "evenement": {
+          "name": "evenement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cle": {
+          "name": "cle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "envoye_le": {
+          "name": "envoye_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "notifications_evenement_cle_unique": {
+          "name": "notifications_evenement_cle_unique",
+          "columns": [
+            {
+              "expression": "evenement",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cle",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "empreinte": {
+          "name": "empreinte",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "utilisateur_id": {
+          "name": "utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expire_le": {
+          "name": "expire_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revoque_le": {
+          "name": "revoque_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "sessions_utilisateur_idx": {
+          "name": "sessions_utilisateur_idx",
+          "columns": [
+            {
+              "expression": "utilisateur_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_utilisateur_id_utilisateurs_id_fk": {
+          "name": "sessions_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.utilisateurs": {
+      "name": "utilisateurs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "utilisateurs_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mot_de_passe_hash": {
+          "name": "mot_de_passe_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "est_admin": {
+          "name": "est_admin",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "mot_de_passe_modifie_le": {
+          "name": "mot_de_passe_modifie_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derniere_connexion_le": {
+          "name": "derniere_connexion_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "utilisateurs_email_unique": {
+          "name": "utilisateurs_email_unique",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.clauses_sociales": {
+      "name": "clauses_sociales",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "clauses_sociales_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gabarit_article": {
+          "name": "gabarit_article",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gabarit_annuaire_html": {
+          "name": "gabarit_annuaire_html",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "clauses_sociales_gristId_unique": {
+          "name": "clauses_sociales_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.departements": {
+      "name": "departements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "departements_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "numero": {
+          "name": "numero",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region_id": {
+          "name": "region_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "libelle_affichage": {
+          "name": "libelle_affichage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chef_lieu": {
+          "name": "chef_lieu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "villes_principales": {
+          "name": "villes_principales",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "superficie_km2": {
+          "name": "superficie_km2",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "population2023": {
+          "name": "population2023",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "densite_hab_km2": {
+          "name": "densite_hab_km2",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "adresse_geocodee": {
+          "name": "adresse_geocodee",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "departements_region_id_regions_id_fk": {
+          "name": "departements_region_id_regions_id_fk",
+          "tableFrom": "departements",
+          "tableTo": "regions",
+          "columnsFrom": [
+            "region_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "departements_gristId_unique": {
+          "name": "departements_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        },
+        "departements_numero_unique": {
+          "name": "departements_numero_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "numero"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.formations": {
+      "name": "formations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "formations_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intitule": {
+          "name": "intitule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "formations_gristId_unique": {
+          "name": "formations_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.regions": {
+      "name": "regions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "regions_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intitule": {
+          "name": "intitule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chef_lieu": {
+          "name": "chef_lieu",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "adresse_geocodee": {
+          "name": "adresse_geocodee",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "regions_gristId_unique": {
+          "name": "regions_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.specialites": {
+      "name": "specialites",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "specialites_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intitule": {
+          "name": "intitule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clause_id": {
+          "name": "clause_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "infobulle": {
+          "name": "infobulle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "specialites_clause_id_clauses_sociales_id_fk": {
+          "name": "specialites_clause_id_clauses_sociales_id_fk",
+          "tableFrom": "specialites",
+          "tableTo": "clauses_sociales",
+          "columnsFrom": [
+            "clause_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "specialites_gristId_unique": {
+          "name": "specialites_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.acheteurs": {
+      "name": "acheteurs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "acheteurs_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ministere": {
+          "name": "ministere",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "categorie": {
+          "name": "categorie",
+          "type": "categorie_acheteur",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "acheteurs_gristId_unique": {
+          "name": "acheteurs_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.beneficiaire_clauses": {
+      "name": "beneficiaire_clauses",
+      "schema": "",
+      "columns": {
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clause_id": {
+          "name": "clause_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "beneficiaire_clauses_clause_idx": {
+          "name": "beneficiaire_clauses_clause_idx",
+          "columns": [
+            {
+              "expression": "clause_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "beneficiaire_clauses_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "beneficiaire_clauses_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "beneficiaire_clauses",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "beneficiaire_clauses_clause_id_clauses_sociales_id_fk": {
+          "name": "beneficiaire_clauses_clause_id_clauses_sociales_id_fk",
+          "tableFrom": "beneficiaire_clauses",
+          "tableTo": "clauses_sociales",
+          "columnsFrom": [
+            "clause_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "beneficiaire_clauses_beneficiaire_id_clause_id_pk": {
+          "name": "beneficiaire_clauses_beneficiaire_id_clause_id_pk",
+          "columns": [
+            "beneficiaire_id",
+            "clause_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.beneficiaire_departements": {
+      "name": "beneficiaire_departements",
+      "schema": "",
+      "columns": {
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "departement_id": {
+          "name": "departement_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "beneficiaire_departements_dep_idx": {
+          "name": "beneficiaire_departements_dep_idx",
+          "columns": [
+            {
+              "expression": "departement_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "beneficiaire_departements_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "beneficiaire_departements_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "beneficiaire_departements",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "beneficiaire_departements_departement_id_departements_id_fk": {
+          "name": "beneficiaire_departements_departement_id_departements_id_fk",
+          "tableFrom": "beneficiaire_departements",
+          "tableTo": "departements",
+          "columnsFrom": [
+            "departement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "beneficiaire_departements_beneficiaire_id_departement_id_pk": {
+          "name": "beneficiaire_departements_beneficiaire_id_departement_id_pk",
+          "columns": [
+            "beneficiaire_id",
+            "departement_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.beneficiaire_regions": {
+      "name": "beneficiaire_regions",
+      "schema": "",
+      "columns": {
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region_id": {
+          "name": "region_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "beneficiaire_regions_region_idx": {
+          "name": "beneficiaire_regions_region_idx",
+          "columns": [
+            {
+              "expression": "region_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "beneficiaire_regions_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "beneficiaire_regions_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "beneficiaire_regions",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "beneficiaire_regions_region_id_regions_id_fk": {
+          "name": "beneficiaire_regions_region_id_regions_id_fk",
+          "tableFrom": "beneficiaire_regions",
+          "tableTo": "regions",
+          "columnsFrom": [
+            "region_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "beneficiaire_regions_beneficiaire_id_region_id_pk": {
+          "name": "beneficiaire_regions_beneficiaire_id_region_id_pk",
+          "columns": [
+            "beneficiaire_id",
+            "region_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.beneficiaire_specialites": {
+      "name": "beneficiaire_specialites",
+      "schema": "",
+      "columns": {
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "specialite_id": {
+          "name": "specialite_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "beneficiaire_specialites_spec_idx": {
+          "name": "beneficiaire_specialites_spec_idx",
+          "columns": [
+            {
+              "expression": "specialite_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "beneficiaire_specialites_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "beneficiaire_specialites_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "beneficiaire_specialites",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "beneficiaire_specialites_specialite_id_specialites_id_fk": {
+          "name": "beneficiaire_specialites_specialite_id_specialites_id_fk",
+          "tableFrom": "beneficiaire_specialites",
+          "tableTo": "specialites",
+          "columnsFrom": [
+            "specialite_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "beneficiaire_specialites_beneficiaire_id_specialite_id_pk": {
+          "name": "beneficiaire_specialites_beneficiaire_id_specialite_id_pk",
+          "columns": [
+            "beneficiaire_id",
+            "specialite_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.beneficiaires": {
+      "name": "beneficiaires",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "beneficiaires_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utilisateur_id": {
+          "name": "utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prenom": {
+          "name": "prenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telephone": {
+          "name": "telephone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "formation_id": {
+          "name": "formation_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "autre_formation": {
+          "name": "autre_formation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "annee_diplome": {
+          "name": "annee_diplome",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_diplomation": {
+          "name": "date_diplomation",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "generated": {
+            "as": "make_date(annee_diplome, 9, 15)",
+            "type": "stored"
+          }
+        },
+        "specialite_ecole": {
+          "name": "specialite_ecole",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sous_specialite": {
+          "name": "sous_specialite",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intitule_memoire": {
+          "name": "intitule_memoire",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "autres_informations": {
+          "name": "autres_informations",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "missions_proposees": {
+          "name": "missions_proposees",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commentaire": {
+          "name": "commentaire",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cv_fichier_id": {
+          "name": "cv_fichier_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consentement_annuaire": {
+          "name": "consentement_annuaire",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "consentement_contact_groupements": {
+          "name": "consentement_contact_groupements",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "alumni": {
+          "name": "alumni",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "fiche_a_jour": {
+          "name": "fiche_a_jour",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "modifie_le": {
+          "name": "modifie_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "anonymise_le": {
+          "name": "anonymise_le",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "beneficiaires_formation_idx": {
+          "name": "beneficiaires_formation_idx",
+          "columns": [
+            {
+              "expression": "formation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "beneficiaires_utilisateur_id_utilisateurs_id_fk": {
+          "name": "beneficiaires_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "beneficiaires",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "beneficiaires_formation_id_formations_id_fk": {
+          "name": "beneficiaires_formation_id_formations_id_fk",
+          "tableFrom": "beneficiaires",
+          "tableTo": "formations",
+          "columnsFrom": [
+            "formation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "beneficiaires_cv_fichier_id_fichiers_id_fk": {
+          "name": "beneficiaires_cv_fichier_id_fichiers_id_fk",
+          "tableFrom": "beneficiaires",
+          "tableTo": "fichiers",
+          "columnsFrom": [
+            "cv_fichier_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "beneficiaires_gristId_unique": {
+          "name": "beneficiaires_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        },
+        "beneficiaires_utilisateurId_unique": {
+          "name": "beneficiaires_utilisateurId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "utilisateur_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.repondants": {
+      "name": "repondants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "repondants_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utilisateur_id": {
+          "name": "utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prenom": {
+          "name": "prenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telephone": {
+          "name": "telephone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raison_sociale": {
+          "name": "raison_sociale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "siret": {
+          "name": "siret",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "anonymise_le": {
+          "name": "anonymise_le",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "repondants_utilisateur_id_utilisateurs_id_fk": {
+          "name": "repondants_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "repondants",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "repondants_gristId_unique": {
+          "name": "repondants_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        },
+        "repondants_utilisateurId_unique": {
+          "name": "repondants_utilisateurId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "utilisateur_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.utilisateurs_acheteurs": {
+      "name": "utilisateurs_acheteurs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "utilisateurs_acheteurs_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "utilisateur_id": {
+          "name": "utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acheteur_id": {
+          "name": "acheteur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prenom": {
+          "name": "prenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "utilisateurs_acheteurs_utilisateur_id_utilisateurs_id_fk": {
+          "name": "utilisateurs_acheteurs_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "utilisateurs_acheteurs",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "utilisateurs_acheteurs_acheteur_id_acheteurs_id_fk": {
+          "name": "utilisateurs_acheteurs_acheteur_id_acheteurs_id_fk",
+          "tableFrom": "utilisateurs_acheteurs",
+          "tableTo": "acheteurs",
+          "columnsFrom": [
+            "acheteur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "utilisateurs_acheteurs_gristId_unique": {
+          "name": "utilisateurs_acheteurs_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        },
+        "utilisateurs_acheteurs_utilisateurId_unique": {
+          "name": "utilisateurs_acheteurs_utilisateurId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "utilisateur_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.acces_coordonnees": {
+      "name": "acces_coordonnees",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "acces_coordonnees_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repondant_id": {
+          "name": "repondant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "affiche_email": {
+          "name": "affiche_email",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "affiche_telephone": {
+          "name": "affiche_telephone",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "acces_coordonnees_repondant_id_repondants_id_fk": {
+          "name": "acces_coordonnees_repondant_id_repondants_id_fk",
+          "tableFrom": "acces_coordonnees",
+          "tableTo": "repondants",
+          "columnsFrom": [
+            "repondant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "acces_coordonnees_marche_id_marches_id_fk": {
+          "name": "acces_coordonnees_marche_id_marches_id_fk",
+          "tableFrom": "acces_coordonnees",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "acces_coordonnees_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "acces_coordonnees_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "acces_coordonnees",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "acces_coordonnees_gristId_unique": {
+          "name": "acces_coordonnees_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        },
+        "acces_coordonnees_unique": {
+          "name": "acces_coordonnees_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "repondant_id",
+            "marche_id",
+            "beneficiaire_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.candidatures": {
+      "name": "candidatures",
+      "schema": "",
+      "columns": {
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repondant_id": {
+          "name": "repondant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "candidatures_repondant_idx": {
+          "name": "candidatures_repondant_idx",
+          "columns": [
+            {
+              "expression": "repondant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "candidatures_marche_id_marches_id_fk": {
+          "name": "candidatures_marche_id_marches_id_fk",
+          "tableFrom": "candidatures",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "candidatures_repondant_id_repondants_id_fk": {
+          "name": "candidatures_repondant_id_repondants_id_fk",
+          "tableFrom": "candidatures",
+          "tableTo": "repondants",
+          "columnsFrom": [
+            "repondant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "candidatures_marche_id_repondant_id_pk": {
+          "name": "candidatures_marche_id_repondant_id_pk",
+          "columns": [
+            "marche_id",
+            "repondant_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.declarations_beneficiaires": {
+      "name": "declarations_beneficiaires",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "declarations_beneficiaires_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repondant_id": {
+          "name": "repondant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "est_beneficiaire_eclauses": {
+          "name": "est_beneficiaire_eclauses",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nom": {
+          "name": "nom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prenom": {
+          "name": "prenom",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "statut": {
+          "name": "statut",
+          "type": "statut_declaration",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'declare'"
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "declarations_marche_idx": {
+          "name": "declarations_marche_idx",
+          "columns": [
+            {
+              "expression": "marche_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "declarations_repondant_idx": {
+          "name": "declarations_repondant_idx",
+          "columns": [
+            {
+              "expression": "repondant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "declarations_beneficiaires_repondant_id_repondants_id_fk": {
+          "name": "declarations_beneficiaires_repondant_id_repondants_id_fk",
+          "tableFrom": "declarations_beneficiaires",
+          "tableTo": "repondants",
+          "columnsFrom": [
+            "repondant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "declarations_beneficiaires_marche_id_marches_id_fk": {
+          "name": "declarations_beneficiaires_marche_id_marches_id_fk",
+          "tableFrom": "declarations_beneficiaires",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "declarations_beneficiaires_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "declarations_beneficiaires_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "declarations_beneficiaires",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "declarations_beneficiaires_gristId_unique": {
+          "name": "declarations_beneficiaires_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.declarations_refus": {
+      "name": "declarations_refus",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "declarations_refus_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "refuse_le": {
+          "name": "refuse_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "refuse_par_utilisateur_id": {
+          "name": "refuse_par_utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raison": {
+          "name": "raison",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "declarations_refus_marche_idx": {
+          "name": "declarations_refus_marche_idx",
+          "columns": [
+            {
+              "expression": "marche_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "declarations_refus_marche_id_marches_id_fk": {
+          "name": "declarations_refus_marche_id_marches_id_fk",
+          "tableFrom": "declarations_refus",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "declarations_refus_refuse_par_utilisateur_id_utilisateurs_id_fk": {
+          "name": "declarations_refus_refuse_par_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "declarations_refus",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "refuse_par_utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "declarations_refus_gristId_unique": {
+          "name": "declarations_refus_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.interets_marches": {
+      "name": "interets_marches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "interets_marches_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "interets_marches_marche_id_marches_id_fk": {
+          "name": "interets_marches_marche_id_marches_id_fk",
+          "tableFrom": "interets_marches",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "interets_marches_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "interets_marches_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "interets_marches",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "interets_marche_beneficiaire_unique": {
+          "name": "interets_marche_beneficiaire_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "marche_id",
+            "beneficiaire_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.invitations_titulaires": {
+      "name": "invitations_titulaires",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "invitations_titulaires_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "statut": {
+          "name": "statut",
+          "type": "statut_invitation",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'en_attente'"
+        },
+        "repondant_id": {
+          "name": "repondant_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "traite_le": {
+          "name": "traite_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "derniere_relance_le": {
+          "name": "derniere_relance_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "invitations_marche_idx": {
+          "name": "invitations_marche_idx",
+          "columns": [
+            {
+              "expression": "marche_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "invitations_titulaires_marche_id_marches_id_fk": {
+          "name": "invitations_titulaires_marche_id_marches_id_fk",
+          "tableFrom": "invitations_titulaires",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "invitations_titulaires_repondant_id_repondants_id_fk": {
+          "name": "invitations_titulaires_repondant_id_repondants_id_fk",
+          "tableFrom": "invitations_titulaires",
+          "tableTo": "repondants",
+          "columnsFrom": [
+            "repondant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "invitations_titulaires_gristId_unique": {
+          "name": "invitations_titulaires_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.marche_beneficiaires": {
+      "name": "marche_beneficiaires",
+      "schema": "",
+      "columns": {
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "beneficiaire_id": {
+          "name": "beneficiaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "marche_beneficiaires_benef_idx": {
+          "name": "marche_beneficiaires_benef_idx",
+          "columns": [
+            {
+              "expression": "beneficiaire_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "marche_beneficiaires_marche_id_marches_id_fk": {
+          "name": "marche_beneficiaires_marche_id_marches_id_fk",
+          "tableFrom": "marche_beneficiaires",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "marche_beneficiaires_beneficiaire_id_beneficiaires_id_fk": {
+          "name": "marche_beneficiaires_beneficiaire_id_beneficiaires_id_fk",
+          "tableFrom": "marche_beneficiaires",
+          "tableTo": "beneficiaires",
+          "columnsFrom": [
+            "beneficiaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "marche_beneficiaires_marche_id_beneficiaire_id_pk": {
+          "name": "marche_beneficiaires_marche_id_beneficiaire_id_pk",
+          "columns": [
+            "marche_id",
+            "beneficiaire_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.marche_specialites": {
+      "name": "marche_specialites",
+      "schema": "",
+      "columns": {
+        "marche_id": {
+          "name": "marche_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "specialite_id": {
+          "name": "specialite_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "marche_specialites_marche_id_marches_id_fk": {
+          "name": "marche_specialites_marche_id_marches_id_fk",
+          "tableFrom": "marche_specialites",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "marche_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "marche_specialites_specialite_id_specialites_id_fk": {
+          "name": "marche_specialites_specialite_id_specialites_id_fk",
+          "tableFrom": "marche_specialites",
+          "tableTo": "specialites",
+          "columnsFrom": [
+            "specialite_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "marche_specialites_marche_id_specialite_id_pk": {
+          "name": "marche_specialites_marche_id_specialite_id_pk",
+          "columns": [
+            "marche_id",
+            "specialite_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.marches": {
+      "name": "marches",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "marches_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acheteur_id": {
+          "name": "acheteur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "intitule": {
+          "name": "intitule",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "numero_lot": {
+          "name": "numero_lot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intitule_lot": {
+          "name": "intitule_lot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clause_id": {
+          "name": "clause_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "statut": {
+          "name": "statut",
+          "type": "statut_marche",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'en_attente_notification'"
+        },
+        "titulaire_id": {
+          "name": "titulaire_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lien_documents": {
+          "name": "lien_documents",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_publication": {
+          "name": "date_publication",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_limite_offres": {
+          "name": "date_limite_offres",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_notification_previsionnelle": {
+          "name": "date_notification_previsionnelle",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date_fin_execution": {
+          "name": "date_fin_execution",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lieu_execution": {
+          "name": "lieu_execution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "adresse_geocodee": {
+          "name": "adresse_geocodee",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lots_lieux_differents": {
+          "name": "lots_lieux_differents",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "lots_clauses_differentes": {
+          "name": "lots_clauses_differentes",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "suivi": {
+          "name": "suivi",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creation_en_autonomie": {
+          "name": "creation_en_autonomie",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "cree_par_utilisateur_id": {
+          "name": "cree_par_utilisateur_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cree_le": {
+          "name": "cree_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "modifie_le": {
+          "name": "modifie_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "marches_parent_idx": {
+          "name": "marches_parent_idx",
+          "columns": [
+            {
+              "expression": "parent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "marches_acheteur_idx": {
+          "name": "marches_acheteur_idx",
+          "columns": [
+            {
+              "expression": "acheteur_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "marches_titulaire_idx": {
+          "name": "marches_titulaire_idx",
+          "columns": [
+            {
+              "expression": "titulaire_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "marches_statut_idx": {
+          "name": "marches_statut_idx",
+          "columns": [
+            {
+              "expression": "statut",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "marches_parent_id_marches_id_fk": {
+          "name": "marches_parent_id_marches_id_fk",
+          "tableFrom": "marches",
+          "tableTo": "marches",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "marches_acheteur_id_acheteurs_id_fk": {
+          "name": "marches_acheteur_id_acheteurs_id_fk",
+          "tableFrom": "marches",
+          "tableTo": "acheteurs",
+          "columnsFrom": [
+            "acheteur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "marches_clause_id_clauses_sociales_id_fk": {
+          "name": "marches_clause_id_clauses_sociales_id_fk",
+          "tableFrom": "marches",
+          "tableTo": "clauses_sociales",
+          "columnsFrom": [
+            "clause_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "marches_titulaire_id_repondants_id_fk": {
+          "name": "marches_titulaire_id_repondants_id_fk",
+          "tableFrom": "marches",
+          "tableTo": "repondants",
+          "columnsFrom": [
+            "titulaire_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "marches_cree_par_utilisateur_id_utilisateurs_id_fk": {
+          "name": "marches_cree_par_utilisateur_id_utilisateurs_id_fk",
+          "tableFrom": "marches",
+          "tableTo": "utilisateurs",
+          "columnsFrom": [
+            "cree_par_utilisateur_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "marches_gristId_unique": {
+          "name": "marches_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.faq_categories": {
+      "name": "faq_categories",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "faq_categories_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "titre": {
+          "name": "titre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "publie": {
+          "name": "publie",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "faq_categories_gristId_unique": {
+          "name": "faq_categories_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        },
+        "faq_categories_slug_unique": {
+          "name": "faq_categories_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.faq_questions": {
+      "name": "faq_questions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "faq_questions_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "categorie_id": {
+          "name": "categorie_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clause_id": {
+          "name": "clause_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "question": {
+          "name": "question",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reponse": {
+          "name": "reponse",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mots_cles": {
+          "name": "mots_cles",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "audience": {
+          "name": "audience",
+          "type": "audience",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'public'"
+        },
+        "auteur": {
+          "name": "auteur",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "publie": {
+          "name": "publie",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "modifie_le": {
+          "name": "modifie_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "faq_questions_categorie_idx": {
+          "name": "faq_questions_categorie_idx",
+          "columns": [
+            {
+              "expression": "categorie_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "faq_questions_categorie_id_faq_categories_id_fk": {
+          "name": "faq_questions_categorie_id_faq_categories_id_fk",
+          "tableFrom": "faq_questions",
+          "tableTo": "faq_categories",
+          "columnsFrom": [
+            "categorie_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "faq_questions_clause_id_clauses_sociales_id_fk": {
+          "name": "faq_questions_clause_id_clauses_sociales_id_fk",
+          "tableFrom": "faq_questions",
+          "tableTo": "clauses_sociales",
+          "columnsFrom": [
+            "clause_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "faq_questions_gristId_unique": {
+          "name": "faq_questions_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.impacts": {
+      "name": "impacts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "impacts_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "libelle": {
+          "name": "libelle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type_indicateur": {
+          "name": "type_indicateur",
+          "type": "type_indicateur",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valeur_manuelle": {
+          "name": "valeur_manuelle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valeur_automatique": {
+          "name": "valeur_automatique",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "largeur_colonnes": {
+          "name": "largeur_colonnes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "impacts_gristId_unique": {
+          "name": "impacts_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.liens": {
+      "name": "liens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "liens_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "zone": {
+          "name": "zone",
+          "type": "zone_lien",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "libelle": {
+          "name": "libelle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "variante": {
+          "name": "variante",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "externe": {
+          "name": "externe",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "liens_gristId_unique": {
+          "name": "liens_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parametres": {
+      "name": "parametres",
+      "schema": "",
+      "columns": {
+        "cle": {
+          "name": "cle",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "valeur": {
+          "name": "valeur",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.support_videos": {
+      "name": "support_videos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "support_videos_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "grist_id": {
+          "name": "grist_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "clause_id": {
+          "name": "clause_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "libelle": {
+          "name": "libelle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "audience": {
+          "name": "audience",
+          "type": "audience",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'public'"
+        },
+        "auteur": {
+          "name": "auteur",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "publie": {
+          "name": "publie",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "modifie_le": {
+          "name": "modifie_le",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "support_videos_clause_id_clauses_sociales_id_fk": {
+          "name": "support_videos_clause_id_clauses_sociales_id_fk",
+          "tableFrom": "support_videos",
+          "tableTo": "clauses_sociales",
+          "columnsFrom": [
+            "clause_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "support_videos_gristId_unique": {
+          "name": "support_videos_gristId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "grist_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.audience": {
+      "name": "audience",
+      "schema": "public",
+      "values": [
+        "public",
+        "beneficiaire",
+        "acheteur",
+        "repondant"
+      ]
+    },
+    "public.categorie_acheteur": {
+      "name": "categorie_acheteur",
+      "schema": "public",
+      "values": [
+        "administration_centrale",
+        "services_a_competence_nationale",
+        "services_deconcentres",
+        "operateurs_etablissements_publics"
+      ]
+    },
+    "public.objectif_jeton": {
+      "name": "objectif_jeton",
+      "schema": "public",
+      "values": [
+        "activation",
+        "reinitialisation"
+      ]
+    },
+    "public.statut_declaration": {
+      "name": "statut_declaration",
+      "schema": "public",
+      "values": [
+        "declare",
+        "valide"
+      ]
+    },
+    "public.statut_invitation": {
+      "name": "statut_invitation",
+      "schema": "public",
+      "values": [
+        "en_attente",
+        "traitee"
+      ]
+    },
+    "public.statut_marche": {
+      "name": "statut_marche",
+      "schema": "public",
+      "values": [
+        "en_attente_notification",
+        "en_attente_declaration",
+        "declaration_a_valider",
+        "clause_validee",
+        "archive"
+      ]
+    },
+    "public.type_indicateur": {
+      "name": "type_indicateur",
+      "schema": "public",
+      "values": [
+        "utilisable",
+        "utilise",
+        "utile",
+        "impactant"
+      ]
+    },
+    "public.zone_lien": {
+      "name": "zone_lien",
+      "schema": "public",
+      "values": [
+        "entete",
+        "pied",
+        "pied_bas"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

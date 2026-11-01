@@ -1,5 +1,24 @@
-# Lancement local de l'image de production. Les secrets viennent de apps/web/.env.local (non versionné).
+# Lancement local. Les secrets viennent de apps/web/.env.local (non versionné) :
+#   docker compose --env-file apps/web/.env.local up -d db        # base seule, pour le développement
+#   docker compose --env-file apps/web/.env.local up -d --build   # base + image de production
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eclauses
+      POSTGRES_USER: eclauses
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir POSTGRES_PASSWORD dans apps/web/.env.local}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eclauses -d eclauses"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   web:
     build: .
     image: eclauses-web:local
@@ -7,6 +26,11 @@ services:
       - "3200:3000"
     env_file:
       - apps/web/.env.local
+    environment:
+      DATABASE_URL: postgres://eclauses:${POSTGRES_PASSWORD}@db:5432/eclauses
+    depends_on:
+      db:
+        condition: service_healthy
     read_only: true
     tmpfs:
       - /tmp
@@ -15,3 +39,6 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+
+volumes:
+  pgdata:
