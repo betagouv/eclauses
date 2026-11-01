@@ -80,28 +80,28 @@ async function setSpecialites(tx: Pick<Tx, 'delete' | 'insert'>, marcheId: numbe
   if (ids?.length) await tx.insert(marcheSpecialites).values([...new Set(ids)].map((specialiteId) => ({ marcheId, specialiteId })));
 }
 
-/* ------------------------------------------------------------------ Déclarer / modifier ---- */
-
 export const declarationSchema = baseSchema.extend({ lots: z.array(lotSchema).max(100).default([]) });
 
-/** Déclare un marché (et ses lots) : il part « en attente de publication ». */
-export async function declarerMarche(s: Session, input: unknown): Promise<{ id: number }> {
-  const entite = entiteDe(s);
-  const data = parse(declarationSchema, input);
-  checkMarche(data, data.lots);
-  const utilisateur = await utilisateurParEmail(s.email);
+/* ------------------------------------------------------------------ Déclarer / modifier ---- */
 
+
+/**
+ * Crée un marché (et ses lots) « en attente de publication ». `autonomie` vaut vrai quand l'acheteur le crée depuis le
+ * site, faux quand l'équipe le crée depuis l'administration (statistique « création en autonomie »).
+ */
+export async function creerMarche(entite: number, utilisateurId: number | null, autonomie: boolean, data: z.infer<typeof declarationSchema>): Promise<{ id: number }> {
+  checkMarche(data, data.lots);
   const parentId = await database().transaction(async (tx) => {
-    const common = { acheteurId: entite, datePublication: data.datePublication ?? null, dateLimiteOffres: data.dateLimiteOffres, dateNotificationPrevisionnelle: data.dateNotificationPrevisionnelle, statut: 'en_attente_publication' as const };
+    const common = { acheteurId: entite, datePublication: data.datePublication ?? null, dateLimiteOffres: data.dateLimiteOffres, dateNotificationPrevisionnelle: data.dateNotificationPrevisionnelle, statut: 'en_attente_publication' as const, creationEnAutonomie: autonomie, creeParUtilisateurId: utilisateurId };
     const [parent] = await tx
       .insert(marches)
-      .values({ ...common, intitule: data.intitule, clauseId: data.lots.length ? null : data.clauseId!, lieuExecution: data.lots.length ? null : data.lieu!, creationEnAutonomie: true, creeParUtilisateurId: utilisateur?.id ?? null })
+      .values({ ...common, intitule: data.intitule, clauseId: data.lots.length ? null : data.clauseId!, lieuExecution: data.lots.length ? null : data.lieu! })
       .returning({ id: marches.id });
     if (!data.lots.length) await setSpecialites(tx, parent!.id, data.specialiteIds);
     for (const lot of data.lots) {
       const [l] = await tx
         .insert(marches)
-        .values({ ...common, parentId: parent!.id, intitule: data.intitule, numeroLot: lot.numero, intituleLot: lot.intitule, clauseId: lot.clauseId, lieuExecution: lot.lieu, creationEnAutonomie: true, creeParUtilisateurId: utilisateur?.id ?? null })
+        .values({ ...common, parentId: parent!.id, intitule: data.intitule, numeroLot: lot.numero, intituleLot: lot.intitule, clauseId: lot.clauseId, lieuExecution: lot.lieu })
         .returning({ id: marches.id });
       await setSpecialites(tx, l!.id, lot.specialiteIds);
     }
@@ -109,6 +109,22 @@ export async function declarerMarche(s: Session, input: unknown): Promise<{ id: 
   });
   await marcheModifie(parentId);
   return { id: parentId };
+}
+
+/** Déclare un marché (et ses lots) pour l'entité de l'acheteur connecté. */
+export async function declarerMarche(s: Session, input: unknown): Promise<{ id: number }> {
+  const entite = entiteDe(s);
+  const data = parse(declarationSchema, input);
+  const utilisateur = await utilisateurParEmail(s.email);
+  return creerMarche(entite, utilisateur?.id ?? null, true, data);
+}
+
+/** Création par l'équipe, pour l'entité de son choix : l'indicateur d'autonomie est faux. */
+export async function declarerMarchePourEntite(admin: Session, entiteId: number, input: unknown): Promise<{ id: number }> {
+  if (!admin.roles.includes('admin')) throw fail(403, 'Accès refusé.');
+  const data = parse(declarationSchema, input);
+  const utilisateur = await utilisateurParEmail(admin.email);
+  return creerMarche(entiteId, utilisateur?.id ?? null, false, data);
 }
 
 export const modificationSchema = baseSchema.extend({

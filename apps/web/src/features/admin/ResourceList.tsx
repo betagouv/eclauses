@@ -71,9 +71,9 @@ export function ResourceList({ resource, result, query, ok }: { resource: Resour
         <div className="fr-col-auto">
           <button className="fr-btn" type="submit">Filtrer</button>
         </div>
-        {resource.canCreate && !resource.readOnly && (
+        {(resource.canCreate || resource.nouveauHref) && !resource.readOnly && (
           <div className="fr-col-auto">
-            <Link className="fr-btn fr-btn--secondary fr-icon-add-line fr-btn--icon-left" href={`/admin/${resource.key}/nouveau`}>Nouveau</Link>
+            <Link className="fr-btn fr-btn--secondary fr-icon-add-line fr-btn--icon-left" href={resource.nouveauHref ?? `/admin/${resource.key}/nouveau`}>Nouveau</Link>
           </div>
         )}
       </form>

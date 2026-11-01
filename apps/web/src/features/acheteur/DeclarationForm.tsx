@@ -8,7 +8,7 @@ import ComboBox from '@/components/ComboBox';
 import helpers from '@/lib/helpers';
 import { declarer } from '@/server/actions/acheteur';
 
-const Component = ({ initial }) => {
+const Component = ({ initial, declarerAction = declarer, retour = '/acheteur-marches' }) => {
   const router = useRouter();
 
   const T = {
@@ -176,9 +176,9 @@ const Component = ({ initial }) => {
 
     try {
       setCreating(true);
-      const res = await declarer(payload);
+      const res = await declarerAction(payload);
       if (!res.ok) throw new Error(res.message);
-      router.push('/acheteur-marches');
+      router.push(retour);
     } catch (e) {
       setErr(e.message || "Échec de création du marché.");
     } finally {
@@ -199,7 +199,7 @@ const Component = ({ initial }) => {
     return (
       <section className="fr-container fr-my-6w">
         <div className="fr-alert fr-alert--error fr-mb-3w"><p><strong>Erreur :</strong> {err}</p></div>
-        <button className="fr-btn fr-btn--secondary" onClick={() => router.push('/acheteur-marches')}>
+        <button className="fr-btn fr-btn--secondary" onClick={() => router.push(retour)}>
           Retour aux marchés
         </button>
       </section>
@@ -216,7 +216,7 @@ const Component = ({ initial }) => {
           </p>
         </div>
         <div className="fr-col-auto">
-          <button className="fr-btn fr-btn--sm fr-btn--secondary fr-icon-arrow-left-line fr-btn--icon-left" onClick={() => router.push('/acheteur-marches')}>
+          <button className="fr-btn fr-btn--sm fr-btn--secondary fr-icon-arrow-left-line fr-btn--icon-left" onClick={() => router.push(retour)}>
             Retour aux marchés
           </button>
         </div>
@@ -395,7 +395,7 @@ const Component = ({ initial }) => {
             <button className="fr-btn" onClick={createMarche} disabled={creating}>
               {creating ? 'Création…' : 'Créer le marché'}
             </button>
-            <button className="fr-btn fr-btn--secondary" onClick={() => router.push('/acheteur-marches')} disabled={creating}>
+            <button className="fr-btn fr-btn--secondary" onClick={() => router.push(retour)} disabled={creating}>
               Annuler
             </button>
           </div>

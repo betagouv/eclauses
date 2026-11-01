@@ -50,6 +50,8 @@ export interface Resource {
    * qui crée ou met à jour le compte.
    */
   account?: { fkProp: string; label: string; required?: boolean };
+  /** Écran de création dédié (au lieu du formulaire généré). */
+  nouveauHref?: string;
   /** Texte d'aide en tête de page. */
   intro?: string;
 }

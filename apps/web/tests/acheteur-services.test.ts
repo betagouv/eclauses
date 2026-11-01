@@ -83,6 +83,15 @@ describe.skipIf(!hasPostgres)('opérations de l’acheteur sur ses marchés', ()
       expect((await row(id)).clauseId).toBeNull();
     });
 
+    it('un administrateur déclare pour une entité : création non autonome, refusée aux autres rôles', async () => {
+      const sp = await specialite();
+      const input = { intitule: 'Saisi par l’équipe', dateLimiteOffres: FUTURE, dateNotificationPrevisionnelle: FUTURE, clauseId: base.clause.id, specialiteIds: [sp.id], lieu: 'Paris' };
+      const admin = { ...acheteur(), roles: ['admin' as const], acheteurId: null, acheteurEntiteId: null };
+      const { id } = await svc.declarerMarchePourEntite(admin, base.acheteur.id, input);
+      expect(await row(id)).toMatchObject({ acheteurId: base.acheteur.id, creationEnAutonomie: false, statut: 'en_attente_publication' });
+      expect(await rejects(svc.declarerMarchePourEntite(acheteur(), base.acheteur.id, input))).toBe(403);
+    });
+
     it('refuse une date limite passée, un marché simple incomplet, des numéros de lot en double, et les non-acheteurs', async () => {
       const valid = { intitule: 'X', dateLimiteOffres: FUTURE, dateNotificationPrevisionnelle: FUTURE, clauseId: base.clause.id, specialiteIds: [1], lieu: 'Paris' };
       expect(await rejects(svc.declarerMarche(acheteur(), { ...valid, dateLimiteOffres: '2000-01-01' }))).toBe(400);

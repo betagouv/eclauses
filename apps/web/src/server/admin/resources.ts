@@ -99,7 +99,8 @@ export const RESOURCES: Resource[] = [
   },
   {
     key: 'marches', label: 'Marché', labelPluriel: 'Marchés et lots', groupe: 'Marchés', table: s.marches, labelProps: ['intitule', 'numeroLot'], search: ['intitule', 'intituleLot', 'lieuExecution'], orderBy: 'id', canCreate: false, canDelete: false,
-    intro: 'Pour créer un marché alloti, utilisez « Nouveau marché ». Changer le statut à la main ne déclenche pas les courriers : préférez les actions des utilisateurs.',
+    nouveauHref: '/admin/marches/nouveau',
+    intro: 'Le bouton « Nouveau » crée un marché ou un marché alloti. Changer le statut à la main ne déclenche pas les courriers : préférez les actions des utilisateurs.',
     fields: [
       text('intitule', 'Intitulé', { required: true, list: true, max: 500 }), ref('parentId', 'Marché parent (lot)', 'marches', { list: true }), text('numeroLot', 'Numéro de lot', { list: true }), text('intituleLot', 'Intitulé du lot'),
       ref('acheteurId', 'Entité acheteuse', 'acheteurs', { required: true, list: true }), ref('clauseId', 'Clause sociale', 'clauses'), enm('statut', 'Statut', STATUT_MARCHE_LABELS, { required: true, list: true }), ref('titulaireId', 'Titulaire', 'repondants'),
