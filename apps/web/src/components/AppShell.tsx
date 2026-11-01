@@ -73,6 +73,13 @@ export async function AppShell({ session, currentPage, children }: { session: Se
                               </a>
                             </li>
                           ))}
+                        {session.roles.includes('admin') && (
+                          <li>
+                            <Link className="fr-btn fr-btn--tertiary" href="/admin">
+                              Administration
+                            </Link>
+                          </li>
+                        )}
                         <li>
                           <LogoutButton />
                         </li>

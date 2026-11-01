@@ -22,11 +22,13 @@ export async function resolveIdentity(userId: number, email: string): Promise<Se
       .where(sql`${repondants.utilisateurId} = ${userId} and not ${repondantADetruire}`),
     db.select({ id: utilisateursAcheteurs.id, entiteId: utilisateursAcheteurs.acheteurId }).from(utilisateursAcheteurs).where(eq(utilisateursAcheteurs.utilisateurId, userId)),
   ]);
+  const [account] = await db.select({ estAdmin: utilisateurs.estAdmin }).from(utilisateurs).where(eq(utilisateurs.id, userId));
 
   const roles: Session['roles'] = [];
   if (benef) roles.push('beneficiaire');
   if (repondant) roles.push('repondant');
   if (acheteur) roles.push('acheteur');
+  if (account?.estAdmin) roles.push('admin');
   if (!roles.length) return null;
 
   return {

@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { objectifJeton } from './enums';
 
@@ -17,6 +17,11 @@ export const utilisateurs = pgTable(
     creeLe: timestamp({ withTimezone: true }).notNull().defaultNow(),
     motDePasseModifieLe: timestamp({ withTimezone: true }),
     derniereConnexionLe: timestamp({ withTimezone: true }),
+    /** Secret TOTP chiffré (AES-GCM) ; actif une fois confirmé. Seuls les administrateurs en ont un. */
+    totpSecretChiffre: text(),
+    totpActiveLe: timestamp({ withTimezone: true }),
+    /** Dernier pas de 30 s accepté : un même code ne sert pas deux fois. */
+    totpDernierPas: integer(),
   },
   (t) => [uniqueIndex('utilisateurs_email_unique').on(sql`lower(${t.email})`)],
 );
@@ -32,6 +37,8 @@ export const sessions = pgTable(
     creeLe: timestamp({ withTimezone: true }).notNull().defaultNow(),
     expireLe: timestamp({ withTimezone: true }).notNull(),
     revoqueLe: timestamp({ withTimezone: true }),
+    /** Seconde étape (administrateurs) validée à cet instant ; vide = pas de double authentification faite. */
+    mfaValideLe: timestamp({ withTimezone: true }),
   },
   (t) => [index('sessions_utilisateur_idx').on(t.utilisateurId)],
 );
@@ -84,3 +91,33 @@ export const limitesDebit = pgTable('limites_debit', {
   compteur: integer().notNull(),
   finFenetre: timestamp({ withTimezone: true }).notNull(),
 });
+
+/** Codes de secours de la double authentification : à usage unique, seule l'empreinte est stockée. */
+export const codesSecours = pgTable(
+  'codes_secours',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    utilisateurId: integer()
+      .notNull()
+      .references(() => utilisateurs.id, { onDelete: 'cascade' }),
+    empreinte: text().notNull(),
+    utiliseLe: timestamp({ withTimezone: true }),
+  },
+  (t) => [index('codes_secours_utilisateur_idx').on(t.utilisateurId)],
+);
+
+/** Journal d'audit de l'administration : qui a fait quoi, sur quoi, quand. L'adresse est recopiée (le compte peut disparaître). */
+export const auditAdmin = pgTable(
+  'audit_admin',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    utilisateurId: integer().references(() => utilisateurs.id, { onDelete: 'set null' }),
+    email: text().notNull(),
+    action: text().notNull(),
+    entite: text().notNull(),
+    entiteId: text(),
+    details: jsonb(),
+    creeLe: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('audit_admin_date_idx').on(t.creeLe), index('audit_admin_entite_idx').on(t.entite, t.entiteId)],
+);

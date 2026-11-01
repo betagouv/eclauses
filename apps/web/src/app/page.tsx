@@ -20,6 +20,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const session = await currentSession();
   const space = await activeSpace(session);
   if (space) redirect(`/${homeOf(space)}`);
+  if (session?.roles.includes('admin')) redirect('/admin');
   return (
     <AppShell session={session} currentPage="accueil">
       <Accueil session={session} />
