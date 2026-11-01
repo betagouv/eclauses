@@ -33,6 +33,12 @@ export function redact(row: Row): Row {
   return copy;
 }
 
+const withoutContacts = (row: Row): Row => {
+  const copy: Row = { ...row };
+  for (const f of CONTACT_FIELDS) delete copy[f];
+  return copy;
+};
+
 /**
  * Lecture des bénéficiaires :
  * - sa propre fiche, en entier ;
@@ -40,6 +46,9 @@ export function redact(row: Row): Row {
  *   sauf consentement au contact. `ids` restreint la lecture.
  */
 export async function readBeneficiaires(session: Session, ids?: number[]): Promise<Row[]> {
+  // Un répondant n'obtient jamais les coordonnées en bloc : elles se consultent une par une, pour un marché, et la
+  // personne en est prévenue (`services/repondant.consulterCoordonnees`). Les acheteurs et bénéficiaires gardent l'annuaire.
+  const noBulkContacts = session.roles.includes('repondant') && !session.roles.includes('beneficiaire') && !session.roles.includes('acheteur');
   const own = session.beneficiaireId;
   const out: Row[] = [];
   if (own && (!ids || ids.includes(own))) {
@@ -47,7 +56,7 @@ export async function readBeneficiaires(session: Session, ids?: number[]): Promi
     if (row) out.push(stripInternal(row));
   }
   const others = await table.read({ where: and(eq(beneficiairesDb.consentementAnnuaire, true), ...(own ? [sql`${beneficiairesDb.id} <> ${own}`] : [])), ids });
-  for (const row of others) if (isVisibleToOthers(row)) out.push(redact(stripInternal(row)));
+  for (const row of others) if (isVisibleToOthers(row)) out.push(noBulkContacts ? withoutContacts(stripInternal(row)) : redact(stripInternal(row)));
   return out;
 }
 

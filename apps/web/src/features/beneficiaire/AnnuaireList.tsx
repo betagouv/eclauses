@@ -3,7 +3,7 @@
 // Îlot interactif de l'« Annuaire » : le serveur lit les fiches visibles, les clauses et les référentiels
 // et les passe en `initial` ; le premier rendu (côté serveur) contient déjà la liste.
 import React from 'react';
-import ComboBox from '@/legacy/components/ComboBox';
+import ComboBox from '@/components/ComboBox';
 import { attachmentUrl } from '@/lib/urls';
 
 const Component = ({ initial, session }) => {

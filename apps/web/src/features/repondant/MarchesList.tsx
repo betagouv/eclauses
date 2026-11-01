@@ -1,12 +1,12 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/repondant-marches), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif « Mes marchés » (répondant) : le serveur lit la fiche, les marchés, déclarations et refus (`initial`).
+// La déclaration des bénéficiaires est une seule Server Action, en une transaction (voir `services/repondant`).
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { lireTables } from '@/server/actions/lecture';
+import { declarer, retirer } from '@/server/actions/repondant';
 
-const Component = () => {
+const Component = ({ initial }) => {
   // ===== Tables & Colonnes =====
   const T = {
     REP:   'Repondants',
@@ -115,29 +115,29 @@ const Component = () => {
   const labelFrom = (opts, id) => (opts.find(o => o.value === id)?.label ?? String(id ?? '—'));
 
   // ===== State =====
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
 
-  const [repRows, setRepRows] = React.useState([]);
-  const [currentRepId, setCurrentRepId] = React.useState(null);
-  const [me, setMe] = React.useState(null);
+  const [repRows, setRepRows] = React.useState(initial.me ? [initial.me] : []);
+  const [currentRepId, setCurrentRepId] = React.useState(initial.me ? initial.me.id : null);
+  const [me, setMe] = React.useState(initial.me);
 
-  const [marchesRows, setMarchesRows] = React.useState([]);
-  const [clauseRows, setClauseRows] = React.useState([]);
-  const [benefRows, setBenefRows] = React.useState([]);
-  const [interestRows, setInterestRows] = React.useState([]);
+  const [marchesRows, setMarchesRows] = React.useState(initial.marches);
+  const [clauseRows, setClauseRows] = React.useState(initial.clauses);
+  const [benefRows, setBenefRows] = React.useState(initial.beneficiaires);
+  const [interestRows, setInterestRows] = React.useState(initial.interets);
 
-  const [optsClauses, setOptsClauses] = React.useState([]);
-  const [optsSpecs, setOptsSpecs] = React.useState([]);
+  const [optsClauses, setOptsClauses] = React.useState(() => toOptions(initial.clauses));
+  const [optsSpecs, setOptsSpecs] = React.useState(() => toOptions(initial.specialites));
   const specLabel = React.useCallback((id) => labelFrom(optsSpecs, id), [optsSpecs]);
 
   // résumés issues de la fiche répondant
-  const [candIds, setCandIds] = React.useState([]);  // marchés candidature
-  const [titIds,  setTitIds]  = React.useState([]);  // marchés titulaires
+  const [candIds, setCandIds] = React.useState(() => asArray(initial.me?.[R.CAND_LIST]).filter(isNum));  // marchés candidature
+  const [titIds,  setTitIds]  = React.useState(() => asArray(initial.me?.[R.TIT_LIST]).filter(isNum));  // marchés titulaires
 
   // déclarations (filtrées dynamiquement pour chaque marché dans la modale)
-  const [declRows, setDeclRows] = React.useState([]);
-  const [refusRows, setRefusRows] = React.useState([]);
+  const [declRows, setDeclRows] = React.useState(initial.declarations);
+  const [refusRows, setRefusRows] = React.useState(initial.refus);
 
   // recherche bénéficiaires (Eclauses) dans la modale
   const [searchBen, setSearchBen] = React.useState('');
@@ -168,65 +168,7 @@ const Component = () => {
   const [detailMarche, setDetailMarche] = React.useState(null);
   const [detailType, setDetailType] = React.useState('');
 
-  // ===== Load =====
-  React.useEffect(() => {
-    let alive = true;
-
-    (async () => {
-      try {
-        setLoading(true); setErr(null);
-
-        const auth = gristAPI.getAuth ? gristAPI.getAuth() : null;
-        if (!auth || !Array.isArray(auth.roles) || !auth.roles.includes('repondant')) {
-          throw new Error("Accès refusé : rôle 'répondant' requis.");
-        }
-
-        const [rep, m, c, specs, b, mi, d, refus] = await Promise.all([
-          gristAPI.getData(T.REP),
-          gristAPI.getData(T.M),
-          gristAPI.getData(T.C),
-          gristAPI.getData(T.SPECS).catch(()=>[]),
-          gristAPI.getData(T.B),
-          gristAPI.getData(T.MI).catch(()=>[]),
-          gristAPI.getData(T.DECL).catch(()=>[]),   // si table pas encore créée → vide
-          gristAPI.getData(T.REFUS).catch(()=>[])
-        ]);
-        if (!alive) return;
-
-        setRepRows(Array.isArray(rep) ? rep : []);
-        setMarchesRows(Array.isArray(m) ? m : []);
-        setClauseRows(Array.isArray(c) ? c : []);
-        setBenefRows(Array.isArray(b) ? b : []);
-        setInterestRows(Array.isArray(mi) ? mi : []);
-        setDeclRows(Array.isArray(d) ? d : []);
-        setRefusRows(Array.isArray(refus) ? refus : []);
-
-        setOptsClauses(toOptions(c || []));
-        setOptsSpecs(toOptions(specs || []));
-
-        // identifie mon répondant
-        let id = auth.repondantId || null;
-        if (!id && rep && rep.length === 1) id = rep[0].id;
-        if (!id) throw new Error("Impossible d’identifier votre fiche répondant.");
-        setCurrentRepId(id);
-
-        const mine = rep.find(r => r.id === id);
-        if (!mine) throw new Error("Votre fiche n’est pas accessible.");
-        setMe(mine);
-
-        setCandIds(asArray(mine[R.CAND_LIST]).filter(isNum));
-        setTitIds(asArray(mine[R.TIT_LIST]).filter(isNum));
-
-      } catch (e) {
-        if (!alive) return;
-        setErr(e.message || 'Erreur de chargement');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-
-    return () => { alive = false; };
-  }, []);
+  React.useEffect(() => { document.title = 'Mes marchés - Eclauses'; }, []);
 
   // état par marché titulaire
   function statusBadgeForTit(marche) {
@@ -391,35 +333,19 @@ const Component = () => {
 
   async function validateDeclarationBatch() {
     if (!currentRepId || !modalMarche) return;
-    const draftDecls = (declRows || []).filter((d) =>
+    const hasDrafts = (declRows || []).some((d) =>
       d[D.REP] === currentRepId &&
       d[D.MARCHE] === modalMarche.id &&
       String(d[D.STATUT] || '').toLowerCase() === 'brouillon'
     );
-    if (!pendingEclauses.length && !pendingManuals.length && !draftDecls.length) return;
+    if (!pendingEclauses.length && !pendingManuals.length && !hasDrafts) return;
     try {
-      for (const d of draftDecls) {
-        await gristAPI.updateRecord(T.DECL, d.id, { [D.STATUT]: 'déclaré' });
-      }
-      for (const benefId of pendingEclauses) {
-        await gristAPI.addRecord(T.DECL, {
-          [D.MARCHE]: modalMarche.id,
-          [D.ECLAUSES]: true,
-          [D.B]: benefId,
-          [D.STATUT]: 'déclaré',
-        });
-      }
-      for (const m of pendingManuals) {
-        await gristAPI.addRecord(T.DECL, {
-          [D.MARCHE]: modalMarche.id,
-          [D.ECLAUSES]: false,
-          [D.NOM]: m.nom,
-          [D.PRENOM]: m.prenom,
-          [D.EMAIL]: m.email,
-          [D.STATUT]: 'déclaré',
-        });
-      }
-      await gristAPI.updateRecord(T.M, modalMarche.id, { [M.STATUS]: 'Déclaration à valider' });
+      // Brouillons repris, bénéficiaires ajoutés, marché passé « à valider » : une seule opération côté serveur.
+      const res = await declarer(modalMarche.id, {
+        eclauses: pendingEclauses,
+        manuels: pendingManuals.map((m) => ({ nom: m.nom, prenom: m.prenom, email: m.email })),
+      });
+      if (!res.ok) throw new Error(res.message);
       await reloadDecls();
       await reloadMarches();
       setPendingEclauses([]);
@@ -437,7 +363,8 @@ const Component = () => {
 
   async function deleteDeclaration(declId) {
     try {
-      await gristAPI.deleteRecord(T.DECL, declId);
+      const res = await retirer(declId);
+      if (!res.ok) throw new Error(res.message);
       await reloadDecls();
     } catch (e) {
       setErr(e.message || "Échec de la suppression.");
@@ -445,17 +372,16 @@ const Component = () => {
   }
 
   async function reloadDecls() {
-    const [d, refus] = await Promise.all([
-      gristAPI.getData(T.DECL).catch(()=>[]),
-      gristAPI.getData(T.REFUS).catch(()=>[]),
-    ]);
-    setDeclRows(Array.isArray(d) ? d : []);
-    setRefusRows(Array.isArray(refus) ? refus : []);
+    const res = await lireTables([T.DECL, T.REFUS]);
+    if (!res.ok) throw new Error(res.message);
+    setDeclRows(res.data[T.DECL] || []);
+    setRefusRows(res.data[T.REFUS] || []);
   }
 
   async function reloadMarches() {
-    const m = await gristAPI.getData(T.M).catch(()=>[]);
-    setMarchesRows(Array.isArray(m) ? m : []);
+    const res = await lireTables([T.M]);
+    if (!res.ok) throw new Error(res.message);
+    setMarchesRows(res.data[T.M] || []);
   }
 
   // ===== Recherche des bénéficiaires (Eclauses) pour la clause du marché
@@ -739,7 +665,6 @@ const Component = () => {
                                 )}
                                 <p className="fr-text--sm fr-mb-1w"><strong>Nom :</strong> {b[B.NOM] || '—'}</p>
                                 <p className="fr-text--sm fr-mb-1w"><strong>Prénom :</strong> {b[B.PRENOM] || '—'}</p>
-                                <p className="fr-text--sm fr-mb-0"><strong>Email :</strong> {b[B.EMAIL] || '—'}</p>
                               </div>
                               <div className="fr-card__footer">
                                 <ul className="fr-btns-group fr-btns-group--inline fr-btns-group--sm">
@@ -800,7 +725,6 @@ const Component = () => {
                       const b = benefRows.find(x => x.id === id) || {};
                       const nom = b[B.NOM] || '';
                       const prenom = b[B.PRENOM] || '';
-                      const email = b[B.EMAIL] || '';
                       return (
                         <div className="fr-col-12 fr-col-md-6" key={`pend-e-${id}`}>
                           <div className="fr-card fr-card--sm">
@@ -809,7 +733,6 @@ const Component = () => {
                                 <p className="fr-badge fr-badge--sm fr-badge--info fr-mb-1w">À enregistrer</p>
                                 <p className="fr-text--sm fr-mb-1w"><strong>Type :</strong> Eclauses</p>
                                 <p className="fr-text--sm fr-mb-1w"><strong>Bénéficiaire :</strong> {(prenom + ' ' + nom).trim() || '—'}</p>
-                                <p className="fr-text--sm fr-mb-0"><strong>Email :</strong> {email || '—'}</p>
                               </div>
                               <div className="fr-card__footer">
                                 <ul className="fr-btns-group fr-btns-group--inline fr-btns-group--sm">
@@ -849,7 +772,7 @@ const Component = () => {
                         const benef = isE ? (benefRows.find(b => b.id === d[D.B]) || {}) : {};
                         const nom = isE ? (benef[B.NOM] || '') : (d[D.NOM] || '');
                         const prenom = isE ? (benef[B.PRENOM] || '') : (d[D.PRENOM] || '');
-                        const email = isE ? (benef[B.EMAIL] || '') : (d[D.EMAIL] || '');
+                        const email = isE ? (d.Beneficiaire__Courriel || '') : (d[D.EMAIL] || '');
                         const statut = String(d[D.STATUT] || 'déclaré');
                         const isValid = statut.toLowerCase() === 'validé';
                         return (
@@ -860,8 +783,7 @@ const Component = () => {
                                   <p className={`fr-badge fr-badge--sm ${isValid ? 'fr-badge--success' : 'fr-badge--info'} fr-mb-1w`}>{statut}</p>
                                   <p className="fr-text--sm fr-mb-1w"><strong>Type :</strong> {isE ? 'Eclauses' : 'Externe'}</p>
                                   <p className="fr-text--sm fr-mb-1w"><strong>Bénéficiaire :</strong> {(prenom + ' ' + nom).trim() || '—'}</p>
-                                  <p className="fr-text--sm fr-mb-0"><strong>Email :</strong> {email || '—'}</p>
-                                </div>
+                                  </div>
                               <div className="fr-card__footer">
                                 <ul className="fr-btns-group fr-btns-group--inline fr-btns-group--sm">
                                   <li>
@@ -962,7 +884,7 @@ const Component = () => {
                         const benef = isE ? (benefRows.find(b => b.id === d[D.B]) || {}) : {};
                         const nom = isE ? (benef[B.NOM] || '') : (d[D.NOM] || '');
                         const prenom = isE ? (benef[B.PRENOM] || '') : (d[D.PRENOM] || '');
-                        const email = isE ? (benef[B.EMAIL] || '') : (d[D.EMAIL] || '');
+                        const email = isE ? (d.Beneficiaire__Courriel || '') : (d[D.EMAIL] || '');
                         const statut = String(d[D.STATUT] || 'déclaré');
                         const isValid = statut.toLowerCase() === 'validé';
                         return (
@@ -973,8 +895,7 @@ const Component = () => {
                                   <p className={`fr-badge fr-badge--sm ${isValid ? 'fr-badge--success' : 'fr-badge--info'} fr-mb-1w`}>{statut}</p>
                                   <p className="fr-text--sm fr-mb-1w"><strong>Type :</strong> {isE ? 'Eclauses' : 'Externe'}</p>
                                   <p className="fr-text--sm fr-mb-1w"><strong>Bénéficiaire :</strong> {(prenom + ' ' + nom).trim() || '—'}</p>
-                                  <p className="fr-text--sm fr-mb-0"><strong>Email :</strong> {email || '—'}</p>
-                                </div>
+                                  </div>
                               </div>
                             </div>
                           </div>

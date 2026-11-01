@@ -1,12 +1,11 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/repondant-infos), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif « Mes informations » (répondant) : le serveur lit la fiche (`initial`) ; l'enregistrement est une Server Action.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import Link from 'next/link';
+import { enregistrerRepondant } from '@/server/actions/repondant';
 
-const Component = () => {
+const Component = ({ initial, session }) => {
   // ===== Tables & colonnes =====
   const TABLE = 'Repondants';
   const COL = {
@@ -25,61 +24,24 @@ const Component = () => {
   const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
 
   // ===== State =====
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr]       = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr]       = React.useState(initial.rec ? null : (initial.error || "Votre fiche n’est pas accessible."));
   const [msg, setMsg]       = React.useState(null);
 
-  const [rows, setRows]     = React.useState([]);
-  const [currentId, setCurrentId] = React.useState(null);
+  const [rows, setRows]     = React.useState(initial.rec ? [initial.rec] : []);
+  const [currentId, setCurrentId] = React.useState(initial.rec ? initial.rec.id : null);
 
-  const [form, setForm] = React.useState({
-    [COL.NOM]: '',
-    [COL.PRENOM]: '',
-    [COL.EMAIL]: '',
-    [COL.TEL]: '',
-    [COL.RAISOC]: '',
-    [COL.SIRET]: '',
+  const formFrom = (rec) => ({
+    [COL.NOM]:    rec[COL.NOM]    || '',
+    [COL.PRENOM]: rec[COL.PRENOM] || '',
+    [COL.EMAIL]:  rec[COL.EMAIL]  || '',
+    [COL.TEL]:    rec[COL.TEL]    || '',
+    [COL.RAISOC]: rec[COL.RAISOC] || '',
+    [COL.SIRET]:  rec[COL.SIRET]  || '',
   });
+  const [form, setForm] = React.useState(() => (initial.rec ? formFrom(initial.rec) : formFrom({})));
 
-  // ===== Load =====
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true); setErr(null); setMsg(null);
-
-        const auth = gristAPI.getAuth ? gristAPI.getAuth() : null;
-        const roles = Array.isArray(auth?.roles) ? auth.roles : [];
-        if (!auth || !roles.includes('repondant')) {
-          throw new Error("Accès refusé : rôle 'répondant' requis.");
-        }
-
-        const data = await gristAPI.getData(TABLE);
-        if (!alive) return;
-        setRows(Array.isArray(data) ? data : []);
-
-        // id depuis auth; si la vue ACL est réduite à 1 ligne, on accepte cette ligne
-        let id = auth?.repondantId || null;
-        if (!id && data && data.length === 1) {
-          id = data[0].id;
-        }
-        if (!id) throw new Error("Impossible d’identifier votre fiche répondant.");
-
-        setCurrentId(id);
-
-        const rec = (data || []).find(r => r.id === id);
-        if (!rec) throw new Error("Votre fiche n’est pas accessible avec ce lien.");
-
-        seedForm(rec);
-      } catch (e) {
-        if (!alive) return;
-        setErr(e.message || 'Erreur de chargement');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  React.useEffect(() => { document.title = 'Mes informations - Eclauses'; }, []);
 
   function seedForm(rec) {
     setForm({
@@ -113,13 +75,13 @@ const Component = () => {
     };
 
     try {
-      await gristAPI.updateRecord(TABLE, currentId, updates);
+      const res = await enregistrerRepondant(updates);
+      if (!res.ok) throw new Error(res.message);
       setMsg("Informations enregistrées avec succès.");
-      // rafraîchit localement
-      const data = await gristAPI.getData(TABLE);
-      setRows(Array.isArray(data) ? data : []);
-      const rec = (data || []).find(r => r.id === currentId);
-      if (rec) seedForm(rec);
+      if (res.data) {
+        setRows([res.data]);
+        seedForm(res.data);
+      }
     } catch (e) {
       setErr(e.message || "Échec de l’enregistrement.");
     }
@@ -191,7 +153,7 @@ const Component = () => {
                 <label className="fr-label" htmlFor="email">E-mail</label>
                 <input id="email" className="fr-input" type="email"
                   value={form[COL.EMAIL]} disabled />
-                <p className="fr-hint-text">Pour modifier cette information, contacter le <a href="#" data-nav="support">support Eclauses.</a></p>
+                <p className="fr-hint-text">Pour modifier cette information, contacter le <Link href="/support-contact">support Eclauses.</Link></p>
                   
               </div>
 

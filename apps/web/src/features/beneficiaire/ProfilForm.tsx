@@ -4,8 +4,8 @@
 // passe en `initial` ; le premier rendu (côté serveur) contient donc déjà le formulaire rempli.
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import ComboBox from '@/legacy/components/ComboBox';
-import { gristAPI } from '@/legacy/gristAPI';
+import ComboBox from '@/components/ComboBox';
+import { clearCV, uploadCV } from '@/lib/cv';
 import { attachmentUrl } from '@/lib/urls';
 import { enregistrerProfil, lireProfil } from '@/server/actions/beneficiaire';
 
@@ -279,7 +279,7 @@ const Component = ({ initial, session }) => {
       setUploading(true);
 
       // Le serveur contrôle le fichier, l'envoie à Grist et l'associe à la fiche en une seule opération.
-      const { attachmentId } = await gristAPI.uploadCV(currentId, fileCV);
+      const { attachmentId } = await uploadCV(currentId, fileCV);
       await refreshRow();
       setCvUrl(attachmentUrl(String(attachmentId)));
 
@@ -308,7 +308,7 @@ function sortByLabelFr(options) {
     if (!currentId) return;
     setErr(null); setMsg(null);
     try {
-      await gristAPI.clearCV(currentId);
+      await clearCV(currentId);
       await refreshRow();
       setFileCV(null);
       if (cvInputRef.current) cvInputRef.current.value = '';

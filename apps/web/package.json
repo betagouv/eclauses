@@ -10,9 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/db-migrate.ts",
-    "gen:schema": "tsx scripts/gen-schema.ts",
-    "port:page": "node scripts/port-page.mjs"
+    "db:migrate": "tsx scripts/db-migrate.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",

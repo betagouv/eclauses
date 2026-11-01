@@ -1,13 +1,14 @@
 // @ts-nocheck : code repris du widget Grist (grist/page/repondant-recherches), typé progressivement.
 'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+// Îlot interactif « Recherche d'un bénéficiaire » (répondant) : le serveur lit les marchés, bénéficiaires et référentiels
+// (`initial`). Les coordonnées ne sont PAS dans la page : elles ne sont livrées, une par une, que par l'action
+// « consulter les coordonnées », qui enregistre la consultation et en prévient la personne.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import ComboBox from '@/components/ComboBox';
+import { attachmentUrl } from '@/lib/urls';
+import { coordonnees } from '@/server/actions/repondant';
 
-const Component = () => {
-  const ComboBox = gristAPI.getComponent ? gristAPI.getComponent('ComboBox') : null;
+const Component = ({ initial }) => {
   // ===== Tables / colonnes =====
   const T = {
     REP: 'Repondants',
@@ -97,25 +98,28 @@ const Component = () => {
   };
 
   // ===== State =====
-  const [loading, setLoading] = React.useState(true);
-  const [err, setErr] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState(initial.error);
 
-  const [repRows, setRepRows] = React.useState([]);
-  const [marchesRows, setMarchesRows] = React.useState([]);
-  const [clauseRows, setClauseRows] = React.useState([]);
-  const [benefRows, setBenefRows] = React.useState([]);
-  const [interestRows, setInterestRows] = React.useState([]);
+  const [repRows, setRepRows] = React.useState(initial.me ? [initial.me] : []);
+  const [marchesRows, setMarchesRows] = React.useState(initial.marches);
+  const [clauseRows, setClauseRows] = React.useState(initial.clauses);
+  const [benefRows, setBenefRows] = React.useState(initial.beneficiaires);
+  const [interestRows, setInterestRows] = React.useState(initial.interets);
 
-  const [currentRepId, setCurrentRepId] = React.useState(null);
-  const [me, setMe] = React.useState(null);
+  const [currentRepId, setCurrentRepId] = React.useState(initial.me ? initial.me.id : null);
+  const [me, setMe] = React.useState(initial.me);
 
-  const [optsMarches, setOptsMarches] = React.useState([]);
-  const [optsClauses, setOptsClauses] = React.useState([]);
-  const [specOptions, setSpecOptions] = React.useState([]);
+  const [optsMarches, setOptsMarches] = React.useState(() => toOptions(buildMarcheOptions(initial.me, initial.marches)));
+  const [optsClauses, setOptsClauses] = React.useState(() => toOptions(initial.clauses));
+  const [specOptions, setSpecOptions] = React.useState(() => toOptions(initial.specialites));
   const [selectedSpecIds, setSelectedSpecIds] = React.useState([]);
 
   // Marché choisi
-  const [selectedMarcheId, setSelectedMarcheId] = React.useState('');
+  const [selectedMarcheId, setSelectedMarcheId] = React.useState(() => {
+    const options = buildMarcheOptions(initial.me, initial.marches);
+    return options.length === 1 ? String(options[0].id) : '';
+  });
 
   // Recherche
   const [search, setSearch] = React.useState('');
@@ -129,96 +133,49 @@ const Component = () => {
   const [cvPreviewLoading, setCvPreviewLoading] = React.useState(false);
   const [cvPreviewError, setCvPreviewError] = React.useState(null);
   const cvPreviewObjectUrlRef = React.useRef(null);
-  const [revealedFor, setRevealedFor] = React.useState(new Set()); // benefId -> coordonnées visibles (session)
+  const [revealedFor, setRevealedFor] = React.useState(new Map()); // benefId -> coordonnées livrées par l'action (jamais dans la page)
 
-  // ===== Load =====
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true); setErr(null);
+  // Options de marché ou lot (candidatures et marchés détenus), calculées à partir des lignes lues : calcul pur.
+  function buildMarcheOptions(mine, m) {
+    if (!mine) return [];
+    // options marchés/lots (candidats + titulaires)
+    const ids = [...new Set([...asArray(mine[R.CAND_LIST]), ...asArray(mine[R.TIT_LIST])].filter(isNum))];
+    const allMarches = Array.isArray(m) ? m : [];
+    const rowById = new Map(allMarches.map(row => [row.id, row]));
+    const seen = new Set();
+    const marcheOptions = [];
+    ids.forEach((id) => {
+      const row = rowById.get(id);
+      if (!row) return;
+      const refIds = asArray(row[M.LOTS])
+        .filter((x) => x !== 'L' && x != null && x !== '')
+        .map((x) => (typeof x === 'number' ? x : Number(x)))
+        .filter((x) => Number.isFinite(x));
+      const children = row[M.PARENT]
+        ? [row]
+        : (refIds.length
+        ? refIds.map(childId => rowById.get(childId)).filter(Boolean)
+        : allMarches.filter(child => Number(child[M.PARENT]) === Number(row.id)));
+      const availableRows = children.length ? children : [row];
+      availableRows
+        .filter((marche) => marche?.[M.CLAUSE])
+        .filter((marche) => !isClosedStatus(marche?.[M.STATUS]))
+        .forEach((marche) => {
+          if (!marche?.id || seen.has(marche.id)) return;
+          seen.add(marche.id);
+          marcheOptions.push(marche);
+      });
+    });
+    marcheOptions.sort((a, b) => {
+      const parentA = Number(a[M.PARENT]) || Number(a.id) || 0;
+      const parentB = Number(b[M.PARENT]) || Number(b.id) || 0;
+      if (parentA !== parentB) return parentA - parentB;
+      return String(a[M.LOT] || '').localeCompare(String(b[M.LOT] || ''), 'fr', { numeric: true, sensitivity: 'base' });
+    });
+    return marcheOptions;
+  }
 
-        const auth = gristAPI.getAuth ? gristAPI.getAuth() : null;
-        if (!auth || !Array.isArray(auth.roles) || !auth.roles.includes('repondant')) {
-          throw new Error("Accès refusé : rôle 'répondant' requis.");
-        }
-
-        const [rep, m, c, b, mi, s] = await Promise.all([
-          gristAPI.getData(T.REP),
-          gristAPI.getData(T.M),
-          gristAPI.getData(T.C),
-          gristAPI.getData(T.B),
-          gristAPI.getData(T.MI).catch(() => []),
-          gristAPI.getData(T.SPECS).catch(() => []),
-        ]);
-        if (!alive) return;
-
-        setRepRows(Array.isArray(rep) ? rep : []);
-        setMarchesRows(Array.isArray(m) ? m : []);
-        setClauseRows(Array.isArray(c) ? c : []);
-        setBenefRows(Array.isArray(b) ? b : []);
-        setInterestRows(Array.isArray(mi) ? mi : []);
-        setOptsClauses(toOptions(c || []));
-        setSpecOptions(toOptions(s || []));
-
-        // identifie le répondant
-        let id = auth.repondantId || null;
-        if (!id && rep && rep.length === 1) id = rep[0].id;
-        if (!id) throw new Error("Impossible d’identifier votre fiche répondant.");
-        setCurrentRepId(id);
-
-        const mine = (rep || []).find(r => r.id === id);
-        if (!mine) throw new Error("Votre fiche n’est pas accessible.");
-        setMe(mine);
-
-        // options marchés/lots (candidats + titulaires)
-        const ids = [...new Set([...asArray(mine[R.CAND_LIST]), ...asArray(mine[R.TIT_LIST])].filter(isNum))];
-        const allMarches = Array.isArray(m) ? m : [];
-        const rowById = new Map(allMarches.map(row => [row.id, row]));
-        const seen = new Set();
-        const marcheOptions = [];
-        ids.forEach((id) => {
-          const row = rowById.get(id);
-          if (!row) return;
-          const refIds = asArray(row[M.LOTS])
-            .filter((x) => x !== 'L' && x != null && x !== '')
-            .map((x) => (typeof x === 'number' ? x : Number(x)))
-            .filter((x) => Number.isFinite(x));
-          const children = row[M.PARENT]
-            ? [row]
-            : (refIds.length
-                ? refIds.map(childId => rowById.get(childId)).filter(Boolean)
-                : allMarches.filter(child => Number(child[M.PARENT]) === Number(row.id)));
-          const availableRows = children.length ? children : [row];
-          availableRows
-            .filter((marche) => marche?.[M.CLAUSE])
-            .filter((marche) => !isClosedStatus(marche?.[M.STATUS]))
-            .forEach((marche) => {
-              if (!marche?.id || seen.has(marche.id)) return;
-              seen.add(marche.id);
-              marcheOptions.push(marche);
-          });
-        });
-        marcheOptions.sort((a, b) => {
-          const parentA = Number(a[M.PARENT]) || Number(a.id) || 0;
-          const parentB = Number(b[M.PARENT]) || Number(b.id) || 0;
-          if (parentA !== parentB) return parentA - parentB;
-          return String(a[M.LOT] || '').localeCompare(String(b[M.LOT] || ''), 'fr', { numeric: true, sensitivity: 'base' });
-        });
-        setOptsMarches(toOptions(marcheOptions));
-        // pré-sélection : auto si un seul marché/lot
-        if (marcheOptions.length === 1) {
-          setSelectedMarcheId(prev => prev || String(marcheOptions[0].id));
-        }
-      } catch (e) {
-        if (!alive) return;
-        setErr(e.message || 'Erreur de chargement');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, []);
+  React.useEffect(() => { document.title = 'Recherche d’un bénéficiaire - Eclauses'; }, []);
 
   // Clause du marché sélectionné
   const selectedMarche = React.useMemo(
@@ -267,7 +224,7 @@ const Component = () => {
   async function openModal(row) { 
 
     const cv = row[B.CV]?.filter((x)=>x!=='L')[0];
-    row.cv_url = cv === undefined ? undefined : gristAPI.attachmentUrl(cv);
+    row.cv_url = cv === undefined ? undefined : attachmentUrl(cv);
 
     setModalRow(row); setModalOpen(true); 
     
@@ -335,16 +292,9 @@ const Component = () => {
   async function revealContacts(benefId) {
     if (!currentRepId || !selectedMarcheId || !isNum(benefId)) return;
     try {
-      // log en base
-      await gristAPI.addRecord(T.LOG, {
-        [LOG.REP]: currentRepId,
-        [LOG.MARCHE]: Number(selectedMarcheId),
-        [LOG.BENEF]: benefId,
-        [LOG.AFF_EMAIL]: true,
-        [LOG.AFF_TEL]: true,
-      });
-      // mémorise côté client (session)
-      const next = new Set(revealedFor); next.add(benefId); setRevealedFor(next);
+      const res = await coordonnees(Number(selectedMarcheId), benefId);
+      if (!res.ok) throw new Error(res.message);
+      setRevealedFor((prev) => new Map(prev).set(benefId, res.data));
     } catch (e) {
       setErr(e.message || "Impossible d’enregistrer l’accès aux coordonnées.");
     }
@@ -562,8 +512,8 @@ const Component = () => {
               <div className="fr-callout fr-mb-2w fr-mt-2w">
                 {!isFalseLike(modalRow?.Je_consens_a_etre_contacte_pour_rejoindre_des_groupements) && revealedFor.has(modalRow.id) ? (
                   <>
-                    <p><strong>Email :</strong> {modalRow[B.EMAIL] || '—'}</p>
-                    <p><strong>Téléphone :</strong> {modalRow[B.TEL] || '—'}</p>
+                    <p><strong>Email :</strong> {revealedFor.get(modalRow.id)?.Courriel || '—'}</p>
+                    <p><strong>Téléphone :</strong> {revealedFor.get(modalRow.id)?.Telephone || '—'}</p>
                   </>
                 ) : (
                   <>

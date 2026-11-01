@@ -5,8 +5,8 @@
 // une seule Server Action, en une transaction.
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import ComboBox from '@/legacy/components/ComboBox';
-import helpers from '@/legacy/components/helpers';
+import ComboBox from '@/components/ComboBox';
+import helpers from '@/lib/helpers';
 import { modifier } from '@/server/actions/acheteur';
 
 const Component = ({ initial }) => {

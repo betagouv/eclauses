@@ -2,7 +2,7 @@
 'use client';
 // Îlot interactif de « Mes informations » (acheteur) : le serveur lit la fiche de l'entité et la passe en `initial`.
 import React from 'react';
-import helpers from '@/legacy/components/helpers';
+import helpers from '@/lib/helpers';
 import { enregistrerEntite } from '@/server/actions/acheteur';
 
 const Component = ({ initial, session }) => {

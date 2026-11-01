@@ -1,37 +1,14 @@
-// @ts-nocheck : code repris du widget Grist (grist/page/repondant-home), typé progressivement.
-'use client';
-// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
-import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
-const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
+import { and, count, eq } from 'drizzle-orm';
+import Link from 'next/link';
+import type { Session as ServerSession } from '@/server/auth/session';
+import { database } from '@/server/db/client';
+import { marches } from '@/server/db/schema';
 
-const Component = () => {
-  const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
-  const [toDeclareCount, setToDeclareCount] = React.useState(0);
-
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const auth = gristAPI.getAuth ? gristAPI.getAuth() : null;
-        if (!auth?.repondantId) return;
-        const [reps, marches] = await Promise.all([
-          gristAPI.getData('Repondants'),
-          gristAPI.getData('Marches'),
-        ]);
-        const me = (reps || []).find((r) => r.id === auth.repondantId);
-        const titIds = asArray(me?.Titulaire_aux_marches).filter((x) => typeof x === 'number' && Number.isFinite(x));
-        const count = (marches || []).filter((m) =>
-          titIds.includes(m.id) &&
-          String(m.Statut || '') === 'En attente de déclaration des bénéficiaires'
-        ).length;
-        setToDeclareCount(count);
-      } catch (e) {
-        console.warn('repondant-home alert load failed', e);
-      }
-    })();
-  }, []);
-
+/** Accueil de l'espace répondant, rendu par le serveur : l'alerte « déclarations à faire » est comptée en base. */
+export async function RepondantHome({ session }: { session: ServerSession }) {
+  const [{ n: toDeclareCount }] = session.repondantId
+    ? await database().select({ n: count() }).from(marches).where(and(eq(marches.titulaireId, session.repondantId), eq(marches.statut, 'en_attente_declaration')))
+    : [{ n: 0 }];
   return (
     <>
       <section className="fr-container fr-my-6w">
@@ -41,7 +18,7 @@ const Component = () => {
           <div className="fr-alert fr-alert--warning fr-mb-4w">
             <p>
               Vous avez {toDeclareCount} marché{toDeclareCount > 1 ? 's' : ''} en attente de déclaration des bénéficiaires.
-              <a href="#" data-nav="repondant-marches" className="fr-link">Voir mes marchés</a>
+              <Link href="/repondant-marches" className="fr-link">Voir mes marchés</Link>
             </p>
           </div>
         )}
@@ -51,7 +28,7 @@ const Component = () => {
             <div className="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-5">
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
-                  <h3 className="fr-tile__title"><a data-nav="repondant-infos" href="#">Mes informations</a></h3>
+                  <h3 className="fr-tile__title"><Link href="/repondant-infos">Mes informations</Link></h3>
                   <p className="fr-tile__desc">Mettez à jour votre fiche à tout moment.</p>
                 </div>
               </div>
@@ -62,7 +39,7 @@ const Component = () => {
             <div className="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-6">
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
-                  <h3 className="fr-tile__title"><a data-nav="repondant-marches" href="#">Mes marchés</a></h3>
+                  <h3 className="fr-tile__title"><Link href="/repondant-marches">Mes marchés</Link></h3>
                   <p className="fr-tile__desc">Liste des marchés pour lesquels vous êtes inscrits en tant que candidat ou pour lesquels vous êtes titulaire.</p>
                 </div>
               </div>
@@ -73,7 +50,7 @@ const Component = () => {
             <div className="fr-tile fr-tile--horizontal fr-enlarge-link" id="tile-7">
               <div className="fr-tile__body">
                 <div className="fr-tile__content">
-                  <h3 className="fr-tile__title"><a data-nav="repondant-recherches" href="#">Recherche d'un bénéficiaire</a></h3>
+                  <h3 className="fr-tile__title"><Link href="/repondant-recherches">Recherche d'un bénéficiaire</Link></h3>
                   <p className="fr-tile__desc">Recherchez des bénéficiaires pour répondre aux clauses sociales de vos marchés.</p>
                 </div>
               </div>
@@ -84,6 +61,4 @@ const Component = () => {
       </section>
     </>
   );
-};
-
-export default Component;
+}

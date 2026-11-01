@@ -1,5 +1,5 @@
 import { isNotNull } from 'drizzle-orm';
-import type { ServerSession } from '@/legacy/gristAPI';
+import type { Session as ServerSession } from '@/server/auth/session';
 import { database } from '@/server/db/client';
 import { beneficiaires } from '@/server/db/schema';
 import { loadTables } from '@/server/page-data';

@@ -4,8 +4,8 @@
 // et ses lots sont créés par une seule Server Action, en une transaction, avec les mêmes contrôles côté serveur.
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import ComboBox from '@/legacy/components/ComboBox';
-import helpers from '@/legacy/components/helpers';
+import ComboBox from '@/components/ComboBox';
+import helpers from '@/lib/helpers';
 import { declarer } from '@/server/actions/acheteur';
 
 const Component = ({ initial }) => {

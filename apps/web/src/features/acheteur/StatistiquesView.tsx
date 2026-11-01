@@ -2,7 +2,7 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import helpers from '@/legacy/components/helpers';
+import helpers from '@/lib/helpers';
 
 const Component = ({ initial }) => {
   // === Tables & colonnes ===

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { ServerSession } from '@/legacy/gristAPI';
+import type { Session as ServerSession } from '@/server/auth/session';
 
 /** « À propos », rendue par le serveur. Les liens pointent vers les vraies pages (les anciens identifiants du widget n'existent plus). */
 export function Apropos({ session }: { session: ServerSession | null }) {

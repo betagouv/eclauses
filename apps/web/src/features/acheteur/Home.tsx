@@ -1,6 +1,6 @@
 import { and, count, eq } from 'drizzle-orm';
 import Link from 'next/link';
-import type { ServerSession } from '@/legacy/gristAPI';
+import type { Session as ServerSession } from '@/server/auth/session';
 import { database } from '@/server/db/client';
 import { marches } from '@/server/db/schema';
 

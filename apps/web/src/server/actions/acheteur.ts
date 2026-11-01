@@ -1,8 +1,6 @@
 'use server';
 
-import type { Row } from '../compat/engine';
 import { requireSession } from '../http';
-import { loadTables } from '../page-data';
 import { updateRow } from '../tables';
 import { declarerMarche, inviterTitulaire, modifierMarche, publierMarche, refuserDeclaration, relancerTitulaire, supprimerMarche, validerDeclaration } from '../services/marches-acheteur';
 import { attempt, type ActionResult } from './result';
@@ -11,14 +9,6 @@ import { attempt, type ActionResult } from './result';
  * Actions de l'espace acheteur. Chacune relit la session (une action est joignable par un POST direct),
  * puis délègue à un service qui contrôle le rôle et la propriété du marché.
  */
-
-/** Relit des tables (après une écriture) avec les mêmes droits qu'au chargement de la page. */
-export async function lireTables(names: string[]): Promise<ActionResult<Record<string, Row[]>>> {
-  return attempt(async () => {
-    const session = await requireSession();
-    return loadTables(session, [], names.slice(0, 12));
-  });
-}
 
 export const declarer = async (input: unknown): Promise<ActionResult<{ id: number }>> => attempt(async () => declarerMarche(await requireSession(), input));
 export const modifier = async (marcheId: number, input: unknown): Promise<ActionResult<null>> => attempt(async () => (await modifierMarche(await requireSession(), marcheId, input), null));

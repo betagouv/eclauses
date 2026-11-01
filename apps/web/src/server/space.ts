@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import type { Session } from './auth/session';
-import { SPACE_PRIORITY, type Role } from '@/legacy/pages';
+import { SPACE_PRIORITY, type Role } from '@/lib/pages';
 
 export const SPACE_COOKIE = 'eclauses_space';
 

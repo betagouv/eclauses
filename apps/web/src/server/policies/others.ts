@@ -40,7 +40,15 @@ const REFERENTIELS: Record<string, Readable> = {
 };
 
 export const referentiel = (name: string) => readOnlyTable(REFERENTIELS[name]!, { authed: true });
-export const clauses = readOnlyTable(specs.clauses, { authed: true });
+/**
+ * Les pages n'ont besoin que du libellé et des gabarits d'une clause. Les listes calculées (`Beneficiaires`,
+ * `Beneficiaires_Actif` : identifiants et adresses e-mail de tous les bénéficiaires rattachés) ne sortent jamais
+ * du serveur : elles incluraient des personnes qui n'ont pas consenti à figurer dans l'annuaire.
+ */
+export const clauses = readOnlyTable(specs.clauses, {
+  authed: true,
+  shape: (r) => pick(r, ['Nom_de_la_clause', 'Gabarit_d_article_de_marche', 'html_gabarit_annuaire_clause']),
+});
 export const faqCategories = readOnlyTable(others.faqCategories, { filter: (r) => r.Published === true });
 export const faqQuestions = readOnlyTable(others.faqQuestions, { filter: (r) => r.Published === true });
 export const supportVideos = readOnlyTable(others.supportVideos, { filter: (r) => r.Published === true });

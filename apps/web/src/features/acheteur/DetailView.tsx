@@ -5,9 +5,10 @@
 // (services de `marches-acheteur`), qui mettent à jour les statuts du lot et du marché parent en une transaction.
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import helpers from '@/legacy/components/helpers';
+import helpers from '@/lib/helpers';
 import { attachmentUrl } from '@/lib/urls';
-import { inviter, lireTables, refuser, relancer, valider } from '@/server/actions/acheteur';
+import { lireTables } from '@/server/actions/lecture';
+import { inviter, refuser, relancer, valider } from '@/server/actions/acheteur';
 
 const Component = ({ initial, session }) => {
   const router = useRouter();

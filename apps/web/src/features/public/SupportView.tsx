@@ -4,7 +4,7 @@
 // rendu contient donc déjà la FAQ. Recherche, filtres, accordéons et liens internes restent côté navigateur.
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { pagePath } from '@/legacy/navigation';
+import { pagePath } from '@/lib/navigation';
 
 const Component = ({ initial, session }) => {
   const router = useRouter();

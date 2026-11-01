@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import type { Session } from '@/server/auth/session';
 import { activeSpace } from '@/server/space';
 import { siteConfig, type SiteLink } from '@/server/site';
-import { homeOf, navFor, SPACES } from '@/legacy/pages';
+import { homeOf, navFor, SPACES } from '@/lib/pages';
 import { LogoutButton } from './LogoutButton';
 
 const FooterLink = ({ l, className }: { l: SiteLink; className: string }) =>

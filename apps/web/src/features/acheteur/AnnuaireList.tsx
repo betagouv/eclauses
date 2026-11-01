@@ -3,7 +3,7 @@
 // Îlot interactif de l'annuaire acheteur : le serveur lit les fiches visibles, les marchés de l'entité, les
 // clauses et les référentiels et les passe en `initial`.
 import React from 'react';
-import ComboBox from '@/legacy/components/ComboBox';
+import ComboBox from '@/components/ComboBox';
 import { attachmentUrl } from '@/lib/urls';
 
 const Component = ({ initial }) => {

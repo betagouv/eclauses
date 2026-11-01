@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SPACE_COOKIE } from '@/server/space';
 import { currentSession } from '@/server/http';
-import { homeOf, SPACES } from '@/legacy/pages';
+import { homeOf, SPACES } from '@/lib/pages';
 
 export const dynamic = 'force-dynamic';
 

@@ -4,8 +4,9 @@
 // les clauses et les passe en `initial`. Les écritures sont des Server Actions (services de `marches-acheteur`).
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import helpers from '@/legacy/components/helpers';
-import { inviter, lireTables, publier, relancer, supprimer } from '@/server/actions/acheteur';
+import helpers from '@/lib/helpers';
+import { lireTables } from '@/server/actions/lecture';
+import { inviter, publier, relancer, supprimer } from '@/server/actions/acheteur';
 
 const Component = ({ initial }) => {
   const router = useRouter();

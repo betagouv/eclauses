@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ServerSession } from '@/legacy/gristAPI';
+import type { Session as ServerSession } from '@/server/auth/session';
 import { AcheteurHome } from './acheteur/Home';
 import { Annuaire as AcheteurAnnuaire } from './acheteur/Annuaire';
 import { Declaration } from './acheteur/Declaration';
@@ -20,6 +20,10 @@ import { ResetPassword } from './public/ResetPassword';
 import { Statistiques as StatistiquesPubliques } from './public/Statistiques';
 import { Support } from './public/Support';
 import { SupportContact } from './public/SupportContact';
+import { RepondantHome } from './repondant/Home';
+import { Infos as RepondantInfos } from './repondant/Infos';
+import { Marches as RepondantMarches } from './repondant/Marches';
+import { Recherches } from './repondant/Recherches';
 import { Annuaire } from './beneficiaire/Annuaire';
 import { BeneficiaireHome } from './beneficiaire/Home';
 import { Marches } from './beneficiaire/Marches';
@@ -60,6 +64,10 @@ export const SERVER_PAGES: Record<string, (props: ServerPageProps) => ReactNode 
   'acheteur-marches-declaration': ({ session }) => <Declaration session={session} />,
   'acheteur-marches-modification': ({ session, query }) => <Modification session={session} query={query} />,
   'acheteur-marches-detail': ({ session, query }) => <Detail session={session} query={query} />,
+  'repondant-home': ({ session }) => <RepondantHome session={session} />,
+  'repondant-infos': ({ session }) => <RepondantInfos session={session} />,
+  'repondant-marches': ({ session }) => <RepondantMarches session={session} />,
+  'repondant-recherches': ({ session }) => <Recherches session={session} />,
   'beneficiaire-home': () => <BeneficiaireHome />,
   'beneficiaire-profil': ({ session }) => <Profil session={session} />,
   'beneficiaire-marches': ({ session }) => <Marches session={session} />,

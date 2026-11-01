@@ -256,6 +256,28 @@ describe.skipIf(!hasPostgres)('accès aux données (forme des pages et droits)',
       expect(await rejects(tables.readTable(anon, 'Beneficiaires'))).toBe(401);
     });
 
+    it('les clauses ne livrent jamais les listes de bénéficiaires ni leurs e-mails', async () => {
+      for (const actorOf of [benef, repondant, acheteur]) {
+        const rows = await tables.readTable(actorOf(), 'Clauses_sociales');
+        expect(rows[0]).toMatchObject({ Nom_de_la_clause: 'Insertion des restaurateurs' });
+        expect(JSON.stringify(rows)).not.toMatch(/@benef\.test/);
+        expect(rows[0]).not.toHaveProperty('Beneficiaires');
+        expect(rows[0]).not.toHaveProperty('Beneficiaires_Actif');
+      }
+    });
+
+    it('un répondant ne reçoit jamais de coordonnées en bloc, même consenties ; un acheteur ou un bénéficiaire gardent l’annuaire', async () => {
+      await base.db.update(s.beneficiaires).set({ consentementAnnuaire: true, consentementContactGroupements: true, telephone: '0102030405' }).where(eq(s.beneficiaires.id, base.a.benef.id));
+      const parRepondant = (await tables.readTable(repondant(), 'Beneficiaires')).find((r) => r.id === base.a.benef.id)!;
+      expect(parRepondant).toMatchObject({ NOM: 'a' });
+      expect(parRepondant).not.toHaveProperty('Courriel');
+      expect(parRepondant).not.toHaveProperty('Telephone');
+      const parAcheteur = (await tables.readTable(acheteur(), 'Beneficiaires')).find((r) => r.id === base.a.benef.id)!;
+      expect(parAcheteur).toMatchObject({ Courriel: 'a@benef.test', Telephone: '0102030405' });
+      const parBenef = (await tables.readTable(benef(base.b), 'Beneficiaires')).find((r) => r.id === base.a.benef.id)!;
+      expect(parBenef).toMatchObject({ Courriel: 'a@benef.test' });
+    });
+
     it('FAQ publiée seulement ; indicateurs calculés ; référentiels réservés aux connectés', async () => {
       await base.db.insert(s.faqCategories).values([{ titre: 'Publiée', slug: 'publiee', publie: true }, { titre: 'Brouillon', slug: 'brouillon' }]);
       expect((await tables.readTable(anon, 'Application_FAQ_Categories')).map((c) => c.Title)).toEqual(['Publiée']);

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { Accueil } from '@/features/accueil/Accueil';
-import { homeOf, pageById } from '@/legacy/pages';
+import { homeOf, pageById } from '@/lib/pages';
 import { currentSession } from '@/server/http';
 import { activeSpace } from '@/server/space';
 

@@ -2,7 +2,7 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { navigate } from '@/legacy/navigation';
+import { navigate } from '@/lib/navigation';
 const { useState, useEffect, useMemo, useCallback } = React;
 
 // Composant partagé "helpers" (type=component)

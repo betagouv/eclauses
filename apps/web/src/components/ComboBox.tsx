@@ -2,9 +2,7 @@
 'use client';
 // Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
 import React from 'react';
-import { gristAPI } from '@/legacy/gristAPI';
 const { useState, useEffect, useMemo, useCallback } = React;
-const helpers = gristAPI.helpers;
 
 // Composant partagé "ComboBox" (type=component)
 // Usage: gristUI.ComboBox dans les pages

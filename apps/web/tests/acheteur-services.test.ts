@@ -270,7 +270,7 @@ describe.skipIf(!hasPostgres)('opérations de l’acheteur sur ses marchés', ()
       const sp = await specialite();
       const ok = await actions.declarer({ intitule: 'Via action', dateLimiteOffres: FUTURE, dateNotificationPrevisionnelle: FUTURE, clauseId: base.clause.id, specialiteIds: [sp.id], lieu: 'Paris' });
       expect(ok.ok && ok.data.id).toBeGreaterThan(0);
-      const lus = await actions.lireTables(['Marches', 'Invitation_Titulaire']);
+      const lus = await (await import('@/server/actions/lecture')).lireTables(['Marches', 'Invitation_Titulaire']);
       expect(lus.ok && lus.data.Marches.some((m) => m.Intitule_du_marche === 'Via action')).toBe(true);
     });
 

@@ -2,10 +2,8 @@ import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/AppShell';
 import { PUBLIC_SERVER_PAGES, SERVER_PAGES } from '@/features/registry';
-import { PageHost } from '@/legacy/PageHost';
-import { pageById } from '@/legacy/pages';
+import { pageById } from '@/lib/pages';
 import { currentSession } from '@/server/http';
-import { publicEnv } from '@/server/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +28,7 @@ export default async function Page({ params, searchParams }: Props) {
   const open = Object.hasOwn(PUBLIC_SERVER_PAGES, def.id) ? PUBLIC_SERVER_PAGES[def.id] : undefined;
   return (
     <AppShell session={session} currentPage={def.id}>
-      {authed && session ? await authed({ session, query }) : open ? await open({ session, query }) : <PageHost id={def.id} session={session} env={publicEnv()} />}
+      {authed && session ? await authed({ session, query }) : open ? await open({ session, query }) : notFound()}
     </AppShell>
   );
 }

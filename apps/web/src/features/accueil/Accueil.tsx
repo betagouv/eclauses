@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { ServerSession } from '@/legacy/gristAPI';
+import type { Session as ServerSession } from '@/server/auth/session';
 
 /**
  * Page d'accueil publique, rendue par le serveur : le contenu est dans le HTML, sans JavaScript ni

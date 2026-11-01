@@ -93,8 +93,24 @@ Le code repris du widget lit la session par un **état global** du module (`gris
 
 Recette : copier la page dans `features/`, remplacer le chargement `useEffect` par `initial` (états initialisés depuis les propriétés, calculs dérivés en `useMemo` plutôt qu'en effets), remplacer les écritures par une action, laisser dans un effet seulement ce qui touche le navigateur (carte Leaflet, titre), écrire le composant serveur qui charge les tables, l'inscrire dans le registre, retirer l'entrée de `PageHost`.
 
-## Reste à faire
+## Pages répondant et nettoyage final
 
-4 pages en ancien mode : **répondant** (accueil, infos, marchés, recherches). Une fois converties, la couche de compatibilité (`/api/data`, `compat/`) et le shim `gristAPI` pourront être supprimés.
+| Page | Mode |
+|---|---|
+| `repondant-home` | entièrement serveur (alerte « déclarations à faire » comptée en base) |
+| `repondant-infos` | serveur + îlot ; enregistrement par action (l'e-mail identifie le compte : toujours refusé) |
+| `repondant-marches` | serveur + îlot ; la **déclaration des bénéficiaires** est une action transactionnelle (`declarerBeneficiaires`) |
+| `repondant-recherches` | serveur + îlot ; les coordonnées ne sont livrées que par l'action `coordonnees` |
+
+`declarerBeneficiaires` : le répondant doit être titulaire du marché, le marché attendre une déclaration, chaque bénéficiaire Eclauses relever de la clause du marché ; les brouillons laissés par un refus sont repris sans doublon ; le marché passe « à valider » et l'acheteur est prévenu. `retirerDeclaration` : ses déclarations non validées seulement, tant que le marché attend.
+
+**Toutes les pages sont maintenant rendues par le serveur.** Supprimés : `PageHost`, `LegacyHost`, le shim `gristAPI`, le script de portage, et l'**API générique `/api/data`** (elle n'a plus d'appelant ; un point d'entrée de moins à protéger, vérifié par un test de bout en bout : 404). La couche `compat/` reste : elle présente les lignes sous la forme que les pages emploient encore (noms de colonnes d'origine, listes d'identifiants). La remplacer par des modèles typés propres à chaque page est un chantier à part.
+
+## Fuites de données trouvées et corrigées en route
+
+Le test de bout en bout (contenu des pages en HTML brut, par rôle) a révélé deux fuites présentes depuis la phase 2 :
+
+1. Les clauses sociales exposaient `Beneficiaires_Actif` : **les adresses e-mail de tous les bénéficiaires rattachés, y compris ceux qui n'ont pas consenti à figurer dans l'annuaire**, à tout utilisateur connecté. Les clauses ne livrent plus que leur libellé et leurs gabarits.
+2. Un répondant recevait les coordonnées de **toutes** les personnes acceptant d'être contactées, sans passer par la consultation enregistrée (qui prévient la personne). Il n'en reçoit plus en bloc : l'action `coordonnees` les livre une par une, pour un marché auquel il candidate ou qu'il détient, en l'enregistrant et en prévenant la personne. Les acheteurs et bénéficiaires gardent l'annuaire. **Décision à confirmer avec l'équipe** : la page de recherche n'affiche plus les e-mails des candidats à déclarer, et la recherche par e-mail n'y existe plus.
 
 **À traiter par l'équipe, hors code** : le texte de la page « Mentions légales » dit encore que les données sont hébergées sur l'instance Grist `grist.numerique.gouv.fr` ; il sera faux après la bascule (hébergement Scaleway). Les pages « Données personnelles » et « Accessibilité » sont à relire pour la même raison.

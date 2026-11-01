@@ -1,4 +1,4 @@
-import type { ServerSession } from '@/legacy/gristAPI';
+import type { Session as ServerSession } from '@/server/auth/session';
 import { acheteurBase, loadTables } from '@/server/page-data';
 import MarchesList from './MarchesList';
 

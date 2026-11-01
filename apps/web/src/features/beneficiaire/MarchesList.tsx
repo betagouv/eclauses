@@ -4,7 +4,7 @@
 // passe en `initial` ; le premier rendu (côté serveur) contient déjà la liste. Les favoris passent par
 // des Server Actions.
 import React from 'react';
-import ComboBox from '@/legacy/components/ComboBox';
+import ComboBox from '@/components/ComboBox';
 import { ajouterInteret, retirerInteret } from '@/server/actions/beneficiaire';
 
 const Component = ({ initial, session }) => {
