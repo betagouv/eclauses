@@ -77,7 +77,7 @@ La comparaison automatique des deux documents montre 18 formules différentes et
 | Destinataires d'une publication | bénéficiaires actifs | tous les rattachés aux clauses du marché et de ses lots |
 | Durée des liens par courrier | 24 h | 30 jours pour tous |
 
-Deux écarts volontaires par rapport à la PROD, à valider :
+Deux écarts volontaires par rapport à la PROD, **validés par l'équipe** :
 - **Publication** : en plus du rattachement, un destinataire doit avoir une adresse, être éligible et ne pas être à supprimer (la PROD écrit aussi aux bénéficiaires hors durée de conservation).
 - **Liens de réinitialisation** : 24 h (activation : 30 jours), car un lien de mot de passe qui dure un mois est un risque inutile.
 
@@ -92,3 +92,20 @@ Trois déclarations de la PROD n'ont **pas de répondant** (saisies par l'équip
 ### À savoir sur l'outillage
 
 Le processus d'import ne se terminait pas seul après la fin du travail (connexions HTTP persistantes vers Grist) : il sort maintenant explicitement. **Ne jamais lancer deux imports `--replace` en même temps sur la même base** : le second vide les tables du premier.
+
+### Conservation et archivage des bénéficiaires : validé et vérifié
+
+Le système de conservation de la PROD est conservé à l'identique : éligibilité 5 ans et 6 mois après la diplomation, effacement des données personnelles à 10 ans (la ligne reste, avec sa date d'effacement), retrait de l'accès des non éligibles, archivage des marchés validés 4 ans et 6 mois après la fin d'exécution, effacement des répondants sans connexion depuis 5 ans. Les publications ne s'adressent plus aux personnes hors durée de conservation.
+
+Simulation en lecture seule sur la copie de la PROD, comparée aux colonnes calculées par Grist :
+
+| Règle | Nouveau code | Grist PROD |
+|---|---|---|
+| Bénéficiaires à effacer (plus de 10 ans) | 0 | 0 |
+| Bénéficiaires déjà effacés | 0 | 0 |
+| Bénéficiaires non éligibles | 78 | 78 |
+| dont avec un compte actif à désactiver | 0 | (non calculé) |
+| Répondants à effacer | 0 | (non calculé) |
+| Marchés à archiver / déjà archivés | 0 / 0 | 0 / 0 |
+
+Aucune tâche n'aurait donc rien à effacer aujourd'hui ; les 78 non éligibles n'ont déjà plus de compte actif. Les tâches sont testées sur des cas limites (`tests/jobs.test.ts`) et rejouables sans effet de bord.
