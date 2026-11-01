@@ -1,0 +1,17 @@
+# Lancement local de l'image de production. Les secrets viennent de apps/web/.env.local (non versionné).
+services:
+  web:
+    build: .
+    image: eclauses-web:local
+    ports:
+      - "3200:3000"
+    env_file:
+      - apps/web/.env.local
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

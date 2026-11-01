@@ -86,3 +86,8 @@ Point d'attention : plusieurs modifications existent actuellement en DEV et ne s
 ## Documentation existante à reprendre
 
 Un début de documentation existe dans [grist-dsfr-react-app/docs](../grist-dsfr-react-app/docs). Elle doit être reprise, actualisée et déplacée progressivement dans ce dossier racine afin de documenter le système complet, pas uniquement le moteur de widget.
+
+### Réécriture (application Next.js)
+
+- [Bilan du prototype](80-reecriture/01-bilan-prototype.md)
+- [Port complet de l'application](80-reecriture/02-port-complet.md)

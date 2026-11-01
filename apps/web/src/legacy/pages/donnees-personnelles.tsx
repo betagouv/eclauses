@@ -1,0 +1,225 @@
+// @ts-nocheck : code repris du widget Grist (grist/page/donnees-personnelles), typé progressivement.
+'use client';
+// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+import React from 'react';
+import { gristAPI } from '@/legacy/gristAPI';
+const { useState, useEffect, useMemo, useCallback } = React;
+const helpers = gristAPI.helpers;
+
+const Component = () => {
+  const lastUpdate = '24 juin 2026';
+  const toc = [
+    { id: 'responsable', label: 'Responsable de traitement' },
+    { id: 'finalites', label: 'Finalités' },
+    { id: 'donnees', label: 'Données traitées' },
+    { id: 'base-legale', label: 'Base légale' },
+    { id: 'conservation', label: 'Durées de conservation' },
+    { id: 'droits', label: 'Vos droits' },
+    { id: 'acces', label: 'Accès aux données' },
+    { id: 'sous-traitants', label: 'Sous-traitants' },
+  ];
+
+  return (
+    <section className="fr-container fr-my-6w">
+      <header className="fr-mb-4w">
+        <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
+          <div className="fr-col">
+            <h1 className="fr-h2">Politique de confidentialité</h1>
+            <p className="fr-text--sm fr-text-mention--grey">Dernière mise à jour : {lastUpdate}</p>
+          </div>
+          <div className="fr-col-auto">
+            <button className="fr-btn fr-btn--secondary" onClick={() => window.print()}>
+              Imprimer la page
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="fr-grid-row fr-grid-row--gutters">
+        <aside className="fr-col-12 fr-col-md-4">
+          <nav className="fr-sidemenu fr-sidemenu--sticky-full-height" aria-label="Sommaire Données personnelles">
+            <div className="fr-sidemenu__inner">
+              <button className="fr-sidemenu__btn" aria-controls="dp-menu">Sommaire</button>
+              <div className="fr-collapse" id="dp-menu">
+                <ul className="fr-sidemenu__list">
+                  {toc.map((it) => (
+                    <li key={it.id} className="fr-sidemenu__item">
+                      <a className="fr-sidemenu__link" href={`#${it.id}`}>{it.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </nav>
+        </aside>
+
+        <div className="fr-col-12 fr-col-md-8">
+          <section id="responsable" className="fr-mb-6w">
+            <h2 className="fr-h3">Qui est responsable de traitement ?</h2>
+            <p>
+              Eclauses est un produit numérique développé au sein de l'Atelier numérique du ministère de la Culture, sous la responsabilité de la mission ministérielle des achats (MMA).
+            </p>
+            <p>
+              Son objectif est de faciliter la mise en relation entre candidats à des marchés publics et bénéficiaires d'une clause sociale portée par le ministère de la Culture.
+            </p>
+          </section>
+
+          <section id="finalites" className="fr-mb-6w">
+            <h2 className="fr-h3">Pourquoi collectons-nous des données à caractère personnel ?</h2>
+            <p>
+              Pour mettre en relation des candidats à des marchés publics et des bénéficiaires de clauses sociales portées par le ministère de la Culture, des données à caractère personnel sont collectées pour :
+            </p>
+            <ul className="fr-list">
+              <li>Gérer l'inscription et la connexion des candidats et des bénéficiaires sur Eclauses via leur compte utilisateur ;</li>
+              <li>Constituer un annuaire des bénéficiaires qui partagent des clauses sociales communes ;</li>
+              <li>Permettre aux bénéficiaires de manifester leur intérêt pour des marchés publics couverts par une clause sociale ;</li>
+              <li>Permettre aux candidats à des marchés publics d'identifier facilement les bénéficiaires répondant aux exigences de la clause sociale ;</li>
+              <li>Permettre aux titulaires des marchés publics de déclarer les bénéficiaires avec lesquels ils souhaitent travailler pour mettre en œuvre leurs clauses sociales.</li>
+            </ul>
+          </section>
+
+          <section id="donnees" className="fr-mb-6w">
+            <h2 className="fr-h3">Quelles sont les données que nous traitons ?</h2>
+            <ul className="fr-list">
+              <li><strong>Données relatives au compte utilisateur</strong> : nom, prénom, formation, adresse courriel ;</li>
+              <li><strong>Données relatives à l'annuaire</strong> : nom, prénom, adresse courriel, numéro de téléphone, formation, année de diplôme, spécialité, département de résidence, région de mobilité, intitulé du mémoire, curriculum vitae ;</li>
+              <li><strong>Données relatives au contact du support</strong> : nom, adresse courriel, champs libres ;</li>
+              <li><strong>Données relatives à la date de dernière connexion.</strong></li>
+            </ul>
+            <p>
+              Pour la mise en ligne sur l'annuaire, seules les données des néo-diplômés ayant consenti à figurer dans l'annuaire sont partagées.
+            </p>
+          </section>
+
+          <section id="base-legale" className="fr-mb-6w">
+            <h2 className="fr-h3">Qu'est-ce qui nous autorise à traiter ces données ?</h2>
+            <p>Eclauses traite des données à caractère personnel en se basant sur :</p>
+            <ul className="fr-list">
+              <li>L'exécution d'une mission d'intérêt public ou relevant de l'exercice de l'autorité publique dont est investi le responsable de traitement au sens de l'article 6-1 e) du RGPD.</li>
+            </ul>
+            <p>
+              Cette mission d'intérêt public se traduit par le décret n° 2025-1016 du 29 octobre 2025 relatif aux attributions du ministre de la Culture et l'arrêté du 21 mars 2019 relatif aux achats du ministère de la Culture.
+            </p>
+          </section>
+
+          <section id="conservation" className="fr-mb-6w">
+            <h2 className="fr-h3">Pendant combien de temps conservons-nous ces données ?</h2>
+            <div className="fr-table fr-table--bordered fr-table--layout-fixed">
+              <table>
+                <caption>Durées de conservation par catégorie de données</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Catégories de données</th>
+                    <th scope="col">Durée de la conservation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Données relatives au compte utilisateur (candidats)</th>
+                    <td>5 ans à partir de la dernière connexion</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives au compte utilisateur (bénéficiaires)</th>
+                    <td>5 ans après la date de diplomation</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives à l'annuaire</th>
+                    <td>10 ans après la date de diplomation</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives au contact du support</th>
+                    <td>1 an à partir de la réception de la demande</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données relatives à date de dernière connexion</th>
+                    <td>5 ans à partir de la date de dernière connexion</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="droits" className="fr-mb-6w">
+            <h2 className="fr-h3">Quels droits avez-vous ?</h2>
+            <p>Vous disposez :</p>
+            <ul className="fr-list">
+              <li>D'un droit d'information et d'un droit d'accès à vos données ;</li>
+              <li>D'un droit de rectification ;</li>
+              <li>D'un droit d'opposition ;</li>
+              <li>D'un droit à la limitation du traitement.</li>
+            </ul>
+            <p>
+              Pour les exercer, contactez-nous à :{' '}
+              <a href="mailto:delegue-protection-donnees@culture.gouv.fr">
+                delegue-protection-donnees@culture.gouv.fr
+              </a>
+            </p>
+            <p>
+              Puisque ce sont des droits personnels, nous ne traiterons votre demande que si nous sommes en mesure de vous identifier. Dans le cas où nous ne parvenons pas à vous identifier, nous pouvons être amenés à vous demander une preuve de votre identité.
+            </p>
+            <p>
+              Pour vous aider dans votre démarche, vous trouverez un modèle de courrier élaboré par la CNIL ici :{' '}
+              <a href="https://www.cnil.fr/fr/modele/courrier/exercer-son-droit-dacces" target="_blank" rel="noopener">
+                cnil.fr/fr/modele/courrier/exercer-son-droit-dacces
+              </a>
+            </p>
+            <p>Nous nous engageons à vous répondre dans un délai raisonnable qui ne saurait dépasser 1 mois à compter de la réception de votre demande.</p>
+          </section>
+
+          <section id="acces" className="fr-mb-6w">
+            <h2 className="fr-h3">Qui va avoir accès à ces données ?</h2>
+            <p>Les accès aux données sont strictement encadrés et juridiquement justifiés. Les personnes suivantes vont avoir accès aux données :</p>
+            <ul className="fr-list">
+              <li>Pour les données de l'annuaire, elles sont uniquement accessibles aux autres néo-diplômés, aux professionnels de la conservation-restauration qui souhaitent répondre à des marchés publics, aux agents du ministère de la Culture et de ses opérateurs.</li>
+              <li>Pour les données d'identification et de connexion : seuls les agents du ministère de la Culture et ses opérateurs y ont accès.</li>
+            </ul>
+          </section>
+
+          <section id="sous-traitants" className="fr-mb-6w">
+            <h2 className="fr-h3">Qui nous aide à traiter les données ?</h2>
+            <p>
+              Certaines des données sont envoyées à d'autres acteurs, appelés sous-traitants de données, pour qu'ils nous aident à les manipuler. Nous nous assurons qu'ils respectent strictement le RGPD et qu'ils apportent des garanties suffisantes en matière de sécurité.
+            </p>
+            <div className="fr-table fr-table--bordered fr-table--layout-fixed">
+              <table>
+                <caption>Sous-traitants de données</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Sous-traitant</th>
+                    <th scope="col">Pays destinataire</th>
+                    <th scope="col">Traitement réalisé</th>
+                    <th scope="col">Garanties</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Grist Gouv - tableur-base de données open source</th>
+                    <td>France</td>
+                    <td>Hébergement</td>
+                    <td>
+                      <a href="https://docs.numerique.gouv.fr/docs/3c7b322e-1840-419a-ac05-6bc2843ae7dd/" target="_blank" rel="noopener">
+                        Documentation DINUM
+                      </a>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div className="fr-mt-6w">
+            <a
+              className="fr-link fr-icon-arrow-up-s-line fr-link--icon-left"
+              href="#top"
+              onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            >
+              Haut de page
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Component;

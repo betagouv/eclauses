@@ -1,0 +1,120 @@
+// @ts-nocheck : code repris du widget Grist (grist/composants/helpers), typé progressivement.
+'use client';
+// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+import React from 'react';
+import { navigate } from '@/legacy/navigation';
+const { useState, useEffect, useMemo, useCallback } = React;
+
+// Composant partagé "helpers" (type=component)
+// Expose un objet utilitaire réutilisable par les pages via gristAPI.getComponent('helpers') ou gristUI.helpers
+
+const helpers = {
+  toBool(v) {
+    if (v === true || v === 1 || v === '1') return true;
+    if (typeof v === 'string' && v.toLowerCase() === 'true') return true;
+    return false;
+  },
+  asArray(v) {
+    return Array.isArray(v) ? v : (v == null ? [] : [v]);
+  },
+  norm(s) {
+    return String(s || '').trim().toLowerCase();
+  },
+  includesI(haystack, needle) {
+    return helpers.norm(haystack).includes(helpers.norm(needle));
+  },
+  emailLooksOk(v) {
+    if (v == null || v === '') return true;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
+  },
+  pickLabelField(rows) {
+    if (!rows || !rows.length) return 'id';
+    const s = rows[0] || {};
+    const pref = ['label','name','Nom','nom','title','Title','Libellé','Libelle','libelle','Intitule','Intitulé'];
+    for (const k of pref) if (k in s && typeof s[k] === 'string') return k;
+    for (const k of Object.keys(s)) if (typeof s[k] === 'string') return k;
+    return 'id';
+  },
+  toOptions(rows, labelKey) {
+    const k = labelKey || helpers.pickLabelField(rows);
+    return (rows || [])
+      .filter(r => r && r.id != null)
+      .map(r => ({ value: r.id, label: String(r[k] ?? r.id) }));
+  },
+  parseDate(v) {
+    if (!v) return null;
+    if (v instanceof Date) return v;
+    if (typeof v === 'string') { const d = new Date(v); return isNaN(d) ? null : d; }
+    if (typeof v === 'number') {
+      if (v > 1e12) return new Date(v);            // timestamp ms
+      if (v > 1e9)  return new Date(v * 1000);     // timestamp s
+      if (v > 1e4)  return new Date(v);            // Excel-like days
+      return new Date(v * 24*60*60*1000);          // jours -> ms
+    }
+    return null;
+  },
+  formatDate(d) {
+    return d ? d.toLocaleDateString('fr-FR') : '—';
+  },
+  daysLeft(target) {
+    const d = helpers.parseDate(target); if (!d) return null;
+    const now = new Date();
+    const ms = d.setHours(23,59,59,999) - now.getTime();
+    return Math.ceil(ms / (24*60*60*1000));
+  },
+  isFiniteNumber(n) {
+    return typeof n === 'number' && isFinite(n);
+  },
+  validLatLng(lat, lng) {
+    return helpers.isFiniteNumber(lat) && helpers.isFiniteNumber(lng) &&
+           lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  },
+  sortByLabelFr(options) {
+    return [...(options || [])].sort((a, b) =>
+      String(a.label).localeCompare(String(b.label), 'fr', {
+        sensitivity: 'base',
+        ignorePunctuation: true,
+      })
+    );
+  },
+  debounce(fn, delay = 200) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), delay);
+    };
+  },
+  throttle(fn, delay = 200) {
+    let last = 0;
+    let timeout = null;
+    let pendingArgs = null;
+    return (...args) => {
+      const now = Date.now();
+      const remaining = delay - (now - last);
+      if (remaining <= 0) {
+        last = now;
+        if (timeout) { clearTimeout(timeout); timeout = null; }
+        fn(...args);
+      } else {
+        pendingArgs = args;
+        if (!timeout) {
+          timeout = setTimeout(() => {
+            last = Date.now();
+            timeout = null;
+            fn(...pendingArgs);
+            pendingArgs = null;
+          }, remaining);
+        }
+      }
+    };
+  },
+  go(id) {
+    try {
+      navigate(id);
+    } catch (e) {
+      console.warn('go navigation error:', e);
+    }
+  }
+};
+
+export default helpers;

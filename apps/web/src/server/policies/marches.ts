@@ -1,0 +1,131 @@
+import type { Row } from '../grist/client';
+import type { Session } from '../auth/session';
+import { grist } from '../config';
+import { decodeRows, prepareFields } from '../grist/schema';
+import { HttpError } from '../http';
+import { assertOwnMarche, forbidden, isInvolved, marcheById, num, pick, requireActor, requireRole, wanted } from './common';
+import type { Actor, TablePolicy } from './types';
+
+/** Colonnes lisibles par un non-acheteur (règles d'accès du document Grist, onglet Marches). */
+const PUBLIC_COLUMNS = [
+  'Date_de_notification_previsionnelle',
+  'Latitude',
+  'Longitude',
+  'Date_Limite_de_Remise_des_Offres',
+  'Date_de_publication',
+  'Intitule_du_marche',
+  'Acheteur',
+  'Numero_de_lot',
+  'Lieu_d_execution',
+  'Date_de_fin_d_execution',
+  'Clauses_sociales',
+  'Invitation_Titulaire_Marche',
+  'Lien_vers_les_documents_de_consultation',
+  'Specialites_du_marche',
+  'Intitule_du_lot',
+  'Marche_parent',
+  'Marche_parent_Intitule_propre',
+  'Intitule_propre',
+  // Structure parent/lots : nécessaire à l'affichage, sans donnée sensible.
+  'Est_lot',
+  'Est_marche_parent',
+  'Lot_Label',
+  'Intitule_Lot',
+  'Lots',
+  'Nb_lots',
+  'Marche_racine',
+  'Lien_Inscription_Candidat',
+] as const;
+
+const PUBLISHED = 'En attente de notification';
+/** Statuts que les bénéficiaires ne voient pas : marché pas encore publié, ou clause déjà validée. */
+const HIDDEN_FROM_BENEFICIAIRES = new Set(['En attente de publication', 'Clause validée']);
+
+/**
+ * Colonnes du marché visibles pour l'acteur ; `null` si le marché est entièrement caché.
+ * - acheteur de l'entité : tout ;
+ * - bénéficiaire : colonnes publiques, sauf marchés non publiés ou déjà validés ;
+ * - titulaire ou candidat du marché : colonnes publiques et statut ;
+ * - tout le monde, visiteurs compris : colonnes publiques d'un marché publié.
+ */
+export function visibleColumns(actor: Actor, row: Row): readonly string[] | 'all' | null {
+  if (actor?.acheteurEntiteId && actor.roles.includes('acheteur') && num(row.Acheteur) === actor.acheteurEntiteId) {
+    return 'all';
+  }
+  const involved = !!actor && actor.roles.includes('repondant') && isInvolved(row, actor);
+  const benefOk = !!actor && actor.roles.includes('beneficiaire') && !HIDDEN_FROM_BENEFICIAIRES.has(String(row.Statut));
+  if (!involved && !benefOk && row.Statut !== PUBLISHED) return null;
+  return [...PUBLIC_COLUMNS, ...(actor ? ['Acheteur_Nom'] : []), ...(involved ? ['Statut'] : [])];
+}
+
+/** Champs que l'acheteur ne saisit jamais : posés par le serveur à la création. */
+const SERVER_SET = new Set(['Acheteur', 'Creation_en_autonomie', 'Cree_par']);
+
+async function marchesWithLots(): Promise<Row[]> {
+  return decodeRows('Marches', await grist().records('Marches'));
+}
+
+export const marches: TablePolicy = {
+  async read(actor, { ids }) {
+    const rows = await marchesWithLots();
+    const out: Row[] = [];
+    for (const row of rows) {
+      if (!wanted(ids, row)) continue;
+      const cols = visibleColumns(actor, row);
+      if (!cols) continue;
+      out.push(cols === 'all' ? row : pick(row, cols));
+    }
+    return out;
+  },
+
+  async create(actor, fields) {
+    const s = requireRole(actor, 'acheteur');
+    if (!s.acheteurEntiteId) throw forbidden();
+    const clean = await prepareFields('Marches', stripServerSet(fields));
+    const withServer: Record<string, unknown> = { ...clean, Acheteur: s.acheteurEntiteId };
+    // Indicateur de statistiques : le marché a été créé depuis le front par l'acheteur, pas par un administrateur.
+    if (await hasColumn('Marches', 'Creation_en_autonomie')) withServer.Creation_en_autonomie = true;
+    if (await hasColumn('Marches', 'Cree_par')) withServer.Cree_par = s.email;
+    const [id] = await grist().addRecords('Marches', [withServer]);
+    return id!;
+  },
+
+  async update(actor, id, fields) {
+    const s = requireActor(actor);
+    const marche = await marcheById(id);
+    if (!marche) throw new HttpError(404, 'Marché introuvable.');
+
+    if (s.roles.includes('acheteur') && s.acheteurEntiteId && num(marche.Acheteur) === s.acheteurEntiteId) {
+      const clean = await prepareFields('Marches', stripServerSet(fields));
+      await grist().updateRecords('Marches', [{ id, fields: clean }]);
+      return;
+    }
+
+    // Un répondant impliqué ne peut que soumettre sa déclaration à la validation de l'acheteur.
+    if (s.roles.includes('repondant') && isInvolved(marche, s)) {
+      const keys = Object.keys(fields);
+      if (keys.length === 1 && keys[0] === 'Statut' && fields.Statut === 'Déclaration à valider') {
+        await grist().updateRecords('Marches', [{ id, fields: { Statut: 'Déclaration à valider' } }]);
+        return;
+      }
+    }
+    throw forbidden();
+  },
+
+  async remove(actor, id) {
+    const s = requireRole(actor, 'acheteur');
+    await assertOwnMarche(s, id);
+    await grist().deleteRecords('Marches', [id]);
+  },
+};
+
+function stripServerSet(fields: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(fields).filter(([k]) => !SERVER_SET.has(k)));
+}
+
+async function hasColumn(table: string, col: string): Promise<boolean> {
+  const { columnsOf } = await import('../grist/schema');
+  return (await columnsOf(table)).has(col);
+}
+
+export type { Session };

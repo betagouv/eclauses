@@ -1,0 +1,139 @@
+// @ts-nocheck : code repris du widget Grist (grist/page/accessibilite), typé progressivement.
+'use client';
+// Porté par scripts/port-page.mjs puis adapté à la main : ne pas regénérer par-dessus.
+import React from 'react';
+import { gristAPI } from '@/legacy/gristAPI';
+const { useState, useEffect, useMemo, useCallback } = React;
+const helpers = gristAPI.helpers;
+
+const Component = () => {
+  const toc = [
+    { id: 'conformite', label: 'État de conformité' },
+    { id: 'contenus-non-accessibles', label: 'Contenus non accessibles' },
+    { id: 'amelioration-contact', label: 'Amélioration et contact' },
+    { id: 'recours', label: 'Voie de recours' },
+  ];
+
+  return (
+    <section className="fr-container fr-my-6w">
+      <header className="fr-mb-4w">
+        <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
+          <div className="fr-col">
+            <h1 className="fr-h2">Déclaration d'accessibilité</h1>
+            <p className="fr-text--sm fr-text-mention--grey">Établie le 15 juillet 2026</p>
+          </div>
+          <div className="fr-col-auto">
+            <button className="fr-btn fr-btn--secondary" onClick={() => window.print()}>
+              Imprimer la page
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="fr-grid-row fr-grid-row--gutters">
+        <aside className="fr-col-12 fr-col-md-4">
+          <nav className="fr-sidemenu fr-sidemenu--sticky-full-height" aria-label="Sommaire Accessibilité">
+            <div className="fr-sidemenu__inner">
+              <button className="fr-sidemenu__btn" aria-controls="accessibilite-menu">Sommaire</button>
+              <div className="fr-collapse" id="accessibilite-menu">
+                <ul className="fr-sidemenu__list">
+                  {toc.map((it) => (
+                    <li key={it.id} className="fr-sidemenu__item">
+                      <a className="fr-sidemenu__link" href={`#${it.id}`}>{it.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </nav>
+        </aside>
+
+        <div className="fr-col-12 fr-col-md-8">
+          <section className="fr-mb-6w">
+            <p>
+              Le Ministère de la Culture s'engage à rendre son service accessible, conformément à l'article 47 de la loi n° 2005-102 du 11 février 2005.
+            </p>
+            <p>
+              Cette déclaration d'accessibilité s'applique au site Eclauses{' '}
+              <a href="https://eclauses.beta.gouv.fr/" target="_blank" rel="noopener">
+                https://eclauses.beta.gouv.fr/
+              </a>.
+            </p>
+          </section>
+
+          <section id="conformite" className="fr-mb-6w">
+            <h2 className="fr-h3">État de conformité</h2>
+            <p>
+              Eclauses est non conforme avec le RGAA. Le site n'a encore pas été audité.
+            </p>
+          </section>
+
+          <section id="contenus-non-accessibles" className="fr-mb-6w">
+            <h2 className="fr-h3">Contenus non accessibles</h2>
+            <p>
+              La plateforme Eclauses est une intégration d'un document GRIST via une <em>iframe</em> HTML et n'est donc pas accessible.
+            </p>
+          </section>
+
+          <section id="amelioration-contact" className="fr-mb-6w">
+            <h2 className="fr-h3">Amélioration et contact</h2>
+            <p>
+              Si vous n'arrivez pas à accéder à un contenu ou à un service, vous pouvez contacter le responsable de Eclauses pour être orienté vers une alternative accessible ou obtenir le contenu sous une autre forme.
+            </p>
+            <ul className="fr-list">
+              <li>
+                E-mail :{' '}
+                <a href="mailto:contact@eclauses.beta.gouv.fr">
+                  contact@eclauses.beta.gouv.fr
+                </a>
+              </li>
+            </ul>
+          </section>
+
+          <section id="recours" className="fr-mb-6w">
+            <h2 className="fr-h3">Voie de recours</h2>
+            <p>
+              Cette procédure est à utiliser dans le cas suivant : vous avez signalé au responsable du site internet un défaut d'accessibilité qui vous empêche d'accéder à un contenu ou à un des services du portail et vous n'avez pas obtenu de réponse satisfaisante.
+            </p>
+            <p>Vous pouvez :</p>
+            <ul className="fr-list">
+              <li>
+                Écrire un message au{' '}
+                <a href="https://formulaire.defenseurdesdroits.fr/" target="_blank" rel="noopener">
+                  Défenseur des droits
+                </a>.
+              </li>
+              <li>
+                Contacter{' '}
+                <a href="https://www.defenseurdesdroits.fr/saisir/delegues" target="_blank" rel="noopener">
+                  le délégué du Défenseur des droits dans votre région
+                </a>.
+              </li>
+              <li>Envoyer un courrier par la poste (gratuit, ne pas mettre de timbre) :</li>
+              <li>Défenseur des droits</li>
+              <li>Libre réponse 71120 75342 Paris CEDEX 07</li>
+            </ul>
+          </section>
+
+          <div className="fr-callout fr-mt-6w">
+            <p className="fr-callout__text">
+              Cette déclaration d'accessibilité a été créée le 15 juillet 2026.
+            </p>
+          </div>
+
+          <div className="fr-mt-6w">
+            <a
+              className="fr-link fr-icon-arrow-up-s-line fr-link--icon-left"
+              href="#top"
+              onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            >
+              Haut de page
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Component;
