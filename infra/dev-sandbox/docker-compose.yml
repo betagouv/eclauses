@@ -1,0 +1,56 @@
+# Déploiement de développement sur serveur-dev.example. Projet isolé (nom `eclauses-dev`) : il ne touche pas aux autres
+# piles du serveur. L'application n'écoute que sur l'adresse privée `WEB_BIND` (127.0.0.1) : le proxy inverse HTTPS
+# (proxy.example) la publie sous eclauses-dev.example.fr.
+# Secrets : fichier `.env` du dossier (généré par `deploy.sh init`, jamais versionné).
+name: eclauses-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eclauses
+      POSTGRES_USER: eclauses
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?manquant dans .env}
+    # Port local pour l'import depuis un poste (tunnel SSH), jamais exposé au réseau.
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eclauses -d eclauses"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    image: eclauses-web:dev
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3200}:3000"
+    environment:
+      DATABASE_URL: postgres://eclauses:${POSTGRES_PASSWORD}@db:5432/eclauses
+      PUBLIC_URL: ${PUBLIC_URL:?manquant dans .env}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-1}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?manquant dans .env}
+      CRON_SECRET: ${CRON_SECRET:?manquant dans .env}
+      # Développement : aucun courrier réel, ils sont seulement écrits dans les journaux du conteneur.
+      MAIL_TRANSPORT: log
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /data/fichiers
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - fichiers:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  fichiers:
