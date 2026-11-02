@@ -16,6 +16,11 @@ Back-office intégré à `apps/web`, sous `/admin`. Réservé aux comptes `utili
 - Dépôts de fichiers : `Content-Length` exigé et plafonné avant lecture (`formDataLimite`).
 - Mot de passe : 10 caractères minimum ; cookie `__Host-eclauses_session` en production ; HTML d'en-tête et de pied de page assaini (`assainirHtml`) ; « mot de passe oublié » ne révèle plus l'existence du compte par son temps de réponse.
 
+## Cache des pages publiques
+- `next.config.ts` : accueil, aide, statistiques (5 min) et textes légaux, à propos (1 h) reçoivent `Cache-Control: public, max-age=0, s-maxage=…, stale-while-revalidate` **uniquement pour une requête sans cookie de session**. Les requêtes avec session restent `no-store`.
+- Un modification faite dans l'administration est visible au plus tard après ce délai pour les visiteurs.
+- À régler sur le CDN / répartiteur de charge (Next.js remplace l'en-tête `Vary`) : ne rien mettre en cache quand le cookie `__Host-eclauses_session` est présent.
+
 ## Écrans
 - Tableau de bord : indicateurs et dernières actions.
 - Moteur générique (`server/admin/resources.ts`) : liste, recherche, filtres, création, modification, suppression des référentiels, du contenu, des acheteurs, bénéficiaires, candidats, marchés, déclarations, journaux.

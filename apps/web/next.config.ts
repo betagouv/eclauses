@@ -31,6 +31,25 @@ const securityHeaders = [
   ...(prod ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' }] : []),
 ];
 
+/**
+ * Pages publiques dont le contenu ne dépend pas de la personne : un visiteur sans session peut recevoir une copie
+ * conservée par le navigateur, le répartiteur de charge ou un CDN. Avec une session, l'en-tête change selon la
+ * personne (menu, espaces) : ces requêtes ne passent pas par cette règle et restent non mises en cache.
+ * `max-age=0` : le navigateur revalide toujours (pas de menu périmé après connexion) ; seul un cache partagé conserve.
+ * Next.js remplace l'en-tête `Vary` : un CDN doit donc être réglé pour ne rien mettre en cache quand le cookie de
+ * session est présent (voir docs/80-reecriture/08-administration.md).
+ * Textes légaux : 1 h ; accueil, aide et statistiques (modifiables dans l'administration) : 5 min.
+ */
+const COOKIE_SESSION = prod ? '__Host-eclauses_session' : 'eclauses_session';
+const sansSession = [{ type: 'cookie' as const, key: COOKIE_SESSION }];
+const cache = (source: string, sMaxAge: number) => ({
+  source,
+  missing: sansSession,
+  headers: [
+    { key: 'Cache-Control', value: `public, max-age=0, s-maxage=${sMaxAge}, stale-while-revalidate=${sMaxAge * 24}` },
+  ],
+});
+
 const config: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
@@ -40,6 +59,14 @@ const config: NextConfig = {
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },
+      cache('/', 300),
+      cache('/cgu', 3600),
+      cache('/mentions-legales', 3600),
+      cache('/donnees-personnelles', 3600),
+      cache('/accessibilite', 3600),
+      cache('/apropos', 3600),
+      cache('/support', 300),
+      cache('/statistiques', 300),
       { source: '/admin/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
       { source: '/api/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
     ];
