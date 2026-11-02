@@ -3,8 +3,10 @@ import type { ReactNode } from 'react';
 import '@gouvfr/dsfr/dist/dsfr.min.css';
 import '@gouvfr/dsfr/dist/utility/utility.min.css';
 import { DsfrScript } from '@/components/DsfrScript';
+import { siteUrl } from '@/lib/seo';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: 'Eclauses',
   description: 'Clauses sociales des marchés publics du ministère de la Culture',
 };

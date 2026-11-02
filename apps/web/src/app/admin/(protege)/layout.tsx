@@ -4,6 +4,7 @@ import { AdminShell } from '@/features/admin/AdminShell';
 import { currentSession } from '@/server/http';
 
 export const dynamic = 'force-dynamic';
+export const metadata = { robots: { index: false, follow: false } };
 
 /** Toute l'administration passe ici : connexion, rôle administrateur, puis double authentification validée. */
 export default async function AdminLayout({ children }: { children: ReactNode }) {

@@ -4,7 +4,7 @@ import { statutMfa } from '@/server/admin/mfa';
 import { currentSession } from '@/server/http';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Vérification en deux étapes - Administration Eclauses' };
+export const metadata = { title: 'Vérification en deux étapes - Administration Eclauses', robots: { index: false, follow: false } };
 
 /** Seconde étape : réservée aux administrateurs connectés (les autres reçoivent une page introuvable, sans rien révéler). */
 export default async function Page() {

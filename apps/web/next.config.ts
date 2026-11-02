@@ -38,7 +38,11 @@ const config: NextConfig = {
   // En standalone dans un monorepo, Next doit tracer depuis la racine du dépôt.
   outputFileTracingRoot: new URL('../../', import.meta.url).pathname,
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      { source: '/admin/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      { source: '/api/:path*', headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+    ];
   },
 };
 

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { AppShell } from '@/components/AppShell';
 import { PUBLIC_SERVER_PAGES, SERVER_PAGES } from '@/features/registry';
 import { pageById } from '@/lib/pages';
+import { metadataFor } from '@/lib/seo';
 import { currentSession } from '@/server/http';
 
 export const dynamic = 'force-dynamic';
@@ -10,8 +11,7 @@ export const dynamic = 'force-dynamic';
 type Props = { params: Promise<{ page: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const def = pageById((await params).page);
-  return { title: def ? `${def.title} - Eclauses` : 'Eclauses' };
+  return metadataFor((await params).page);
 }
 
 export default async function Page({ params, searchParams }: Props) {
