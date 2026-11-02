@@ -8,7 +8,7 @@ Back-office intégré à `apps/web`, sous `/admin`. Réservé aux comptes `utili
 - Chaque écriture (Server Action) revérifie le rôle et la double authentification (`requireAdmin`) et est journalisée dans `audit_admin`.
 - Création du premier administrateur : `npx tsx scripts/create-admin.ts adresse@exemple.fr` (affiche un lien d'activation ; refuse une base non locale sans `--allow-remote-target`). Les suivants se créent depuis `/admin/comptes`.
 
-- Premier enrôlement 2FA : outre le code de l'application, un code à 8 chiffres envoyé par courrier à l'administrateur est exigé (le mot de passe seul ne suffit pas).
+- Premier enrôlement 2FA : le mot de passe suffit à enrôler un premier appareil (le code reçu par courrier, ajouté après l'audit, a été retiré à la demande). Risque résiduel : un mot de passe d'administrateur volé avant sa première activation de la 2FA donne accès. À limiter en activant la 2FA dès la création du compte.
 
 ## Durcissement transverse (audit du 2026-11-02)
 - Adresse IP : `TRUSTED_PROXIES` (défaut 1) = nombre de proxys ; on retient l'entrée de `X-Forwarded-For` ajoutée par le dernier proxy de confiance. Connexion limitée aussi par compte (40 essais / h).

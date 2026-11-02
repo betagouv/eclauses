@@ -60,7 +60,6 @@ describe.skipIf(!hasPostgres)('double authentification des administrateurs', () 
   let guard: typeof import('@/server/admin/guard');
   let s: typeof import('@/server/db/schema');
   let box: typeof import('@/server/auth/secret-box');
-  let outbox: (typeof import('@/server/mail/transport'))['outbox'];
   let db: ReturnType<(typeof import('@/server/db/client'))['database']>;
   let admin: { id: number; email: string };
 
@@ -73,7 +72,6 @@ describe.skipIf(!hasPostgres)('double authentification des administrateurs', () 
     guard = await import('@/server/admin/guard');
     s = await import('@/server/db/schema');
     box = await import('@/server/auth/secret-box');
-    outbox = (await import('@/server/mail/transport')).outbox;
     db = (await import('@/server/db/client')).database();
   });
   afterAll(async () => {
@@ -94,10 +92,9 @@ describe.skipIf(!hasPostgres)('double authentification des administrateurs', () 
     }
     return 0;
   };
-  const codeMail = () => /(\d{8})/.exec(outbox.at(-1)?.html ?? '')![1]!;
   const enroll = async () => {
     const { secret } = await mfa.demarrerActivation(admin.email);
-    const { codesSecours } = await mfa.confirmerActivation(admin.email, codeFor(secret, stepOf(Date.now())), codeMail());
+    const { codesSecours } = await mfa.confirmerActivation(admin.email, codeFor(secret, stepOf(Date.now())));
     return { secret, codesSecours };
   };
 
@@ -110,19 +107,6 @@ describe.skipIf(!hasPostgres)('double authentification des administrateurs', () 
     expect(() => box.open(u!.totpSecretChiffre!.replace(/.$/, 'A'))).toThrow();
   });
 
-  it('activation : le code reçu par courrier est exigé (le mot de passe seul ne suffit pas)', async () => {
-    const { secret } = await mfa.demarrerActivation(admin.email);
-    expect(outbox.at(-1)!.to).toBe(admin.email);
-    const bon = codeFor(secret, stepOf(Date.now()));
-    expect(await rejects(mfa.confirmerActivation(admin.email, bon, ''))).toBe(400);
-    expect(await rejects(mfa.confirmerActivation(admin.email, bon, '12345678'))).toBe(400);
-    expect((await mfa.statutMfa(admin.email)).active).toBe(false);
-    // le code d'un enrôlement précédent ne vaut pas pour le suivant
-    const ancien = codeMail();
-    await mfa.demarrerActivation(admin.email);
-    expect(await rejects(mfa.confirmerActivation(admin.email, bon, ancien))).toBe(400);
-  });
-
   it('un compte qui n’est pas administrateur ne peut rien faire', async () => {
     const [u] = await db.insert(s.utilisateurs).values({ email: 'simple@culture.test' }).returning();
     expect(await rejects(mfa.demarrerActivation(u!.email))).toBe(403);
@@ -131,8 +115,8 @@ describe.skipIf(!hasPostgres)('double authentification des administrateurs', () 
 
   it('activation : mauvais code refusé, bon code accepté, 8 codes de secours, pas de seconde activation', async () => {
     const { secret } = await mfa.demarrerActivation(admin.email);
-    expect(await rejects(mfa.confirmerActivation(admin.email, '000000', codeMail()))).toBe(400);
-    const { codesSecours } = await mfa.confirmerActivation(admin.email, codeFor(secret, stepOf(Date.now())), codeMail());
+    expect(await rejects(mfa.confirmerActivation(admin.email, '000000'))).toBe(400);
+    const { codesSecours } = await mfa.confirmerActivation(admin.email, codeFor(secret, stepOf(Date.now())));
     expect(codesSecours).toHaveLength(8);
     expect(new Set(codesSecours).size).toBe(8);
     const rows = await db.select().from(s.codesSecours);
