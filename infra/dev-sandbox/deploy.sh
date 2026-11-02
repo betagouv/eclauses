@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 HOST="${DEPLOY_HOST:-utilisateur@serveur-dev.example}"
 KEY="${DEPLOY_KEY:-$HOME/.ssh/id_rsa}"
 DIR="${DEPLOY_DIR:-eclauses-dev}"
-SSH=(ssh -o BatchMode=yes -o IdentitiesOnly=yes -i "$KEY" -o ControlPath=none "$HOST")
+SSH=(ssh -o BatchMode=yes -o IdentitiesOnly=yes -i "$KEY" -o ControlPath=none -o ServerAliveInterval=15 -o ServerAliveCountMax=8 "$HOST")
 remote() { "${SSH[@]}" "$@"; }
 
 case "${1:-deploy}" in
@@ -30,7 +30,19 @@ ENV"
     fi ;;
   deploy)
     docker buildx build --platform linux/amd64 -t eclauses-web:dev --load .
-    docker save eclauses-web:dev | gzip | remote "gunzip | docker load"
+    # Transfert en fichier, reprenable : après une coupure du VPN, on reprend à la taille déjà reçue (pas de rsync sur le serveur).
+    archive="$(mktemp -t eclauses-web.XXXXXX).tar.gz"
+    docker save eclauses-web:dev | gzip > "$archive"
+    total=$(stat -f%z "$archive")
+    remote "rm -f $DIR/image.tar.gz"
+    for essai in 1 2 3 4 5 6; do
+      recu=$(remote "stat -c%s $DIR/image.tar.gz 2>/dev/null || echo 0")
+      [ "$recu" -ge "$total" ] && break
+      tail -c +$((recu + 1)) "$archive" | remote "cat >> $DIR/image.tar.gz" || { echo "transfert interrompu (essai $essai), reprise…"; sleep 5; }
+    done
+    [ "$(remote "stat -c%s $DIR/image.tar.gz")" -eq "$total" ] || { echo "transfert incomplet"; exit 1; }
+    rm -f "$archive"
+    remote "cd $DIR && gunzip < image.tar.gz | docker load && rm -f image.tar.gz"
     scp -q -o IdentitiesOnly=yes -i "$KEY" infra/dev-sandbox/docker-compose.yml "$HOST:$DIR/docker-compose.yml"
     remote "cd $DIR && docker compose up -d && docker compose ps" ;;
   status) remote "cd $DIR && docker compose ps && curl -s -m5 http://\$(grep ^WEB_BIND .env | cut -d= -f2):3200/api/health; echo" ;;
