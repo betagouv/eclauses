@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { database } from './db/client';
 import { beneficiaireADetruire, beneficiaireEligible, repondantADetruire } from './db/expr';
-import { beneficiaires, fichiers, limitesDebit, marches, repondants, sessions, utilisateurs } from './db/schema';
+import { beneficiaireDepartements, beneficiaireRegions, beneficiaireSpecialites, beneficiaires, fichiers, limitesDebit, marches, repondants, sessions, utilisateurs, utilisateursAcheteurs } from './db/schema';
 import { purgerJetons } from './services/comptes';
 import { supprimerFichier } from './services/fichiers';
 import { inviterBeneficiaires } from './services/notifications';
@@ -47,11 +47,17 @@ async function anonymiseBeneficiaires(): Promise<JobResult> {
           sousSpecialite: null,
           intituleMemoire: null,
           autresInformations: null,
+          missionsProposees: null,
+          commentaire: null,
           cvFichierId: null,
           utilisateurId: null,
           anonymiseLe: today(),
         })
         .where(eq(beneficiaires.id, r.id));
+      // Spécialités, départements et régions de mobilité : données de profil effacées aussi.
+      await tx.delete(beneficiaireSpecialites).where(eq(beneficiaireSpecialites.beneficiaireId, r.id));
+      await tx.delete(beneficiaireDepartements).where(eq(beneficiaireDepartements.beneficiaireId, r.id));
+      await tx.delete(beneficiaireRegions).where(eq(beneficiaireRegions.beneficiaireId, r.id));
       if (r.userId) await tx.delete(utilisateurs).where(eq(utilisateurs.id, r.userId));
     });
     if (r.cv) await supprimerFichier(r.cv);
@@ -76,18 +82,25 @@ async function anonymiseRepondants(): Promise<JobResult> {
   return { job: 'anonymise-repondants', processed: rows.length };
 }
 
-/** Bénéficiaires devenus non éligibles : leur accès est retiré (le compte perd son mot de passe, la fiche reste). */
+/**
+ * Bénéficiaires devenus non éligibles : leur compte de connexion est supprimé (la fiche reste, sans compte). Un compte
+ * qui sert aussi à un autre profil (candidat, acheteur) ou à l'administration est conservé.
+ */
 async function deleteIneligibleAccounts(): Promise<JobResult> {
   const db = database();
   const rows = await db
     .select({ userId: utilisateurs.id })
     .from(beneficiaires)
     .innerJoin(utilisateurs, eq(utilisateurs.id, beneficiaires.utilisateurId))
-    .where(and(sql`not ${beneficiaireEligible}`, sql`${utilisateurs.motDePasseHash} is not null`));
-  for (const r of rows) {
-    await db.update(utilisateurs).set({ motDePasseHash: null }).where(eq(utilisateurs.id, r.userId));
-    await db.delete(sessions).where(eq(sessions.utilisateurId, r.userId));
-  }
+    .where(
+      and(
+        sql`not ${beneficiaireEligible}`,
+        eq(utilisateurs.estAdmin, false),
+        sql`not exists (select 1 from ${repondants} r where r.utilisateur_id = ${utilisateurs.id})`,
+        sql`not exists (select 1 from ${utilisateursAcheteurs} a where a.utilisateur_id = ${utilisateurs.id})`,
+      ),
+    );
+  for (const r of rows) await db.delete(utilisateurs).where(eq(utilisateurs.id, r.userId));
   return { job: 'delete-ineligible-accounts', processed: rows.length };
 }
 

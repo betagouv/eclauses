@@ -77,7 +77,8 @@ export function titulaireRelance(info: MarcheInfo, activationUrl: string | null)
 <p>Une fois votre espace activé, vous pourrez déclarer le ou les bénéficiaire(s) retenus depuis la page « Mes marchés ».</p>`
     : `<p>Rendez-vous sur votre espace, page « Mes marchés », pour déclarer le ou les bénéficiaires retenus : ${link(login(), 'Accéder à mon espace')}</p>`;
   return {
-    subject: `Eclauses - Relance : déclaration attendue pour ${info.isLot ? 'un lot' : 'un marché'} dont vous êtes titulaire`,
+    // Comme dans n8n : un titulaire qui n'a pas encore activé son espace reçoit l'objet « actions requises ».
+    subject: activationUrl ? 'Eclauses - Relance : actions requises suite à votre titularisation sur un marché' : `Eclauses - Relance : déclaration attendue pour ${info.isLot ? 'un lot' : 'un marché'} dont vous êtes titulaire`,
     html: layout(`${CONTEXTE_CLAUSE}
 <p>Vous avez été déclaré comme titulaire ${info.ofNoun} suivant sur la plateforme Eclauses :</p>
 ${marcheList(info, [{ label: 'Acheteur', value: info.acheteur }])}
@@ -113,24 +114,6 @@ export function clauseActiveeTitulaire(info: MarcheInfo): Rendered {
     html: layout(`<p>Merci d'avoir renseigné les informations liées à la clause sociale pour ${info.isLot ? 'le lot' : 'le marché'} suivant :</p>
 ${marcheList(info, [{ label: 'Acheteur', value: info.acheteur }])}
 <p><strong>Cette déclaration a été validée par l'acheteur et la clause sociale est considérée comme activée pour ce ${info.noun}.</strong></p>`),
-  };
-}
-
-export function beneficiaireDeclare(info: MarcheInfo): Rendered {
-  return {
-    subject: `Eclauses - vous avez été déclaré bénéficiaire d'une clause sociale sur ${info.isLot ? 'un lot' : 'un marché'}`,
-    html: layout(`${CONTEXTE_CLAUSE}
-<p>Vous avez été déclaré comme bénéficiaire ${info.ofNoun} suivant sur la plateforme Eclauses :</p>
-${marcheList(info, [
-  { label: 'Acheteur', value: info.acheteur },
-  { label: 'Titulaire', value: info.titulaire },
-])}
-<p>Le titulaire a été informé de la nécessité de formaliser administrativement votre coopération avec :</p>
-<ul>
-  <li>la signature d'un DC2 en cas de co-traitance ;</li>
-  <li>ou d'un DC4 en cas de sous-traitance ;</li>
-  <li>ou d'un contrat en cas d'embauche directe.</li>
-</ul>`),
   };
 }
 

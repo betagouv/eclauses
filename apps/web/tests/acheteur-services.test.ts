@@ -199,6 +199,7 @@ describe.skipIf(!hasPostgres)('opérations de l’acheteur sur ses marchés', ()
       await base.db.insert(s.invitationsTitulaires).values({ marcheId: base.parent.id, email: 'nouveau@societe.test' });
       await svc.relancerTitulaire(acheteur(), base.parent.id);
       expect(outbox[0]!.html).toContain('/reset-password?token=');
+      expect(outbox[0]!.subject).toBe('Eclauses - Relance : actions requises suite à votre titularisation sur un marché');
       expect(await rejects(svc.relancerTitulaire(await autreAcheteur(), base.parent.id))).toBe(403);
     });
   });
@@ -208,13 +209,13 @@ describe.skipIf(!hasPostgres)('opérations de l’acheteur sur ses marchés', ()
       (await base.db.insert(s.declarationsBeneficiaires).values({ repondantId: base.titulaire.id, marcheId, email: 'benef@test.test', ...over }).returning())[0]!;
     const aValider = (id: number) => base.db.update(s.marches).set({ statut: 'declaration_a_valider', titulaireId: base.titulaire.id }).where(eq(s.marches.id, id));
 
-    it('valider : déclarations validées, marché validé, bénéficiaires et acheteur prévenus', async () => {
+    it('valider : déclarations validées, marché validé, titulaire et acheteur prévenus (jamais le bénéficiaire)', async () => {
       await aValider(base.parent.id);
       const d = await declare(base.parent.id);
       await svc.validerDeclaration(acheteur(), base.parent.id);
       expect((await row(base.parent.id)).statut).toBe('clause_validee');
       expect((await base.db.select().from(s.declarationsBeneficiaires).where(eq(s.declarationsBeneficiaires.id, d.id)))[0]!.statut).toBe('valide');
-      expect(outbox.map((m) => m.to).sort()).toEqual(['acheteur@culture.test', 'benef@test.test', 'titulaire@societe.test']);
+      expect(outbox.map((m) => m.to).sort()).toEqual(['acheteur@culture.test', 'titulaire@societe.test']);
     });
 
     it('lots : le parent n’est validé que lorsque tous ses lots le sont', async () => {

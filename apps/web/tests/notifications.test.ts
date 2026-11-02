@@ -137,32 +137,11 @@ describe.skipIf(!hasPostgres)('notifications', () => {
     const declare = async (marcheId: number, over: Partial<typeof s.declarationsBeneficiaires.$inferInsert> = {}) =>
       (await base.db.insert(s.declarationsBeneficiaires).values({ repondantId: base.titulaire.id, marcheId, ...over }).returning())[0]!;
 
-    it('validée : « marché » sans lot, « lot » avec lot', async () => {
-      const d1 = await declare(base.parent.id, { email: 'benef@test.test', statut: 'valide' });
-      const l = await lot('2', 'Peinture');
-      const d2 = await declare(l.id, { email: 'benef2@test.test', statut: 'valide' });
-      await n.declarationModifiee(d1.id);
-      await n.declarationModifiee(d2.id);
-      expect(outbox[0]!.subject).toBe("Eclauses - vous avez été déclaré bénéficiaire d'une clause sociale sur un marché");
-      expect(text(outbox[0]!.html)).not.toContain('Lot :');
-      expect(outbox[1]!.subject).toContain('sur un lot');
-      expect(text(outbox[1]!.html)).toContain('Lot : Lot 2 - Peinture');
-    });
-
-    it('utilise l’adresse du bénéficiaire inscrit quand aucun e-mail n’est saisi', async () => {
-      const d = await declare(base.parent.id, { beneficiaireId: base.a.benef.id, statut: 'valide' });
-      await n.declarationModifiee(d.id);
-      expect(outbox.map((m) => m.to)).toEqual(['a@benef.test']);
-    });
-
-    it('pas de courrier tant que la déclaration n’est pas validée, ni deux fois', async () => {
-      const d = await declare(base.parent.id, { email: 'benef@test.test' });
-      await n.declarationModifiee(d.id);
+    it('un bénéficiaire déclaré, même après validation, ne reçoit aucun courrier', async () => {
+      const d = await declare(base.parent.id, { email: 'benef@test.test', beneficiaireId: base.a.benef.id, statut: 'valide' });
+      expect(d.id).toBeGreaterThan(0);
+      expect(n).not.toHaveProperty('declarationModifiee');
       expect(outbox).toHaveLength(0);
-      await base.db.update(s.declarationsBeneficiaires).set({ statut: 'valide' }).where(eq(s.declarationsBeneficiaires.id, d.id));
-      await n.declarationModifiee(d.id);
-      await n.declarationModifiee(d.id);
-      expect(outbox).toHaveLength(1);
     });
 
     it('refus : le titulaire du marché reçoit le motif', async () => {

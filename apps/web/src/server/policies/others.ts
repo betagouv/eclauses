@@ -10,7 +10,6 @@ import { assurerUtilisateur, normaliser, utilisateurParEmail } from '../services
 import {
   accesCoordonneesCree,
   candidatInscrit,
-  declarationModifiee,
   invitationCreee,
   motDePasseOublie as demandeMotDePasseOublie,
   refusCree,
@@ -178,7 +177,6 @@ export const declarations: TablePolicy = {
     const marche = await marcheById(num(fields.Marche));
     if (!marche || !isTitulaire(marche, s)) throw forbidden('Vous n’êtes pas titulaire de ce marché.');
     const id = await others.declarations.insert(fields, DECLARATION_CREATE, { repondantId: s.repondantId });
-    await declarationModifiee(id);
     return id;
   },
   async update(actor, id, fields) {
@@ -191,7 +189,6 @@ export const declarations: TablePolicy = {
       throw forbidden();
     }
     await others.declarations.update(id, fields, new Set(['Statut']));
-    await declarationModifiee(id);
   },
   async remove(actor, id) {
     const s = requireRole(actor, 'repondant');

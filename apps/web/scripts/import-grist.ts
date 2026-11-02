@@ -481,7 +481,6 @@ async function main() {
       if (r.Statut === 'Déclaration à valider') sent.push({ evenement: 'marche-a-valider', cle: String(id) });
       if (r.Statut === 'Clause validée') sent.push({ evenement: 'marche-validee', cle: String(id) });
     }
-    for (const r of await g.records('Declarations_Beneficiaires')) if (r.Statut === 'validé' && declarations.get(r.id)) sent.push({ evenement: 'declaration-validee', cle: String(declarations.get(r.id)) });
     if (sent.length) await db.insert(s.notificationsEnvoyees).values(sent).onConflictDoNothing();
     counts['courriers marqués envoyés'] = { source: sent.length, cible: sent.length };
   }

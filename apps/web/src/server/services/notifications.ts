@@ -112,18 +112,7 @@ export const marcheModifie = (id: number) =>
 
 /* ------------------------------------------------------------------ Déclarations -------- */
 
-/** Déclaration d'un bénéficiaire : prévenir la personne une fois la déclaration validée par l'acheteur. */
-export const declarationModifiee = (id: number) =>
-  sansEchec(`déclaration ${id}`, async () => {
-    const [row] = await compat.declarations.read({ ids: [id] });
-    if (!row) return;
-    if (text(row.Statut) !== 'validé') return liberer('declaration-validee', id);
-    const to = text(row.Email_envoi);
-    const info = await loadMarcheInfo(Number(row.Marche));
-    if (!to || !info) return;
-    if (!(await reserver('declaration-validee', id))) return;
-    await send(to, t.beneficiaireDeclare(info));
-  });
+/* Un bénéficiaire déclaré ne reçoit aucun courrier : seuls le titulaire (refus) et l'acheteur sont prévenus. */
 
 export const refusCree = (id: number) =>
   sansEchec(`refus ${id}`, async () => {

@@ -8,7 +8,7 @@ import { loadMarcheInfo } from '../mail/describe';
 import { titulaireRelance } from '../mail/templates';
 import { sendMail } from '../mail/transport';
 import { creerJeton, utilisateurParEmail } from './comptes';
-import { declarationModifiee, invitationCreee, marcheModifie, refusCree } from './notifications';
+import { invitationCreee, marcheModifie, refusCree } from './notifications';
 
 /**
  * Opérations d'un acheteur sur ses marchés. Elles regroupent des enchaînements que les anciennes pages
@@ -267,7 +267,6 @@ export async function validerDeclaration(s: Session, marcheId: number): Promise<
     if (parentId) await tx.update(marches).set({ statut: 'clause_validee', modifieLe: new Date() }).where(eq(marches.id, parentId));
     return { declarations, parentId };
   });
-  for (const d of declarations) await declarationModifiee(d.id);
   await marcheModifie(marcheId);
   if (parentId) await marcheModifie(parentId);
 }

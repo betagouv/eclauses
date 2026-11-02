@@ -5,7 +5,7 @@ import { database } from '../db/client';
 import { beneficiaireADetruire, beneficiaireEligible } from '../db/expr';
 import { accesCoordonnees, beneficiaireClauses, beneficiaires, candidatures, declarationsBeneficiaires, marches, utilisateurs } from '../db/schema';
 import { HttpError } from '../http';
-import { accesCoordonneesCree, declarationModifiee, marcheModifie } from './notifications';
+import { accesCoordonneesCree, marcheModifie } from './notifications';
 
 /**
  * Opérations d'un répondant (candidat ou titulaire). Comme pour l'acheteur, chaque enchaînement s'exécute en une
@@ -78,7 +78,6 @@ export async function declarerBeneficiaires(s: Session, marcheId: number, input:
     await tx.update(marches).set({ statut: 'declaration_a_valider', modifieLe: new Date() }).where(eq(marches.id, marcheId));
     return [...drafts.map((d) => d.id), ...inserted.map((i) => i.id)];
   });
-  for (const id of created) await declarationModifiee(id);
   await marcheModifie(marcheId);
 }
 

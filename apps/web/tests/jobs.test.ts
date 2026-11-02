@@ -35,12 +35,21 @@ describe.skipIf(!hasPostgres)('tâches planifiées', () => {
 
   it('anonymise les bénéficiaires de plus de 10 ans, supprime leur compte, garde la ligne', async () => {
     const u = await user('vieux@benef.test');
-    const [vieux] = await db.insert(s.beneficiaires).values({ nom: 'Vieux', prenom: 'Paul', telephone: '0102', anneeDiplome: year - 11, utilisateurId: u.id }).returning();
+    const [vieux] = await db.insert(s.beneficiaires).values({ nom: 'Vieux', prenom: 'Paul', telephone: '0102', anneeDiplome: year - 11, utilisateurId: u.id, commentaire: 'note interne', missionsProposees: 'maçonnerie' }).returning();
+    const [spe] = await db.insert(s.specialites).values({ intitule: 'Pierre' }).returning();
+    const [dep] = await db.insert(s.departements).values({ numero: '75', nom: 'Paris' }).returning();
+    const [reg] = await db.insert(s.regions).values({ intitule: 'Île-de-France' }).returning();
+    await db.insert(s.beneficiaireSpecialites).values({ beneficiaireId: vieux!.id, specialiteId: spe!.id });
+    await db.insert(s.beneficiaireDepartements).values({ beneficiaireId: vieux!.id, departementId: dep!.id });
+    await db.insert(s.beneficiaireRegions).values({ beneficiaireId: vieux!.id, regionId: reg!.id });
     const [recent] = await db.insert(s.beneficiaires).values({ nom: 'Récent', anneeDiplome: year - 1 }).returning();
     const res = await jobs.JOBS['anonymise-beneficiaires']!();
     expect(res.processed).toBe(1);
     const [after] = await db.select().from(s.beneficiaires).where(eq(s.beneficiaires.id, vieux!.id));
-    expect(after).toMatchObject({ nom: `Beneficiaire #${vieux!.id}`, prenom: null, telephone: null, utilisateurId: null });
+    expect(after).toMatchObject({ nom: `Beneficiaire #${vieux!.id}`, prenom: null, telephone: null, utilisateurId: null, commentaire: null, missionsProposees: null });
+    expect(await db.select().from(s.beneficiaireSpecialites)).toHaveLength(0);
+    expect(await db.select().from(s.beneficiaireDepartements)).toHaveLength(0);
+    expect(await db.select().from(s.beneficiaireRegions)).toHaveLength(0);
     expect(after!.anonymiseLe).toBe(new Date().toISOString().slice(0, 10));
     expect(await db.select().from(s.utilisateurs)).toHaveLength(0);
     const [r] = await db.select().from(s.beneficiaires).where(eq(s.beneficiaires.id, recent!.id));
@@ -49,21 +58,25 @@ describe.skipIf(!hasPostgres)('tâches planifiées', () => {
     expect((await jobs.JOBS['anonymise-beneficiaires']!()).processed).toBe(0);
   });
 
-  it('retire l’accès des bénéficiaires non éligibles sans supprimer leur fiche', async () => {
+  it('supprime le compte des bénéficiaires non éligibles (la fiche reste), sauf s’il sert à autre chose', async () => {
     const u = await user('ancien@benef.test');
     const ok = await user('ok@benef.test');
+    const aussiCandidat = await user('double@benef.test');
+    const admin = await user('admin@benef.test', { estAdmin: true });
     await db.insert(s.beneficiaires).values([
       { nom: 'Ancien', anneeDiplome: year - 6, utilisateurId: u.id },
       { nom: 'Éligible', anneeDiplome: year - 1, utilisateurId: ok.id },
+      { nom: 'Double', anneeDiplome: year - 6, utilisateurId: aussiCandidat.id },
+      { nom: 'Admin', anneeDiplome: year - 6, utilisateurId: admin.id },
     ]);
+    await db.insert(s.repondants).values({ utilisateurId: aussiCandidat.id, nom: 'Société' });
     await db.insert(s.sessions).values({ empreinte: 'e1', utilisateurId: u.id, expireLe: new Date(Date.now() + 3600_000) });
     expect((await jobs.JOBS['delete-ineligible-accounts']!()).processed).toBe(1);
-    const [a] = await db.select().from(s.utilisateurs).where(eq(s.utilisateurs.id, u.id));
-    expect(a!.motDePasseHash).toBeNull();
+    expect((await db.select().from(s.utilisateurs)).map((x) => x.email).sort()).toEqual(['admin@benef.test', 'double@benef.test', 'ok@benef.test']);
     expect(await db.select().from(s.sessions)).toHaveLength(0);
-    const [b] = await db.select().from(s.utilisateurs).where(eq(s.utilisateurs.id, ok.id));
-    expect(b!.motDePasseHash).toBe('x');
-    expect(await db.select().from(s.beneficiaires)).toHaveLength(2);
+    const fiches = await db.select().from(s.beneficiaires);
+    expect(fiches).toHaveLength(4);
+    expect(fiches.find((f) => f.nom === 'Ancien')!.utilisateurId).toBeNull();
   });
 
   it('anonymise les répondants sans connexion depuis plus de 5 ans', async () => {

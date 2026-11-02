@@ -200,7 +200,7 @@ describe.skipIf(!hasPostgres)('accès aux données (forme des pages et droits)',
       const decls = await tables.readTable(acheteur(), 'Declarations_Beneficiaires');
       expect(decls[0]).toMatchObject({ Statut: 'déclaré', Beneficiaire__Courriel: 'a@benef.test', Email_envoi: 'a@benef.test' });
       await tables.updateRow(acheteur(), 'Declarations_Beneficiaires', declId, { Statut: 'validé' });
-      expect(outbox.map((m) => m.to)).toEqual(['a@benef.test']);
+      expect(outbox).toHaveLength(0); // le bénéficiaire déclaré ne reçoit aucun courrier
       const [m] = await tables.readTable(acheteur(), 'Marches', [base.parent.id]);
       expect(m!.Beneficiaires).toEqual([declId]);
     });

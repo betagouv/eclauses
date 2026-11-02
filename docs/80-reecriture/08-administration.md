@@ -33,3 +33,9 @@ Back-office intégré à `apps/web`, sous `/admin`. Réservé aux comptes `utili
 - Les mentions légales et la page données personnelles citent encore Grist.
 - Plan de bascule en production (gel de Grist, courriers, DNS) non rédigé.
 - Pas de contrôle automatisé des écrans admin dans `scripts/smoke.ts`.
+
+## Écarts avec n8n corrigés (2026-11-02)
+- Anonymisation d'un bénéficiaire : spécialités, départements, régions, commentaire interne et missions proposées sont aussi effacés.
+- Bénéficiaires non éligibles : le compte de connexion est supprimé (la fiche reste), sauf s'il sert aussi à un candidat, un acheteur ou un administrateur.
+- Relance d'un titulaire dont l'espace n'est pas activé : objet « Relance : actions requises suite à votre titularisation sur un marché », comme dans n8n.
+- Décision : un bénéficiaire déclaré ne reçoit **aucun** courrier (le flux `beneficiaire/declarer/valide` n'existe plus, ni dans le code ni à reprendre dans n8n).
