@@ -5,7 +5,8 @@ import { database } from '../db/client';
 import { sessions, utilisateurs } from '../db/schema';
 import { resolveIdentity } from './identity';
 
-export const SESSION_COOKIE = 'eclauses_session';
+/** En production, le préfixe `__Host-` oblige le navigateur à n'accepter le cookie que sécurisé, sans domaine, à la racine. */
+export const SESSION_COOKIE = process.env.NODE_ENV === 'production' ? '__Host-eclauses_session' : 'eclauses_session';
 export const SESSION_TTL_SECONDS = 24 * 60 * 60;
 const MFA_VALIDITE_MS = 12 * 60 * 60 * 1000;
 

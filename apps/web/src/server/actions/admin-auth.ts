@@ -20,10 +20,10 @@ export async function demarrerMfa(): Promise<ActionResult<{ secret: string; qrSv
   return attempt(async () => demarrerActivation((await admin()).email));
 }
 
-export async function confirmerMfa(code: string): Promise<ActionResult<{ codesSecours: string[] }>> {
+export async function confirmerMfa(code: string, codeCourrier: string): Promise<ActionResult<{ codesSecours: string[] }>> {
   return attempt(async () => {
     const s = await admin();
-    const res = await confirmerActivation(s.email, code);
+    const res = await confirmerActivation(s.email, code, codeCourrier);
     await markMfaValidated(await token());
     await auditer({ ...s, mfa: true }, 'mfa.activation', 'utilisateur', null);
     return res;

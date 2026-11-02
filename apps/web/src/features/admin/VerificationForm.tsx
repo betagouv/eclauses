@@ -6,6 +6,7 @@ import { confirmerMfa, demarrerMfa, verifierMfa } from '@/server/actions/admin-a
 /** Seconde étape de connexion : activation (première fois, avec QR code et codes de secours) ou saisie du code. */
 export function VerificationForm({ active }: { active: boolean }) {
   const [code, setCode] = useState('');
+  const [codeCourrier, setCodeCourrier] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [setup, setSetup] = useState<{ secret: string; qrSvg: string } | null>(null);
@@ -26,7 +27,7 @@ export function VerificationForm({ active }: { active: boolean }) {
     e.preventDefault();
     setErr(null);
     setBusy(true);
-    const res = setup ? await confirmerMfa(code) : await verifierMfa(code);
+    const res = setup ? await confirmerMfa(code, codeCourrier) : await verifierMfa(code);
     setBusy(false);
     if (!res.ok) return setErr(res.message);
     if (setup && res.data && 'codesSecours' in res.data) setBackup(res.data.codesSecours);
@@ -57,7 +58,7 @@ export function VerificationForm({ active }: { active: boolean }) {
       <h1 className="fr-h3">Vérification en deux étapes</h1>
       {!active && !setup && (
         <>
-          <p>Pour accéder à l’administration, activez d’abord la double authentification avec une application d’authentification (FreeOTP, Google Authenticator, Microsoft Authenticator…).</p>
+          <p>Pour accéder à l’administration, activez d’abord la double authentification avec une application d’authentification (FreeOTP, Google Authenticator, Microsoft Authenticator…). Un code de confirmation sera envoyé à votre adresse e-mail.</p>
           {err && <div className="fr-alert fr-alert--error fr-mb-2w"><p>{err}</p></div>}
           <button className="fr-btn" type="button" onClick={start} disabled={busy}>
             Commencer l’activation
@@ -70,7 +71,11 @@ export function VerificationForm({ active }: { active: boolean }) {
             <div className="fr-mb-3w">
               <p>1. Scannez ce QR code avec votre application d’authentification, ou saisissez la clé : <code>{setup.secret}</code></p>
               <div aria-label="QR code" dangerouslySetInnerHTML={{ __html: setup.qrSvg }} />
-              <p className="fr-mt-2w">2. Saisissez le code à 6 chiffres affiché pour confirmer.</p>
+              <p className="fr-mt-2w">2. Saisissez le code à 6 chiffres affiché par l’application, puis le code à 8 chiffres que nous venons de vous envoyer par courrier.</p>
+              <div className="fr-input-group fr-mb-2w">
+                <label className="fr-label" htmlFor="code-courrier">Code reçu par courrier</label>
+                <input id="code-courrier" className="fr-input" inputMode="numeric" autoComplete="off" value={codeCourrier} onChange={(e) => setCodeCourrier(e.target.value)} required />
+              </div>
             </div>
           )}
           {err && <div className="fr-alert fr-alert--error fr-mb-2w"><p>{err}</p></div>}

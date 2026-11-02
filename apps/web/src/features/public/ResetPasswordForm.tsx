@@ -51,8 +51,8 @@ const Component = ({ initial }) => {
       e.nativeEvent.stopImmediatePropagation();
     }
     if (!record) return;
-    if (!password || password.length < 8) {
-      setStatus({ state: 'error', message: 'Le mot de passe doit contenir au moins 8 caractères.' });
+    if (!password || password.length < 10) {
+      setStatus({ state: 'error', message: 'Le mot de passe doit contenir au moins 10 caractères.' });
       return;
     }
     if (password !== confirm) {

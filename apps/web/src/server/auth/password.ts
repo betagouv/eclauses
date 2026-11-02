@@ -9,6 +9,9 @@ const P = 1;
 const LEN = 32;
 
 /** Format : `scrypt$N$r$p$sel(base64)$hash(base64)`. */
+export const MOT_DE_PASSE_MIN = 10;
+export const MESSAGE_MOT_DE_PASSE = `Le mot de passe doit contenir au moins ${MOT_DE_PASSE_MIN} caractères.`;
+
 export async function hashPassword(plain: string): Promise<string> {
   const salt = randomBytes(16);
   const hash = await scrypt(plain, salt, LEN, { N, r: R, p: P, maxmem: 128 * N * R * 2 });

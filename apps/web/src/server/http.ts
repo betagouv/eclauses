@@ -49,8 +49,28 @@ export function assertSameOrigin(req: Request): void {
   if (new URL(origin).host !== host) throw new HttpError(403, 'Origine refusée.');
 }
 
-export const clientIp = (req: Request): string =>
-  req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
+/**
+ * Adresse du client. `X-Forwarded-For` est librement forgeable par le client : seules les entrées ajoutées par nos
+ * propres proxys sont fiables, c'est-à-dire les dernières. `TRUSTED_PROXIES` (défaut 1) = nombre de proxys devant
+ * l'application ; on prend l'adresse située juste avant eux.
+ */
+export const clientIp = (req: Request): string => {
+  const chain = (req.headers.get('x-forwarded-for') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const proxies = Math.max(0, Number(process.env.TRUSTED_PROXIES ?? 1) || 0);
+  if (!chain.length) return 'local';
+  return chain[Math.max(0, chain.length - Math.max(1, proxies))]!;
+};
+
+/**
+ * Lit un corps `multipart` en refusant d'abord ce qui dépasse `max` octets : la taille annoncée est exigée (un envoi
+ * sans `Content-Length` est refusé) pour ne jamais charger en mémoire un corps de taille inconnue.
+ */
+export async function formDataLimite(req: Request, max: number): Promise<FormData | null> {
+  const declared = req.headers.get('content-length');
+  if (declared === null || !/^\d+$/.test(declared)) throw new HttpError(411, 'Taille de la requête manquante.');
+  if (Number(declared) > max) throw new HttpError(413, 'Fichier trop volumineux.');
+  return req.formData().catch(() => null);
+}
 
 /**
  * Limiteur partagé entre instances (compteur en base) : `max` essais par `windowMs` et par clé. Le

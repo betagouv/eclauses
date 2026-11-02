@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { MESSAGE_MOT_DE_PASSE, MOT_DE_PASSE_MIN } from '@/server/auth/password';
 import { assertSameOrigin, clientIp, handle, HttpError, rateLimit } from '@/server/http';
 import { consommerJeton, etatJeton } from '@/server/services/comptes';
 
-const body = z.object({ token: z.string().trim().min(20).max(128), password: z.string().min(8).max(200) });
+const body = z.object({ token: z.string().trim().min(20).max(128), password: z.string().min(MOT_DE_PASSE_MIN).max(200) });
 
 /** Lien reçu par courrier : vérifier le jeton sans le consommer (la page l'affiche avant de demander le mot de passe). */
 export function GET(req: Request) {
@@ -26,7 +27,7 @@ export function POST(req: Request) {
     assertSameOrigin(req);
     await rateLimit(`reset:${clientIp(req)}`, 10, 15 * 60_000);
     const parsed = body.safeParse(await req.json().catch(() => null));
-    if (!parsed.success) throw new HttpError(400, 'Le mot de passe doit contenir au moins 8 caractères.');
+    if (!parsed.success) throw new HttpError(400, MESSAGE_MOT_DE_PASSE);
     if (!(await consommerJeton(parsed.data.token, parsed.data.password))) throw new HttpError(400, 'Lien invalide ou expiré.');
     return NextResponse.json({ status: 'ok' });
   });

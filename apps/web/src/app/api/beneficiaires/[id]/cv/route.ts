@@ -5,7 +5,7 @@ import { setOwnCv } from '@/server/beneficiaires';
 import { database } from '@/server/db/client';
 import { utilisateurs } from '@/server/db/schema';
 import { sql } from 'drizzle-orm';
-import { assertSameOrigin, handle, HttpError, requireSession } from '@/server/http';
+import { assertSameOrigin, formDataLimite, handle, HttpError, requireSession } from '@/server/http';
 import { enregistrerFichier, supprimerFichier } from '@/server/services/fichiers';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -25,10 +25,7 @@ export function POST(req: Request, ctx: Ctx) {
     const id = await ownId(ctx, session.beneficiaireId);
 
     const max = config().CV_MAX_BYTES;
-    const declared = Number(req.headers.get('content-length') ?? 0);
-    if (declared > max + 64 * 1024) throw new HttpError(413, 'Fichier trop volumineux.');
-
-    const form = await req.formData().catch(() => null);
+    const form = await formDataLimite(req, max + 64 * 1024);
     const file = form?.get('file');
     if (!(file instanceof File)) throw new HttpError(400, 'Aucun fichier reçu.');
 

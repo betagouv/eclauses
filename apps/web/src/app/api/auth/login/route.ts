@@ -27,6 +27,8 @@ export function POST(req: Request) {
     const mail = email.toLowerCase();
 
     await rateLimit(`login:${clientIp(req)}:${mail}`);
+    // Limite par compte, quelle que soit l'adresse : freine aussi une attaque répartie sur de nombreuses adresses IP.
+    await rateLimit(`login-compte:${mail}`, 40, 60 * 60_000);
 
     const user = await utilisateurParEmail(mail);
     const check = await verifyPassword(user?.motDePasseHash ?? (await dummy()), password);

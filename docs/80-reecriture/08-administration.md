@@ -8,6 +8,14 @@ Back-office intégré à `apps/web`, sous `/admin`. Réservé aux comptes `utili
 - Chaque écriture (Server Action) revérifie le rôle et la double authentification (`requireAdmin`) et est journalisée dans `audit_admin`.
 - Création du premier administrateur : `npx tsx scripts/create-admin.ts adresse@exemple.fr` (affiche un lien d'activation ; refuse une base non locale sans `--allow-remote-target`). Les suivants se créent depuis `/admin/comptes`.
 
+- Premier enrôlement 2FA : outre le code de l'application, un code à 8 chiffres envoyé par courrier à l'administrateur est exigé (le mot de passe seul ne suffit pas).
+
+## Durcissement transverse (audit du 2026-11-02)
+- Adresse IP : `TRUSTED_PROXIES` (défaut 1) = nombre de proxys ; on retient l'entrée de `X-Forwarded-For` ajoutée par le dernier proxy de confiance. Connexion limitée aussi par compte (40 essais / h).
+- En-têtes de sécurité dans `next.config.ts` (CSP, `frame-ancestors 'none'`, HSTS en production, etc.).
+- Dépôts de fichiers : `Content-Length` exigé et plafonné avant lecture (`formDataLimite`).
+- Mot de passe : 10 caractères minimum ; cookie `__Host-eclauses_session` en production ; HTML d'en-tête et de pied de page assaini (`assainirHtml`) ; « mot de passe oublié » ne révèle plus l'existence du compte par son temps de réponse.
+
 ## Écrans
 - Tableau de bord : indicateurs et dernières actions.
 - Moteur générique (`server/admin/resources.ts`) : liste, recherche, filtres, création, modification, suppression des référentiels, du contenu, des acheteurs, bénéficiaires, candidats, marchés, déclarations, journaux.

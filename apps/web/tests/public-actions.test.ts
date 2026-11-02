@@ -39,9 +39,10 @@ describe.skipIf(!hasPostgres)('actions des pages publiques', () => {
   describe('mot de passe oublié', () => {
     it('même réponse pour un compte connu et inconnu, un courrier seulement pour le compte connu', async () => {
       expect(await actions.demanderReinitialisation('inconnu@x.test')).toEqual({ ok: true, data: null });
+      await new Promise((r) => setTimeout(r, 200)); // l'envoi se fait après la réponse
       expect(outbox).toHaveLength(0);
       expect(await actions.demanderReinitialisation(' Titulaire@Societe.test ')).toEqual({ ok: true, data: null });
-      expect(outbox.map((m) => m.to)).toEqual(['titulaire@societe.test']);
+      await vi.waitFor(() => expect(outbox.map((m) => m.to)).toEqual(['titulaire@societe.test']));
     });
 
     it('adresse invalide refusée ; au-delà de 5 demandes par adresse IP : refusé (429)', async () => {
@@ -52,9 +53,9 @@ describe.skipIf(!hasPostgres)('actions des pages publiques', () => {
   });
 
   describe('définir le mot de passe', () => {
-    it('le lien reçu ne sert qu’une fois, le mot de passe doit faire 8 caractères', async () => {
+    it('le lien reçu ne sert qu’une fois, le mot de passe doit faire 10 caractères', async () => {
       const { jeton } = await comptes.creerJeton(base.titulaireUser.id, 'reinitialisation');
-      expect(await actions.definirMotDePasse(jeton, 'court')).toMatchObject({ ok: false });
+      expect(await actions.definirMotDePasse(jeton, 'neuf-cara')).toMatchObject({ ok: false });
       expect(await actions.definirMotDePasse(jeton, 'un-vrai-mot-de-passe')).toEqual({ ok: true, data: null });
       expect(await actions.definirMotDePasse(jeton, 'un-vrai-mot-de-passe')).toMatchObject({ ok: false, message: 'Lien invalide ou expiré.' });
       expect(await actions.definirMotDePasse('jeton-inventé-qui-nexiste-pas', 'un-vrai-mot-de-passe')).toMatchObject({ ok: false });

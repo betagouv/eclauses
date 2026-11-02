@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supportRequest } from '@/server/mail/templates';
 import { sendMail } from '@/server/mail/transport';
 import { safeFileName } from '@/server/cv';
-import { assertSameOrigin, clientIp, handle, HttpError, rateLimit } from '@/server/http';
+import { assertSameOrigin, clientIp, formDataLimite, handle, HttpError, rateLimit } from '@/server/http';
 
 const body = z.object({
   nom: z.string().trim().min(1).max(200),
@@ -20,7 +20,7 @@ export function POST(req: Request) {
     assertSameOrigin(req);
     await rateLimit(`support:${clientIp(req)}`, 5, 15 * 60_000);
 
-    const form = await req.formData().catch(() => null);
+    const form = await formDataLimite(req, ATTACHMENT_MAX_BYTES + 64 * 1024);
     const parsed = body.safeParse({ nom: form?.get('nom'), email: form?.get('email'), message: form?.get('message') });
     if (!form || !parsed.success) throw new HttpError(400, 'Merci de renseigner votre nom, votre e-mail et votre message.');
     const { nom, email, message } = parsed.data;

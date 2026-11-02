@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { MESSAGE_MOT_DE_PASSE, MOT_DE_PASSE_MIN } from '../auth/password';
 import { clientIp, HttpError, rateLimit } from '../http';
 import { consommerJeton } from '../services/comptes';
 import { inscrireCandidat, verifierCandidat } from '../services/candidats';
@@ -22,7 +23,8 @@ export async function demanderReinitialisation(email: string): Promise<ActionRes
     await limiter('forgot', 5);
     const value = String(email ?? '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || value.length > 320) throw new HttpError(400, 'Adresse e-mail invalide.');
-    await motDePasseOublie(value);
+    // Sans attendre l'envoi : le temps de réponse ne doit pas révéler si l'adresse a un compte.
+    void motDePasseOublie(value);
     return null;
   });
 }
@@ -30,7 +32,7 @@ export async function demanderReinitialisation(email: string): Promise<ActionRes
 export async function definirMotDePasse(token: string, motDePasse: string): Promise<ActionResult<null>> {
   return attempt(async () => {
     await limiter('reset', 10);
-    if (typeof motDePasse !== 'string' || motDePasse.length < 8 || motDePasse.length > 200) throw new HttpError(400, 'Le mot de passe doit contenir au moins 8 caractères.');
+    if (typeof motDePasse !== 'string' || motDePasse.length < MOT_DE_PASSE_MIN || motDePasse.length > 200) throw new HttpError(400, MESSAGE_MOT_DE_PASSE);
     if (!(await consommerJeton(String(token ?? '').trim(), motDePasse))) throw new HttpError(400, 'Lien invalide ou expiré.');
     return null;
   });
