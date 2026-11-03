@@ -34,7 +34,13 @@ services:
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?manquant dans .env}
       CRON_SECRET: ${CRON_SECRET:?manquant dans .env}
       # Développement : aucun courrier réel, ils sont seulement écrits dans les journaux du conteneur.
-      MAIL_TRANSPORT: log
+      MAIL_TRANSPORT: ${MAIL_TRANSPORT:-log}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       STORAGE_DRIVER: local
       STORAGE_LOCAL_DIR: /data/fichiers
     depends_on:

@@ -23,7 +23,7 @@ function smtp(): Transporter {
   return transporter;
 }
 
-const FROM = () => process.env.MAIL_FROM ?? 'Eclauses - Ministère de la Culture <contact@eclauses.beta.gouv.fr>';
+const FROM = () => process.env.MAIL_FROM || 'Eclauses - Ministère de la Culture <contact@eclauses.beta.gouv.fr>';
 
 /**
  * Envoie un courrier. `MAIL_TRANSPORT=smtp` pour un vrai envoi (Scaleway Transactional Email, par
