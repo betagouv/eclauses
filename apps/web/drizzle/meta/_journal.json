@@ -50,6 +50,13 @@
       "when": 1793570407148,
       "tag": "0006_administration_mfa_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793705458535,
+      "tag": "0007_mfa_par_courrier",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,6 @@ export default async function Page() {
   if (!session) redirect('/login?next=admin');
   if (!session.roles.includes('admin')) notFound();
   if (session.mfa) redirect('/admin');
-  const { active } = await statutMfa(session.email);
-  return <VerificationForm active={active} />;
+  const { active, methode } = await statutMfa(session.email);
+  return <VerificationForm active={active} methode={methode} />;
 }

@@ -152,6 +152,92 @@ describe.skipIf(!hasPostgres)('double authentification des administrateurs', () 
     expect(await db.select().from(s.codesSecours)).toHaveLength(0);
   });
 
+  describe('vérification par code reçu par e-mail', () => {
+    let outbox: (typeof import('@/server/mail/transport'))['outbox'];
+    beforeAll(async () => {
+      outbox = (await import('@/server/mail/transport')).outbox;
+    });
+    beforeEach(() => {
+      outbox.length = 0;
+    });
+    const dernierCode = () => /letter-spacing[^>]*>(\d{6})</.exec(outbox.at(-1)!.html)![1]!;
+    const activerParCourrier = async () => {
+      await mfa.demarrerActivationCourrier(admin.email);
+      return mfa.confirmerActivation(admin.email, dernierCode());
+    };
+
+    it('activation : le code est envoyé à l’administrateur, haché en base, et confirme avec 8 codes de secours', async () => {
+      await mfa.demarrerActivationCourrier(admin.email);
+      expect(outbox).toHaveLength(1);
+      expect(outbox[0]).toMatchObject({ to: 'admin@culture.test', subject: 'Eclauses - Votre code de vérification' });
+      const code = dernierCode();
+      const [u] = await db.select().from(s.utilisateurs).where(eq(s.utilisateurs.id, admin.id));
+      expect(u).toMatchObject({ mfaMethode: 'courrier', totpSecretChiffre: null, totpActiveLe: null });
+      expect(u!.mfaCodeEmpreinte).toMatch(/^[0-9a-f]{64}$/);
+      expect(u!.mfaCodeEmpreinte).not.toContain(code);
+      expect(await rejects(mfa.confirmerActivation(admin.email, code === '000000' ? '111111' : '000000'))).toBe(400);
+      const { codesSecours } = await mfa.confirmerActivation(admin.email, code);
+      expect(codesSecours).toHaveLength(8);
+      expect(await mfa.statutMfa(admin.email)).toEqual({ active: true, methode: 'courrier' });
+    });
+
+    it('à la connexion : un code par envoi, qui ne sert qu’une fois ; un nouvel envoi remplace le précédent', async () => {
+      await activerParCourrier();
+      await t.sql.unsafe('truncate limites_debit');
+      await mfa.envoyerCodeCourrier(admin.email);
+      const ancien = dernierCode();
+      await mfa.envoyerCodeCourrier(admin.email);
+      const nouveau = dernierCode();
+      if (ancien !== nouveau) expect(await rejects(mfa.verifier(admin.email, ancien))).toBe(400);
+      await mfa.verifier(admin.email, nouveau);
+      expect(await rejects(mfa.verifier(admin.email, nouveau))).toBe(400);
+    });
+
+    it('un code expiré est refusé ; un code d’application ne marche pas pour une méthode e-mail', async () => {
+      await activerParCourrier();
+      await t.sql.unsafe('truncate limites_debit');
+      await mfa.envoyerCodeCourrier(admin.email);
+      const code = dernierCode();
+      await t.sql.unsafe("update utilisateurs set mfa_code_expire_le = now() - interval '1 minute'");
+      expect(await rejects(mfa.verifier(admin.email, code))).toBe(400);
+    });
+
+    it('les codes de secours fonctionnent aussi, sans envoi de courrier', async () => {
+      const { codesSecours } = await activerParCourrier();
+      await t.sql.unsafe('truncate limites_debit');
+      await mfa.verifier(admin.email, codesSecours[0]!);
+      expect(await rejects(mfa.verifier(admin.email, codesSecours[0]!))).toBe(400);
+    });
+
+    it('les envois sont limités (5 par 15 min) et une méthode « application » ne peut pas demander de code', async () => {
+      await mfa.demarrerActivationCourrier(admin.email);
+      for (let i = 0; i < 4; i++) await mfa.envoyerCodeCourrier(admin.email);
+      expect(await rejects(mfa.envoyerCodeCourrier(admin.email))).toBe(429);
+      await t.sql.unsafe('truncate limites_debit');
+      await mfa.reinitialiser(admin.id);
+      await enroll();
+      expect(await rejects(mfa.envoyerCodeCourrier(admin.email))).toBe(409);
+    });
+
+    it('réinitialiser efface la méthode et le code en attente', async () => {
+      await mfa.demarrerActivationCourrier(admin.email);
+      await mfa.reinitialiser(admin.id);
+      const [u] = await db.select().from(s.utilisateurs).where(eq(s.utilisateurs.id, admin.id));
+      expect(u).toMatchObject({ mfaMethode: null, mfaCodeEmpreinte: null, mfaCodeExpireLe: null, totpActiveLe: null });
+    });
+
+    it('les actions de la page : choix, envoi, vérification puis accès à l’administration', async () => {
+      cookie = await ses.createSession(admin.id);
+      expect(await actions.demarrerMfaCourrier()).toEqual({ ok: true, data: null });
+      const conf = await actions.confirmerMfa(dernierCode());
+      expect(conf).toMatchObject({ ok: true });
+      cookie = await ses.createSession(admin.id);
+      expect(await actions.envoyerCodeMfa()).toEqual({ ok: true, data: null });
+      expect(await actions.verifierMfa(dernierCode())).toEqual({ ok: true, data: null });
+      expect((await guard.requireAdmin()).email).toBe('admin@culture.test');
+    });
+  });
+
   describe('session et accès', () => {
     it('un administrateur a le rôle admin ; la seconde étape manque tant qu’elle n’est pas validée', async () => {
       cookie = await ses.createSession(admin.id);

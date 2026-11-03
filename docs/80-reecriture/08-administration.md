@@ -3,12 +3,12 @@
 Back-office intégré à `apps/web`, sous `/admin`. Réservé aux comptes `utilisateurs.est_admin`.
 
 ## Sécurité
-- Mot de passe puis double authentification (TOTP, RFC 6238) obligatoire ; validation valable 12 h par session.
+- Mot de passe puis double authentification obligatoire ; validation valable 12 h par session. Deux méthodes au choix de l'administrateur à l'activation : application d'authentification (TOTP, RFC 6238) ou code à 6 chiffres reçu par e-mail (valable 10 min, usage unique, empreinte HMAC en base, 5 envois par 15 min). Les 8 codes de secours existent dans les deux cas. Un administrateur déjà activé garde l'application ; changer de méthode passe par la réinitialisation de la 2FA depuis `/admin/comptes`.
 - Secret TOTP chiffré (AES-256-GCM, clé `MFA_ENCRYPTION_KEY`, 64 caractères hexadécimaux), 8 codes de secours à usage unique, anti-rejeu, limitation 5 essais / 15 min.
 - Chaque écriture (Server Action) revérifie le rôle et la double authentification (`requireAdmin`) et est journalisée dans `audit_admin`.
 - Création du premier administrateur : `npx tsx scripts/create-admin.ts adresse@exemple.fr` (affiche un lien d'activation ; refuse une base non locale sans `--allow-remote-target`). Les suivants se créent depuis `/admin/comptes`.
 
-- Premier enrôlement 2FA : le mot de passe suffit à enrôler un premier appareil (le code reçu par courrier, ajouté après l'audit, a été retiré à la demande). Risque résiduel : un mot de passe d'administrateur volé avant sa première activation de la 2FA donne accès. À limiter en activant la 2FA dès la création du compte.
+- Premier enrôlement 2FA : le mot de passe suffit à enrôler un premier appareil (le code reçu par courrier, ajouté après l'audit, a été retiré à la demande). Avec la méthode e-mail, la boîte de réception devient le second facteur : elle doit être protégée au moins aussi bien que le mot de passe. Risque résiduel : un mot de passe d'administrateur volé avant sa première activation de la 2FA donne accès. À limiter en activant la 2FA dès la création du compte.
 
 ## Durcissement transverse (audit du 2026-11-02)
 - Adresse IP : `TRUSTED_PROXIES` (défaut 1) = nombre de proxys ; on retient l'entrée de `X-Forwarded-For` ajoutée par le dernier proxy de confiance. Connexion limitée aussi par compte (40 essais / h).

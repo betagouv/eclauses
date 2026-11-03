@@ -18,6 +18,17 @@ export function resetPassword(url: string): Rendered {
   };
 }
 
+/** Code de la seconde étape de connexion des administrateurs (méthode « code par e-mail »). */
+export function codeVerification(code: string, minutes: number): Rendered {
+  return {
+    subject: 'Eclauses - Votre code de vérification',
+    html: layout(
+      `<p>Votre code de vérification pour accéder à l'administration d'Eclauses : <strong style="font-size:1.4em;letter-spacing:.2em">${esc(code)}</strong></p>
+<p>Il est valable ${minutes} minutes et ne sert qu'une fois. Si vous n'êtes pas à l'origine de cette demande, ne le communiquez à personne et changez votre mot de passe.</p>`,
+    ),
+  };
+}
+
 export function finalizeInscription(url: string): Rendered {
   return {
     subject: 'Eclauses - Finalisez votre inscription',

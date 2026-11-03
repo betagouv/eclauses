@@ -17,11 +17,16 @@ export const utilisateurs = pgTable(
     creeLe: timestamp({ withTimezone: true }).notNull().defaultNow(),
     motDePasseModifieLe: timestamp({ withTimezone: true }),
     derniereConnexionLe: timestamp({ withTimezone: true }),
-    /** Secret TOTP chiffré (AES-GCM) ; actif une fois confirmé. Seuls les administrateurs en ont un. */
+    /** Secret TOTP chiffré (AES-GCM) ; actif une fois confirmé. `totpActiveLe` marque l'activation de la double authentification, quelle que soit la méthode. */
     totpSecretChiffre: text(),
     totpActiveLe: timestamp({ withTimezone: true }),
     /** Dernier pas de 30 s accepté : un même code ne sert pas deux fois. */
     totpDernierPas: integer(),
+    /** Méthode de seconde étape : `app` (application d'authentification) ou `courrier` (code reçu par e-mail). Vide sur un compte actif = `app`. */
+    mfaMethode: text(),
+    /** Code à usage unique envoyé par e-mail (méthode `courrier`) : empreinte HMAC et expiration, effacées dès l'usage. */
+    mfaCodeEmpreinte: text(),
+    mfaCodeExpireLe: timestamp({ withTimezone: true }),
   },
   (t) => [uniqueIndex('utilisateurs_email_unique').on(sql`lower(${t.email})`)],
 );
