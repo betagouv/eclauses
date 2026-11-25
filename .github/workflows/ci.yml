@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, v2]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  v2:
+    name: Typage, tests et build (application Next.js)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: eclauses
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: eclauses
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U eclauses"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Base jetable du service ci-dessus : les tests créent et suppriment leurs propres bases.
+      DATABASE_URL: postgres://eclauses:ci-only@127.0.0.1:5432/eclauses
+      MAIL_TRANSPORT: log
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Failles connues des dépendances de production
+        run: npm audit --omit=dev --audit-level=moderate

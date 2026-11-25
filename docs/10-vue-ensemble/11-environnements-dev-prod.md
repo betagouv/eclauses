@@ -2,7 +2,7 @@
 
 ## Références connues
 
-Les identifiants suivants sont issus des exports et notes de migration. Ils doivent toujours être vérifiés avant usage.
+Les identifiants des documents ne sont pas versionnés (dépôt public) : ils sont conservés hors du dépôt et doivent toujours être vérifiés avant usage.
 
 | Environnement | Document Grist connu |
 |---|---|
