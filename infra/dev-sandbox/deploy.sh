@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Déploie l'application sur serveur-dev.example depuis ce poste.
+# Déploie l'application sur un serveur Docker distant (SSH) depuis ce poste.
 #   infra/dev-sandbox/deploy.sh init <url-publique>   # première fois : dossier distant + .env avec secrets générés
 #   infra/dev-sandbox/deploy.sh                       # construit l'image (amd64), l'envoie et relance
 #   infra/dev-sandbox/deploy.sh status | logs | tunnel
-# Variables : DEPLOY_HOST (défaut utilisateur@serveur-dev.example), DEPLOY_KEY (défaut ~/.ssh/id_rsa), DEPLOY_DIR (défaut eclauses-dev), DEPLOY_BIND (adresse d'écoute, défaut 127.0.0.1).
+# Configuration : copier infra/dev-sandbox/deploy.env.example en infra/dev-sandbox/deploy.env (ignoré par git) et le remplir.
+#   DEPLOY_HOST (obligatoire, utilisateur@serveur), DEPLOY_KEY (défaut ~/.ssh/id_rsa), DEPLOY_DIR (défaut eclauses-dev),
+#   DEPLOY_BIND (adresse d'écoute de l'application sur le serveur, défaut 127.0.0.1).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-HOST="${DEPLOY_HOST:-utilisateur@serveur-dev.example}"
+[ -f infra/dev-sandbox/deploy.env ] && . infra/dev-sandbox/deploy.env
+HOST="${DEPLOY_HOST:?DEPLOY_HOST manquant : voir infra/dev-sandbox/deploy.env.example}"
 KEY="${DEPLOY_KEY:-$HOME/.ssh/id_rsa}"
 DIR="${DEPLOY_DIR:-eclauses-dev}"
 SSH=(ssh -o BatchMode=yes -o IdentitiesOnly=yes -i "$KEY" -o ControlPath=none -o ServerAliveInterval=15 -o ServerAliveCountMax=8 "$HOST")

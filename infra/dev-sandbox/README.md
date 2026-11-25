@@ -1,6 +1,6 @@
-# Déploiement de développement (serveur-dev.example)
+# Déploiement de développement (Docker, serveur distant)
 
-Application : https://eclauses-dev.example.fr (proxy inverse `proxy.example` → `127.0.0.1:3200`, adresse privée du serveur).
+Application publiée derrière un proxy inverse HTTPS qui transmet à `DEPLOY_BIND:3200`. Les valeurs propres à votre serveur (hôte, clé SSH, adresse) sont dans `infra/dev-sandbox/deploy.env`, ignoré par git : voir `deploy.env.example`.
 Base PostgreSQL et fichiers : volumes Docker du projet `eclauses-dev`. Courriers : mode journal (aucun envoi réel).
 
 ## Commandes (depuis la racine du dépôt)
@@ -17,4 +17,4 @@ Base PostgreSQL et fichiers : volumes Docker du projet `eclauses-dev`. Courriers
 
 ## Premier administrateur
 Depuis `apps/web`, via le tunnel, avec l'adresse publique pour que le lien d'activation soit correct :
-`PUBLIC_URL=https://eclauses-dev.example.fr DATABASE_URL=… npx tsx scripts/create-admin.ts prenom.nom@oriatec.fr`
+`PUBLIC_URL=https://<adresse-publique> DATABASE_URL=… npx tsx scripts/create-admin.ts prenom.nom@exemple.fr`

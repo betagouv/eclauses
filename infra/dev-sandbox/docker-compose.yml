@@ -1,6 +1,5 @@
-# Déploiement de développement sur serveur-dev.example. Projet isolé (nom `eclauses-dev`) : il ne touche pas aux autres
-# piles du serveur. L'application n'écoute que sur l'adresse privée `WEB_BIND` (127.0.0.1) : le proxy inverse HTTPS
-# (proxy.example) la publie sous eclauses-dev.example.fr.
+# Déploiement de développement sur un serveur Docker. Projet isolé (nom `eclauses-dev`) : il ne touche pas aux autres
+# piles du serveur. L'application n'écoute que sur l'adresse `WEB_BIND` (privée ou locale) : un proxy inverse HTTPS la publie.
 # Secrets : fichier `.env` du dossier (généré par `deploy.sh init`, jamais versionné).
 name: eclauses-dev
 
