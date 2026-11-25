@@ -104,7 +104,9 @@ describe.skipIf(!hasPostgres)('double authentification des administrateurs', () 
     expect(u!.totpSecretChiffre).toMatch(/^v1\./);
     expect(u!.totpSecretChiffre).not.toContain(secret);
     expect(box.open(u!.totpSecretChiffre!)).toBe(secret);
-    expect(() => box.open(u!.totpSecretChiffre!.replace(/.$/, 'A'))).toThrow();
+    // Altère le premier caractère du contenu chiffré (le dernier caractère base64 peut ne porter aucun bit utile).
+    const [v, iv, tag, body] = u!.totpSecretChiffre!.split('.');
+    expect(() => box.open([v, iv, tag, (body![0] === 'A' ? 'B' : 'A') + body!.slice(1)].join('.'))).toThrow();
   });
 
   it('un compte qui n’est pas administrateur ne peut rien faire', async () => {
