@@ -13,11 +13,17 @@ const Component = () => {
     CAND: 'Candidat_aux_marches',    // RefList('Marches')
     TIT:  'Titulaire_aux_marches',   // RefList('Marches')
     INTITULE_LOT: 'Intitule_propre',
+    INTITULE: 'Intitule_du_marche',
+    LOT: 'Numero_de_lot',
+    LOT_TITLE: 'Intitule_du_lot',
+    PARENT: 'Marche_parent',
+    CLAUSE: 'Clauses_sociales',
+    STATUS: 'Statut',
   };
 
   // ===== Utils =====
   const emailLooksOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim());
-  const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
+  const isClosedStatus = (v) => ['Clause validée', 'Archivé'].includes(String(v || ''));
 
   // ===== State =====
   const [loading, setLoading] = React.useState(true);
@@ -33,6 +39,8 @@ const Component = () => {
   const [marcheId, setMarcheId] = React.useState(null);
   const [marcheLabel, setMarcheLabel] = React.useState(null);
   const [marcheValid, setMarcheValid] = React.useState(true);
+  const [lotOptions, setLotOptions] = React.useState([]);
+  const [selectedLotIds, setSelectedLotIds] = React.useState([]);
 
   const [form, setForm] = React.useState({
     [COL.NOM]: '',
@@ -43,17 +51,6 @@ const Component = () => {
     [COL.SIRET]: '',
   });
 
-  // ===== Load =====
-  React.useEffect(() => {
-    try {
-      
-    } catch (_) {
-      console.log("Error",_);
-      setMarcheId(null);
-      setLoading(false);
-    }
-  }, []);
-
   React.useEffect(() => {
     let alive = true;
     (async () => {
@@ -61,21 +58,36 @@ const Component = () => {
       try {
 
         const params = gristAPI.getQueryParams ? gristAPI.getQueryParams() : new URLSearchParams(window.location.search);
-        const raw = params.get('marche');
+        const raw = params.get('marche') || params.get('marche_');
         const n = raw != null ? Number(raw) : null;
-        console.log("Data get",raw, n);
         setMarcheId(Number.isFinite(n) ? n : null);
         
         const marches = await gristAPI.getData(MARCHES);
-        console.log("marches",marches)
         if (!alive) return;
-        const m = (marches || []).find(r => r.id === n);
-        console.log("marches trouvé",n)
-        if (m) {
-          setMarcheLabel(m[COL.INTITULE_LOT]);
-          setMarcheValid(true);
+        const requested = (marches || []).find(r => r.id === n);
+        const parent = requested?.[COL.PARENT]
+          ? (marches || []).find(r => Number(r.id) === Number(requested[COL.PARENT]))
+          : requested;
+        if (parent && !parent[COL.PARENT]) {
+          const allChildren = (marches || []).filter(r => Number(r[COL.PARENT]) === Number(parent.id));
+          const children = allChildren
+            .filter((lot) => lot[COL.CLAUSE])
+            .filter((lot) => !isClosedStatus(lot[COL.STATUS]))
+            .sort((a, b) => String(a[COL.LOT] || '').localeCompare(String(b[COL.LOT] || ''), 'fr', { numeric: true, sensitivity: 'base' }));
+
+          const fallbackNonAllotted = allChildren.length === 0 && parent[COL.CLAUSE] && !isClosedStatus(parent[COL.STATUS])
+            ? [parent]
+            : [];
+          const options = children.length ? children : fallbackNonAllotted;
+
+          setMarcheLabel(parent[COL.INTITULE] || parent[COL.INTITULE_LOT] || `Marché #${parent.id}`);
+          setLotOptions(options);
+          setSelectedLotIds(options.length === 1 ? [options[0].id] : []);
+          setMarcheValid(options.length > 0);
         } else {
           setMarcheLabel(null);
+          setLotOptions([]);
+          setSelectedLotIds([]);
           setMarcheValid(false);
         }
 
@@ -87,7 +99,7 @@ const Component = () => {
       }
     })();
     return () => { alive = false; };
-  }, [marcheId]);
+  }, []);
 
   function seedForm(rec) {
     setForm({
@@ -109,17 +121,34 @@ const Component = () => {
   function goBackToEmailStep() {
     setErr(null);
     setMsg(null);
-    const currentEmail = String(form[COL.EMAIL] || verifiedEmail || emailInput || '').trim();
+    const currentEmail = String(form[COL.EMAIL] || verifiedEmail || emailInput || '').trim().toLowerCase();
     setEmailInput(currentEmail);
     setStep('email');
   }
+  function toggleLot(lotId) {
+    setErr(null);
+    setSelectedLotIds((prev) => prev.includes(lotId) ? prev.filter((id) => id !== lotId) : [...prev, lotId]);
+  }
+  const selectedLots = React.useMemo(
+    () => lotOptions.filter((lot) => selectedLotIds.includes(lot.id)),
+    [lotOptions, selectedLotIds]
+  );
+  const hasOnlyParentOption = lotOptions.length === 1 && Number(lotOptions[0]?.id) === Number(marcheId);
+  const lotLabel = (lot) => {
+    const num = lot?.[COL.LOT] ? `Lot ${lot[COL.LOT]} - ` : '';
+    return `${num}${lot?.[COL.LOT_TITLE] || lot?.[COL.INTITULE_LOT] || lot?.[COL.INTITULE] || marcheLabel || 'Marché sans intitulé'}`;
+  };
 
   async function verifyEmailFirst() {
     setErr(null);
     setMsg(null);
-    const email = String(emailInput || '').trim();
+    const email = String(emailInput || '').trim().toLowerCase();
     if (!emailLooksOk(email)) {
       setErr("Adresse e-mail invalide.");
+      return;
+    }
+    if (!selectedLotIds.length) {
+      setErr(hasOnlyParentOption ? "Le marché n'est pas sélectionné." : "Sélectionnez au moins un lot.");
       return;
     }
 
@@ -137,6 +166,8 @@ const Component = () => {
         body: JSON.stringify({
           email,
           marcheId,
+          lotIds: selectedLotIds,
+          marcheIds: selectedLotIds,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -145,7 +176,9 @@ const Component = () => {
       const status = String(data?.status || '').toLowerCase();
       if (status === 'exist') {
         setSubmitted(true);
-        setMsg("Vous disposez dédjà d'un compte Eclauses avec cet email. Le marché a été ajouté dans votre liste de marché en candidature. Vous pouvez vous connecter à votre compte.");
+        setMsg(hasOnlyParentOption
+          ? "Vous disposez déjà d'un compte Eclauses avec cet email. Le marché a été ajouté dans votre liste de marchés en candidature. Vous pouvez vous connecter à votre compte."
+          : "Vous disposez déjà d'un compte Eclauses avec cet email. Les lots sélectionnés ont été ajoutés dans votre liste de marchés en candidature. Vous pouvez vous connecter à votre compte.");
         return;
       }
       if (status === 'new') {
@@ -181,17 +214,21 @@ const Component = () => {
       setErr("Adresse e-mail invalide.");
       return;
     }
+    if (!selectedLotIds.length) {
+      setErr(hasOnlyParentOption ? "Le marché n'est pas sélectionné." : "Sélectionnez au moins un lot.");
+      return;
+    }
 
     const payload = {
       [COL.NOM]:    form[COL.NOM]    || null,
       [COL.PRENOM]: form[COL.PRENOM] || null,
-      [COL.EMAIL]:  form[COL.EMAIL]  || null,
+      [COL.EMAIL]:  String(form[COL.EMAIL] || '').trim().toLowerCase() || null,
       [COL.TEL]:    form[COL.TEL]    || null,
       [COL.RAISOC]: form[COL.RAISOC] || null,
       [COL.SIRET]:  form[COL.SIRET]  || null,
     };
 
-    const candList = (marcheId && Number.isFinite(marcheId)) ? ['L', marcheId] : [];
+    const candList = selectedLotIds.length ? ['L', ...selectedLotIds] : [];
 
     try {
       await gristAPI.addRecord(TABLE, {
@@ -214,11 +251,11 @@ const Component = () => {
       </section>
     );
   }
-  if (marcheId && !marcheValid) {
+  if (!marcheValid) {
     return (
       <section className="fr-container fr-my-6w">
         <div className="fr-alert fr-alert--error">
-          <p>Ce lien d'inscription n'est plus valide : le marché est clos ou l'URL est erronée.</p>
+          <p>Ce lien d'inscription n'est plus valide : le marché est clos, ne contient aucun lot disponible ou l'URL est erronée.</p>
         </div>
       </section>
     );
@@ -245,6 +282,33 @@ const Component = () => {
             <div className="fr-grid-row fr-grid-row--gutters">
               <div className="fr-col-12">
                 <div className="fr-card fr-p-3w">
+                  <fieldset className="fr-fieldset fr-mb-3w" aria-labelledby="lots-legend">
+                    <legend className="fr-fieldset__legend fr-text--regular" id="lots-legend">
+                      {hasOnlyParentOption ? 'Marché concerné' : 'Choisissez les lots pour lesquels vous souhaitez rechercher des bénéficiaires'}
+                      <span className="fr-text-default--error" aria-hidden="true">*</span>
+                    </legend>
+                    <div className="fr-fieldset__content">
+                      {hasOnlyParentOption ? (
+                        <p className="fr-text--sm fr-mb-0">
+                          <strong>{lotLabel(lotOptions[0])}</strong>
+                        </p>
+                      ) : (
+                        lotOptions.map((lot) => (
+                          <div className="fr-checkbox-group fr-checkbox-group--sm" key={lot.id}>
+                            <input
+                              type="checkbox"
+                              id={`lot-${lot.id}`}
+                              checked={selectedLotIds.includes(lot.id)}
+                              onChange={() => toggleLot(lot.id)}
+                            />
+                            <label className="fr-label" htmlFor={`lot-${lot.id}`}>
+                              {lotLabel(lot)}
+                            </label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </fieldset>
                   <div className="fr-input-group">
                     <label className="fr-label" htmlFor="email-first">E-mail professionnel</label>
                     <input
@@ -252,7 +316,7 @@ const Component = () => {
                       className="fr-input"
                       type="email"
                       value={emailInput}
-                      onChange={(e) => { setErr(null); setEmailInput(e.target.value); }}
+                      onChange={(e) => { setErr(null); setEmailInput(e.target.value.toLowerCase()); }}
                     />
                     {emailInput && !emailLooksOk(emailInput) && (
                       <p className="fr-error-text">Format d’e-mail invalide.</p>
@@ -286,6 +350,17 @@ const Component = () => {
                     <p className="fr-text--sm fr-mb-2w">
                       <span className="fr-text-default--error" aria-hidden="true">*</span> Champs obligatoires
                     </p>
+
+                    <div className="fr-callout fr-callout--blue-cumulus fr-mb-3w">
+                      <p className="fr-callout__text">
+                        {hasOnlyParentOption ? 'Marché sélectionné' : 'Lots sélectionnés'} : <strong>{selectedLots.map(lotLabel).join(', ')}</strong>
+                      </p>
+                      {!hasOnlyParentOption && (
+                        <button className="fr-btn fr-btn--secondary fr-btn--sm fr-mt-2w" onClick={goBackToEmailStep}>
+                          Modifier les lots sélectionnés
+                        </button>
+                      )}
+                    </div>
 
                     <div className="fr-input-group">
                       <label className="fr-label" htmlFor="rs">Raison sociale <span className="fr-text-default--error" aria-hidden="true">*</span></label>

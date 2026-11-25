@@ -18,9 +18,14 @@ const Component = () => {
   };
 
   const M = {
-    INTITULE: 'Intitule',
+    INTITULE: 'Intitule_du_marche',
     INTIT_PROPRE: 'Intitule_propre',
+    INTITULE_LOT: 'Intitule_du_lot',
+    LOT: 'Numero_de_lot',
     CLAUSE: 'Clauses_sociales',         // Ref -> Clauses_sociales
+    PARENT: 'Marche_parent',
+    LOTS: 'Lots',
+    STATUS: 'Statut',
   };
 
   const B = {
@@ -39,6 +44,8 @@ const Component = () => {
     SPECS: 'Specialite',
     SOUS_SPEC: 'Sous_specialite',
     MEMOIRE: 'Intitule_du_memoire',
+    ELIGIBLE: 'Eligible',
+    DOIT_SUPPRIMER: 'Doit_supprimer',
   };
 
   const LOG = {
@@ -59,7 +66,9 @@ const Component = () => {
   const norm = (s) => String(s || '').toLowerCase();
   const includesI = (h, n) => norm(h).includes(norm(n));
   const isNum = (x) => typeof x === 'number' && isFinite(x);
+  const toBool = (v) => v === true || v === 1 || v === '1' || (typeof v === 'string' && v.toLowerCase() === 'true');
   const isFalseLike = (v) => v === false || v === 0 || v === '0' || (typeof v === 'string' && v.toLowerCase() === 'false');
+  const isClosedStatus = (v) => ['Clause validée', 'Archivé'].includes(String(v || ''));
 
   function pickLabelField(rows) {
     if (!rows || !rows.length) return 'id';
@@ -71,7 +80,7 @@ const Component = () => {
   }
   function toOptions(rows) {
     const key = pickLabelField(rows);
-    return (rows || []).map(r => ({ value: r.id, label: String(r[key] ?? r.id) }));
+    return (rows || []).map(r => ({ value: r.id, label: String(r[key] ?? r.id), tooltip: r.Tooltip || '' }));
   }
   const labelFrom = (opts, id) => (opts.find(o => o.value === id)?.label ?? String(id ?? '—'));
   const fullName = (r) => {
@@ -154,13 +163,44 @@ const Component = () => {
         if (!mine) throw new Error("Votre fiche n’est pas accessible.");
         setMe(mine);
 
-        // options marchés (candidats + titulaires)
+        // options marchés/lots (candidats + titulaires)
         const ids = [...new Set([...asArray(mine[R.CAND_LIST]), ...asArray(mine[R.TIT_LIST])].filter(isNum))];
-        const ms = (m || []).filter(row => ids.includes(row.id));
-        setOptsMarches(toOptions(ms));
-        // pré-sélection : auto si un seul marché
-        if (ms.length === 1) {
-          setSelectedMarcheId(prev => prev || String(ms[0].id));
+        const allMarches = Array.isArray(m) ? m : [];
+        const rowById = new Map(allMarches.map(row => [row.id, row]));
+        const seen = new Set();
+        const marcheOptions = [];
+        ids.forEach((id) => {
+          const row = rowById.get(id);
+          if (!row) return;
+          const refIds = asArray(row[M.LOTS])
+            .filter((x) => x !== 'L' && x != null && x !== '')
+            .map((x) => (typeof x === 'number' ? x : Number(x)))
+            .filter((x) => Number.isFinite(x));
+          const children = row[M.PARENT]
+            ? [row]
+            : (refIds.length
+                ? refIds.map(childId => rowById.get(childId)).filter(Boolean)
+                : allMarches.filter(child => Number(child[M.PARENT]) === Number(row.id)));
+          const availableRows = children.length ? children : [row];
+          availableRows
+            .filter((marche) => marche?.[M.CLAUSE])
+            .filter((marche) => !isClosedStatus(marche?.[M.STATUS]))
+            .forEach((marche) => {
+              if (!marche?.id || seen.has(marche.id)) return;
+              seen.add(marche.id);
+              marcheOptions.push(marche);
+          });
+        });
+        marcheOptions.sort((a, b) => {
+          const parentA = Number(a[M.PARENT]) || Number(a.id) || 0;
+          const parentB = Number(b[M.PARENT]) || Number(b.id) || 0;
+          if (parentA !== parentB) return parentA - parentB;
+          return String(a[M.LOT] || '').localeCompare(String(b[M.LOT] || ''), 'fr', { numeric: true, sensitivity: 'base' });
+        });
+        setOptsMarches(toOptions(marcheOptions));
+        // pré-sélection : auto si un seul marché/lot
+        if (marcheOptions.length === 1) {
+          setSelectedMarcheId(prev => prev || String(marcheOptions[0].id));
         }
       } catch (e) {
         if (!alive) return;
@@ -191,6 +231,7 @@ const Component = () => {
     const specSet = new Set((selectedSpecIds || []).map(v => String(v)));
     const q = norm(search);
     return (benefRows || [])
+      .filter(b => toBool(b[B.ELIGIBLE]) && !toBool(b[B.DOIT_SUPPRIMER]))
       .filter(b => asArray(b[B.CLAUSES]).includes(selectedClauseId))
       .filter(b => {
         if (specSet.size) {
@@ -266,6 +307,19 @@ const Component = () => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Erreur de chargement du CV (${res.status}).`);
       const blob = await res.blob();
+      const contentType = String(blob.type || res.headers.get('Content-Type') || '').toLowerCase();
+      if (contentType.includes('word') || contentType.includes('officedocument')) {
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'cv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        setCvPreviewError('Prévisualisation impossible. Le fichier a été téléchargé sur votre ordinateur.');
+        return;
+      }
       if (cvPreviewObjectUrlRef.current) {
         URL.revokeObjectURL(cvPreviewObjectUrlRef.current);
       }
@@ -333,20 +387,20 @@ const Component = () => {
       <header className="fr-mb-3w">
         <h1 className="fr-h3 fr-mb-1w">Recherche de bénéficiaires</h1>
         <p className="fr-text--sm fr-text-mention--grey">
-          Choisissez un marché, puis consultez les bénéficiaires de sa clause sociale.
+          Choisissez un marché ou un lot, puis consultez les bénéficiaires de sa clause sociale.
         </p>
       </header>
 
-      {/* Sélection du marché */}
-      <div className="fr-grid-row fr-grid-row--gutters fr-mb-3w">
+      {/* Sélection du marché ou du lot */}
+      <div className="fr-grid-row fr-grid-row--gutters">
         <div className="fr-col-12 fr-col-md-4">
           <div className="fr-select-group">
-            <label className="fr-label" htmlFor="marche">Marché</label>
+            <label className="fr-label" htmlFor="marche">Marché ou lot</label>
             <select id="marche" className="fr-select"
                     value={selectedMarcheId}
                     onChange={(e)=>setSelectedMarcheId(e.target.value)}>
-              {optsMarches.length ? 
-                    <option value="">— Sélectionner un marché —</option> : <option value="">— Aucun marché accessible —</option>}
+              {optsMarches.length ?
+                    <option value="">— Sélectionner un marché ou un lot —</option> : <option value="">— Aucun marché ou lot accessible —</option>}
               {optsMarches.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
@@ -384,13 +438,13 @@ const Component = () => {
           </>
         )}
       </div>
-      <p className="fr-hint-text fr-mt-1w">
-        Clause du marché : <strong>{labelFrom(optsClauses, selectedClauseId)}</strong>
+      <p className="fr-hint-text fr-mt-1w fr-mb-3w">
+        Clause : <strong>{labelFrom(optsClauses, selectedClauseId)}</strong>
       </p>
 
       {/* Liste */}
       {!selectedMarche ? (
-        <div className="fr-callout"><p className="fr-callout__text">Veuillez choisir un marché.</p></div>
+        <div className="fr-callout"><p className="fr-callout__text">Veuillez choisir un marché ou un lot.</p></div>
       ) : (
         <>
 
@@ -406,10 +460,10 @@ const Component = () => {
                   <div key={r.id} className="fr-col-12 fr-col-md-6">
                     <article className="fr-card fr-enlarge-link" onClick={() => openModal(r)}>
                       <div className="fr-card__body">
-                            <h2 className="fr-card__title fr-text--md">
                             {r.__isInterested && (
-                                <span className="fr-icon-star-fill" aria-hidden="true"></span>
+                              <p className="fr-badge fr-badge--sm fr-badge--new fr-badge--no-icon fr-mt-2w">★ Intérêt exprimé</p>
                             )}
+                            <h2 className="fr-card__title fr-text--md fr-mt-2w">
                               <a href="#" onClick={(e) => { e.preventDefault(); openModal(r); }}>{nomComplet}</a>
                             </h2>
                         <p className="fr-card__desc"><strong>Spécialité : </strong>{speList || '—'}</p>

@@ -12,7 +12,7 @@ const Component = () => {
                   <h3 class="fr-tile__title">
                     <a data-nav="beneficiaire-profil" href="#">Mes informations</a>
                   </h3>
-                  <p class="fr-tile__desc">Coordonnées, formation, spécialités, zones de mobilité, CV. Mettez à jour votre fiche à tout moment.
+                  <p class="fr-tile__desc">Mettez à jour votre fiche bénéficiaire (coordonnées, formations, mobilité...)
                 </p>
                 </div>
               </div>
@@ -34,7 +34,7 @@ const Component = () => {
                   <h3 class="fr-tile__title">
                     <a data-nav="beneficiaire-marches" href="#">Marchés actifs</a>
                   </h3>
-                  <p class="fr-tile__desc">Liste et carte des marchés encore réalisables et filtrés par vos clauses sociales.
+                  <p class="fr-tile__desc">Consultez les marchés couverts par une clause sociale sur tout le territoire.
                 </p>
                 </div>
               </div>
@@ -56,7 +56,7 @@ const Component = () => {
                   <h3 class="fr-tile__title">
                     <a data-nav="beneficiaire-annuaire" href="#">Annuaire</a>
                   </h3>
-                  <p class="fr-tile__desc">Recherchez des pairs partageant des clauses communes.
+                  <p class="fr-tile__desc">Consultez l’annuaire des bénéficiaires partageant la même clause sociale.
                 </p>
                 </div>
               </div>

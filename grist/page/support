@@ -29,7 +29,6 @@ const Component = () => {
   const SECTION_IDS = {
     FAQ: 'section-foire-aux-questions',
     VIDEOS: 'section-tutoriels-videos',
-    CONTACT: 'section-contact-support',
   };
 
   const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
@@ -170,19 +169,9 @@ const Component = () => {
   const [openIds, setOpenIds] = React.useState(new Set());
   const [pendingFaqTarget, setPendingFaqTarget] = React.useState(null);
 
-  const [contactNom, setContactNom] = React.useState('');
-  const [contactEmail, setContactEmail] = React.useState('');
-  const [contactMessage, setContactMessage] = React.useState('');
-  const [contactFile, setContactFile] = React.useState(null);
-  const [contactSending, setContactSending] = React.useState(false);
-  const [contactMsg, setContactMsg] = React.useState(null);
-  const [contactErr, setContactErr] = React.useState(null);
-
   const rootRef = React.useRef(null);
 
   const auth = gristAPI?.getAuth ? gristAPI.getAuth() : null;
-
-  const emailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || ''));
 
   React.useEffect(() => {
     let mounted = true;
@@ -412,62 +401,6 @@ const Component = () => {
     });
   }, [pendingFaqTarget, filteredQAs]);
 
-  const submitContact = async (e) => {
-    e.preventDefault();
-    setContactErr(null);
-    setContactMsg(null);
-
-    if (!contactNom.trim()) {
-      setContactErr('Le nom est requis.');
-      return;
-    }
-    if (!emailOk(contactEmail)) {
-      setContactErr('Adresse e-mail invalide.');
-      return;
-    }
-    if (!contactMessage.trim()) {
-      setContactErr('Le message est requis.');
-      return;
-    }
-
-    const webhookUrl = gristAPI.getEnv ? gristAPI.getEnv('N8N_SUPPORT_URL') : '';
-    if (!webhookUrl) {
-      setContactErr('Configuration manquante : N8N_SUPPORT_URL.');
-      return;
-    }
-
-    try {
-      setContactSending(true);
-
-      const fd = new FormData();
-      fd.append('nom', contactNom.trim());
-      fd.append('email', contactEmail.trim());
-      fd.append('message', contactMessage.trim());
-      fd.append('source', 'support-page');
-      if (contactFile) fd.append('piece_jointe', contactFile, contactFile.name || 'piece_jointe');
-
-      const res = await fetch(webhookUrl, {
-        method: 'POST',
-        body: fd,
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '');
-        throw new Error(txt || `Webhook en erreur (${res.status}).`);
-      }
-
-      setContactNom('');
-      setContactEmail('');
-      setContactMessage('');
-      setContactFile(null);
-      setContactMsg('Votre demande a bien été envoyée au support.');
-    } catch (error) {
-      setContactErr(error?.message || "Impossible d'envoyer le message au support.");
-    } finally {
-      setContactSending(false);
-    }
-  };
-
   if (loading) {
     return (
       <section className="fr-container fr-my-6w">
@@ -490,10 +423,23 @@ const Component = () => {
   return (
     <main ref={rootRef} className="fr-container fr-my-6w">
       <header className="fr-mb-4w">
-        <h1 className="fr-h3 fr-mb-1w">Support</h1>
-        <p className="fr-text--sm fr-text-mention--grey">
-          Contactez le support, consultez la FAQ, ou regardez les tutoriels vidéo.
-        </p>
+        <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
+          <div className="fr-col">
+            <h1 className="fr-h3 fr-mb-1w">Centre d'aide</h1>
+            <p className="fr-text--sm fr-text-mention--grey">
+              Consultez la FAQ ou regardez les tutoriels vidéo.
+            </p>
+          </div>
+          <div className="fr-col-auto">
+            <button
+              className="fr-btn fr-icon-mail-line fr-btn--icon-left"
+              type="button"
+              onClick={() => gristAPI?.navigate && gristAPI.navigate('support-contact')}
+            >
+              Contacter le support
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="fr-grid-row fr-grid-row--gutters">
@@ -508,9 +454,6 @@ const Component = () => {
                   </li>
                   <li className="fr-sidemenu__item">
                     <a className="fr-sidemenu__link" href={`#${SECTION_IDS.VIDEOS}`}>Tutoriels vidéos</a>
-                  </li>
-                  <li className="fr-sidemenu__item">
-                    <a className="fr-sidemenu__link" href={`#${SECTION_IDS.CONTACT}`}>Contacter le support</a>
                   </li>
                 </ul>
               </div>
@@ -631,74 +574,6 @@ const Component = () => {
             )}
           </section>
 
-          <section id={SECTION_IDS.CONTACT} className="fr-mb-6w">
-            <h2 className="fr-h4 fr-mb-2w">Contacter le support</h2>
-
-            {contactMsg && (
-              <div className="fr-alert fr-alert--success fr-mb-2w">
-                <p>{contactMsg}</p>
-              </div>
-            )}
-            {contactErr && (
-              <div className="fr-alert fr-alert--error fr-mb-2w">
-                <p>{contactErr}</p>
-              </div>
-            )}
-
-            <form onSubmit={submitContact}>
-              <div className="fr-input-group">
-                <label className="fr-label" htmlFor="support-nom">Nom</label>
-                <input
-                  id="support-nom"
-                  className="fr-input"
-                  type="text"
-                  value={contactNom}
-                  onChange={(e) => setContactNom(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="fr-input-group">
-                <label className="fr-label" htmlFor="support-email">Email</label>
-                <input
-                  id="support-email"
-                  className="fr-input"
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  required
-                />
-              </div>
-              
-              <div className="fr-input-group">
-                <label className="fr-label" htmlFor="support-message">Message</label>
-                <textarea
-                  id="support-message"
-                  className="fr-input"
-                  rows="6"
-                  value={contactMessage}
-                  onChange={(e) => setContactMessage(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="fr-upload-group">
-                <label className="fr-label" htmlFor="support-piece-jointe">Pièce jointe (optionnel)</label>
-                <input
-                  id="support-piece-jointe"
-                  className="fr-upload"
-                  type="file"
-                  onChange={(e) => setContactFile((e.target.files && e.target.files[0]) || null)}
-                />
-              </div>
-
-              <div className="fr-btns-group fr-btns-group--inline fr-mt-2w">
-                <button className="fr-btn" type="submit" disabled={contactSending}>
-                  {contactSending ? 'Envoi…' : 'Envoyer au support'}
-                </button>
-              </div>
-            </form>
-          </section>
         </div>
       </div>
     </main>

@@ -21,6 +21,8 @@ const Component = () => {
     SPECS: 'Specialite',
     CV: 'curriculum_vitae',
     CONSENT_ANN: 'Je_consens_a_figurer_dans_l_annuaire_partage_avec_les_professionnels_du_secteur',
+    ELIGIBLE: 'Eligible',
+    DOIT_SUPPRIMER: 'Doit_supprimer',
     CLAUSES_BENEF: 'Clauses_sociales_de_rattachement', // ref list
     CLAUSE_MARCHE: 'Clauses_sociales',                 // ref sur Marches
     ACHE_MARCHE: 'Acheteur',                           // ref Acheteurs
@@ -169,7 +171,7 @@ const Component = () => {
         setRegionsRows(Array.isArray(regs) ? regs : []);
         setValidClauseIdSet(new Set((cls || []).map(r => r.id)));
         const specKey = pickLabelField(specs || []);
-        setSpecOptions((specs || []).map(r => ({ value: r.id, label: String(r[specKey] ?? r.id) })));
+        setSpecOptions((specs || []).map(r => ({ value: r.id, label: String(r[specKey] ?? r.id), tooltip: r.Tooltip || '' })));
 
         // Précharge Leaflet pour les cartes
         loadLeaflet().catch(() => {});
@@ -210,8 +212,10 @@ const Component = () => {
     const valid = validClauseIdSet;
     const clauseAcheteur = acheteurClauseIdSet;
     const specSet = new Set((selectedSpecIds || []).map(v => String(v)));
-    const res = (benefRows || []).filter(r => {
-      const benClauses = sanitizeIds(r[COL.CLAUSES_BENEF], valid);
+	    const res = (benefRows || []).filter(r => {
+	      if (!toBool(r[COL.ELIGIBLE])) return false;
+	      if (toBool(r[COL.DOIT_SUPPRIMER])) return false;
+	      const benClauses = sanitizeIds(r[COL.CLAUSES_BENEF], valid);
       const intersect = benClauses.some(id => clauseAcheteur.has(id));
       if (!intersect) return false;
       if (onlyConsent && !toBool(r[COL.CONSENT_ANN])) return false;
@@ -515,6 +519,19 @@ const Component = () => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Erreur de chargement du CV (${res.status}).`);
       const blob = await res.blob();
+      const contentType = String(blob.type || res.headers.get('Content-Type') || '').toLowerCase();
+      if (contentType.includes('word') || contentType.includes('officedocument')) {
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'cv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        setCvPreviewError('Prévisualisation impossible. Le fichier a été téléchargé sur votre ordinateur.');
+        return;
+      }
       if (cvPreviewObjectUrlRef.current) {
         URL.revokeObjectURL(cvPreviewObjectUrlRef.current);
       }

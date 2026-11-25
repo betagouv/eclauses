@@ -2,7 +2,6 @@ const Component = () => {
   const { useState, useEffect } = React;
   const ComboBox = gristAPI.getComponent('ComboBox');
   // === Constantes ===
-  const N8N_CV_UPLOAD_URL = 'https://eclauses-ia.oriatec-host.fr/dev/api/upload_cv.php'; // Webhook n8n
   const MAX_CV_BYTES = 5 * 1024 * 1024; // 5 Mo
   const ACCEPTED_CV_TYPES = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
   const TABLE = 'Beneficiaires'; // table principale
@@ -59,7 +58,12 @@ const Component = () => {
 
   function toOptions(rows, key = undefined) {
     const k = key === undefined ? pickLabelField(rows) : key;
-    return (rows || []).map(r => ({ value: r.id, label: String(r[k] ?? r.id) }));
+    return (rows || []).map(r => ({ value: r.id, label: String(r[k] ?? r.id), tooltip: r.Tooltip || '' }));
+  }
+
+  function goSupportContact(e) {
+    if (e) e.preventDefault();
+    if (gristAPI?.navigate) gristAPI.navigate('support-contact');
   }
 
   // === États ===
@@ -70,6 +74,7 @@ const Component = () => {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [consentMsg, setConsentMsg] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   // Auth (depuis MagicLink)
   const [auth, setAuth] = useState(null);
@@ -224,7 +229,10 @@ const Component = () => {
   }
 
   // === Handlers ===
-  function setField(name, value) { setForm(prev => ({ ...prev, [name]: value })); }
+  function setField(name, value) {
+    setFormErrors(prev => ({ ...prev, [name]: null }));
+    setForm(prev => ({ ...prev, [name]: value }));
+  }
   function setSelectSingle(name, e) {
     const v = e.target.value;
     setField(name, v ? Number(v) : null);
@@ -245,7 +253,20 @@ const Component = () => {
   async function save(source) {
     if (!currentId) return;
     setErr(null); setMsg(null);
+    setFormErrors({});
     if (source === 'consents') setConsentMsg(false);
+
+    if (source === 'profile') {
+      const nextErrors = {};
+      if (isEmpty(form['NOM'])) nextErrors.NOM = 'Champ requis.';
+      if (isEmpty(form['Prenom'])) nextErrors.Prenom = 'Champ requis.';
+      if (!displayList(form['Specialite']).length) nextErrors.Specialite = 'Champ requis.';
+      if (Object.keys(nextErrors).length) {
+        setFormErrors(nextErrors);
+        setErr('Merci de compléter les champs obligatoires.');
+        return;
+      }
+    }
 
     if (!emailLooksOk(form['Courriel'])) {
       setErr('Adresse e-mail invalide.');
@@ -294,7 +315,7 @@ const Component = () => {
     }
   }
 
-  // === Upload CV via n8n ===
+  // === Upload CV via API Grist depuis le widget ===
   async function uploadCV() {
     if (!currentId || !fileCV) return;
     setErr(null); setMsg(null);
@@ -309,34 +330,60 @@ const Component = () => {
 
       setUploading(true);
 
+      if (!grist?.docApi?.getAccessToken) {
+        throw new Error("L'API d'upload Grist n'est pas disponible dans ce widget.");
+      }
+
+      const tokenInfo = await grist.docApi.getAccessToken({ readOnly: false });
+      if (!tokenInfo?.baseUrl || !tokenInfo?.token) {
+        throw new Error("Impossible d'obtenir un jeton d'accès Grist.");
+      }
+
       const formData = new FormData();
-      formData.append('cv', fileCV);               // le fichier
-      formData.append('benef_id', String(currentId)); // pour que n8n sache quelle ligne mettre à jour
+      formData.append('upload', fileCV, fileCV.name);
 
       const controller = new AbortController();
       const to = setTimeout(() => controller.abort(), 20000);
       let res;
-      const uploadUrl = gristAPI.getEnv('N8N_CV_UPLOAD_URL', N8N_CV_UPLOAD_URL);
       try {
-        res = await fetch(uploadUrl, { method: 'POST', body: formData, signal: controller.signal });
+        res = await fetch(`${tokenInfo.baseUrl}/attachments?auth=${tokenInfo.token}`, {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          signal: controller.signal,
+        });
       } finally {
         clearTimeout(to);
       }
 
-      // Attendu: { ok: true, message?: string, attachment_id?: number }
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        throw new Error(data.message || 'Échec du téléversement.');
+      const data = await res.json().catch(() => []);
+      if (!res.ok) {
+        throw new Error(data?.message || `Échec du téléversement (${res.status}).`);
       }
 
-      // Rafraîchit la fiche (n8n a déjà mis à jour la colonne côté Grist)
+      const attachmentId = Array.isArray(data) ? data[0] : (data?.attachment_id || data?.attachmentId || data?.id);
+      if (!Number.isFinite(Number(attachmentId))) {
+        throw new Error("L'upload a réussi mais l'identifiant de pièce jointe est introuvable.");
+      }
+
+      // Grist refuse la liaison depuis la session du widget (ACL_DENY "Cannot access attachment") :
+      // on la délègue à n8n, qui vérifie le jeton AuthLink puis écrit la cellule.
+      const linkUrl = gristAPI.getEnv ? gristAPI.getEnv('N8N_LIEN_CV', '') : '';
+      if (!linkUrl) throw new Error('Configuration manquante : N8N_LIEN_CV.');
+      const authToken = (gristAPI.getQueryParams ? gristAPI.getQueryParams().get('Token_') : null)
+        || (gristAPI.getAuth ? gristAPI.getAuth()?.token : null);
+      if (!authToken) throw new Error('Session expirée, veuillez vous reconnecter.');
+      const linkRes = await fetch(linkUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ benef_id: Number(currentId), attachment_id: Number(attachmentId), token: authToken }),
+      });
+      if (!linkRes.ok) {
+        const linkData = await linkRes.json().catch(() => null);
+        throw new Error(linkData?.message || `Liaison du CV en erreur (${linkRes.status}).`);
+      }
       await refreshRow();
-
-      // Extraire l'ID de l'attachment (si fourni par l'API)
-      const attachmentId = data.attachment_id || data.attachmentId || data.id;
-      if (attachmentId && Number.isFinite(Number(attachmentId))) {
-        refreshCvUrl([Number(attachmentId)]);
-      }
+      refreshCvUrl([Number(attachmentId)]);
 
       setFileCV(null);
       if (cvInputRef.current) cvInputRef.current.value = '';
@@ -622,17 +669,19 @@ function sortByLabelFr(options) {
 
               <div className="fr-grid-row fr-grid-row--gutters">
                 <div className="fr-col-12 fr-col-md-6 fr-mb-3w">
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="nom">Nom</label>
+                  <div className={`fr-input-group ${formErrors.NOM ? 'fr-input-group--error' : ''}`}>
+                    <label className="fr-label" htmlFor="nom">Nom <span className="fr-text-default--error" aria-hidden="true">*</span></label>
                     <input id="nom" className="fr-input" type="text"
                       value={form['NOM']} onChange={(e) => setField('NOM', e.target.value)} />
+                    {formErrors.NOM && <p className="fr-error-text">{formErrors.NOM}</p>}
                   </div>
                 </div>
                 <div className="fr-col-12 fr-col-md-6 fr-mb-3w">
-                  <div className="fr-input-group">
-                    <label className="fr-label" htmlFor="prenom">Prénom</label>
+                  <div className={`fr-input-group ${formErrors.Prenom ? 'fr-input-group--error' : ''}`}>
+                    <label className="fr-label" htmlFor="prenom">Prénom <span className="fr-text-default--error" aria-hidden="true">*</span></label>
                     <input id="prenom" className="fr-input" type="text"
                       value={form['Prenom']} onChange={(e) => setField('Prenom', e.target.value)} />
+                    {formErrors.Prenom && <p className="fr-error-text">{formErrors.Prenom}</p>}
                   </div>
                 </div>
 
@@ -641,7 +690,7 @@ function sortByLabelFr(options) {
                     <label className="fr-label" htmlFor="courriel">Courriel</label>
                     <input id="courriel" className="fr-input" type="email"
                       value={form['Courriel']} disabled />
-                    <p className="fr-hint-text">Pour modifier cette information, contacter le <a href="#" data-nav="support">support Eclauses.</a></p>
+                    <p className="fr-hint-text">Pour modifier cette information, contacter le <a href="#" onClick={goSupportContact}>support Eclauses.</a></p>
                   </div>
                 </div>
                 <div className="fr-col-12 fr-col-md-6 fr-mb-3w">
@@ -657,7 +706,7 @@ function sortByLabelFr(options) {
                     <label className="fr-label" htmlFor="annee">Année de diplôme</label>
                     <input id="annee" className="fr-input" type="text"
                       value={form['Annee_de_diplome']} disabled />
-                    <p className="fr-hint-text">Pour modifier cette information, contacter le <a href="#" data-nav="support">support Eclauses.</a></p>
+                    <p className="fr-hint-text">Pour modifier cette information, contacter le <a href="#" onClick={goSupportContact}>support Eclauses.</a></p>
                   </div>
                 </div>
                 <div className="fr-col-12 fr-col-md-6 fr-mb-3w">
@@ -665,7 +714,7 @@ function sortByLabelFr(options) {
                     <label className="fr-label" htmlFor="formation">Formation</label>
                     <input id="formation" className="fr-input" type="text"
                       value={form['Formation'] ? (optFormation.find(o => o.value === form['Formation'])?.label || '—') : '—'} disabled />
-                    <p className="fr-hint-text">Pour modifier cette information, contacter le <a href="#" data-nav="support">support Eclauses.</a></p>
+                    <p className="fr-hint-text">Pour modifier cette information, contacter le <a href="#" onClick={goSupportContact}>support Eclauses.</a></p>
                   </div>
                 </div>
 
@@ -674,6 +723,7 @@ function sortByLabelFr(options) {
                     <ComboBox
                       id="specs-combo"
                       label="Spécialité(s)"
+                      required
                       options={optSpecialites}
                       multiple
                       value={displayList(form['Specialite'])}
@@ -685,6 +735,7 @@ function sortByLabelFr(options) {
                   ) : (
                     <div className="fr-alert fr-alert--error"><p>ComboBox indisponible.</p></div>
                   )}
+                  {formErrors.Specialite && <p className="fr-error-text">{formErrors.Specialite}</p>}
                 </div>
 
                 <div className="fr-col-12 fr-col-md-6 fr-mb-3w">

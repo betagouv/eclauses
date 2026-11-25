@@ -25,10 +25,13 @@ const Component = () => {
     SPECS: 'Specialite',
     SOUS_SPEC: 'Sous_specialite',
     MEMOIRE: 'Intitule_du_memoire',
+    ELIGIBLE: 'Eligible',
+    DOIT_SUPPRIMER: 'Doit_supprimer',
   };
 
   // ===== Utils =====
   const asArray = (v) => Array.isArray(v) ? v : (v == null ? [] : [v]);
+  const toBool  = (v) => v === true || v === 1 || v === '1' || (typeof v === 'string' && v.toLowerCase() === 'true');
   const isFalseLike = (v) => v === false || v === 0 || v === '0' || (typeof v === 'string' && v.toLowerCase() === 'false');
   const includesIci = (h, n) => String(h || '').toLowerCase().includes(String(n || '').toLowerCase());
   const norm = (s) => String(s || '').toLowerCase();
@@ -148,7 +151,7 @@ const Component = () => {
         deptsByIdRef.current = mapById(depts);
 
         const specLabelKey = pickLabelField(s || []);
-        setSpecOptions((s || []).map(r => ({ value: r.id, label: String(r[specLabelKey] ?? r.id) })));
+        setSpecOptions((s || []).map(r => ({ value: r.id, label: String(r[specLabelKey] ?? r.id), tooltip: r.Tooltip || '' })));
 
         // Sélection initiale : auth → selection → unique
         const auth = gristAPI?.getAuth ? gristAPI.getAuth() : null;
@@ -208,8 +211,10 @@ const Component = () => {
   const filtered = React.useMemo(() => {
     const clauseFilterId = selectedClauseId || null;
     const res = (benefRows || []).filter(r => {
-      if (!r) return false;
-      const rClauses = sanitizeIds(r[CLAUSE_COL], validClauseIdSet);
+	      if (!r) return false;
+	      if (!toBool(r[COL.ELIGIBLE])) return false;
+	      if (toBool(r[COL.DOIT_SUPPRIMER])) return false;
+	      const rClauses = sanitizeIds(r[CLAUSE_COL], validClauseIdSet);
       if (clauseFilterId == null || !rClauses.includes(clauseFilterId)) return false;
 
       if (selectedSpecIds.length) {
@@ -372,6 +377,19 @@ const Component = () => {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Erreur de chargement du CV (${res.status}).`);
       const blob = await res.blob();
+      const contentType = String(blob.type || res.headers.get('Content-Type') || '').toLowerCase();
+      if (contentType.includes('word') || contentType.includes('officedocument')) {
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = 'cv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+        setCvPreviewError('Prévisualisation impossible. Le fichier a été téléchargé sur votre ordinateur.');
+        return;
+      }
       if (cvPreviewObjectUrlRef.current) {
         URL.revokeObjectURL(cvPreviewObjectUrlRef.current);
       }

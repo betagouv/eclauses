@@ -1,18 +1,12 @@
 const Component = () => {
-  const lastUpdate = new Date().toLocaleDateString('fr-FR');
-
+  const lastUpdate = '24 juin 2026';
   const items = [
-    { id: 'editeur', label: 'Éditeur du site' },
-    { id: 'hebergeur', label: 'Hébergement' },
-    { id: 'publication', label: 'Direction de la publication' },
-    { id: 'contact', label: 'Contact' },
+    { id: 'editeur', label: 'Éditeur de la plateforme' },
+    { id: 'publication', label: 'Directeur de la publication' },
+    { id: 'hebergement', label: 'Hébergement' },
     { id: 'accessibilite', label: 'Accessibilité' },
-    { id: 'propriete', label: 'Propriété intellectuelle' },
-    { id: 'donnees', label: 'Données personnelles' },
-    { id: 'cookies', label: 'Cookies' },
-    { id: 'responsabilite', label: 'Responsabilité' },
-    { id: 'droit', label: 'Droit applicable' },
-    { id: 'signalement', label: 'Signalement de contenus' },
+    { id: 'en-savoir-plus', label: 'En savoir plus' },
+    { id: 'signalement', label: 'Signaler un dysfonctionnement' },
   ];
 
   return (
@@ -32,7 +26,6 @@ const Component = () => {
       </header>
 
       <div className="fr-grid-row fr-grid-row--gutters">
-        {/* Sommaire */}
         <aside className="fr-col-12 fr-col-md-4">
           <nav className="fr-sidemenu fr-sidemenu--sticky-full-height" aria-label="Sommaire des mentions légales">
             <div className="fr-sidemenu__inner">
@@ -50,119 +43,105 @@ const Component = () => {
           </nav>
         </aside>
 
-        {/* Contenu */}
         <div className="fr-col-12 fr-col-md-8">
           <section id="editeur" className="fr-mb-6w">
-            <h2 className="fr-h3">Éditeur du site</h2>
+            <h2 className="fr-h3">Éditeur de la plateforme</h2>
             <p>
-              <strong>[Nom de l’entité]</strong><br />
-              [Forme juridique] – [Capital social]<br />
-              SIREN : [XXXXXXXXX]<br />
-              Siège social : [Adresse complète]<br />
-              [Code postal] [Ville] – [Pays]
+              La mission ministérielle des achats (MMA) au sein du ministère de la Culture :
             </p>
             <p>
-              Courriel : <a href="mailto:contact@example.org">contact@example.org</a><br />
-              Téléphone : <a href="tel:+33123456789">+33&nbsp;1&nbsp;23&nbsp;45&nbsp;67&nbsp;89</a>
+              182 rue Saint-Honoré<br />
+              75001 Paris<br />
+              France
             </p>
-          </section>
-
-          <section id="hebergeur" className="fr-mb-6w">
-            <h2 className="fr-h3">Hébergement</h2>
-            <p>
-              <strong>[Nom de l’hébergeur]</strong><br />
-              [Adresse de l’hébergeur]<br />
-              Site : <a href="https://www.example-host.com" target="_blank" rel="noopener">www.example-host.com</a>
-            </p>
+            <p>Téléphone : <a href="tel:+33140158000">01 40 15 80 00</a></p>
           </section>
 
           <section id="publication" className="fr-mb-6w">
-            <h2 className="fr-h3">Direction de la publication</h2>
-            <p>
-              Directeur·rice de la publication : <strong>[Nom Prénom]</strong> (<em>[Fonction]</em>)<br />
-              Responsable de la rédaction : <strong>[Nom Prénom]</strong>
-            </p>
+            <h2 className="fr-h3">Directeur de la publication</h2>
+            <p>Monsieur Renaud SOUCHE, en sa qualité de chef de la mission.</p>
           </section>
 
-          <section id="contact" className="fr-mb-6w">
-            <h2 className="fr-h3">Contact</h2>
-            <p>
-              Pour toute question, vous pouvez nous écrire à <a href="mailto:contact@example.org">contact@example.org</a> ou par courrier à l’adresse de l’éditeur.
-            </p>
+          <section id="hebergement" className="fr-mb-6w">
+            <h2 className="fr-h3">Hébergement de la plateforme GRIST utilisée par l'équipe</h2>
+            <p>Grist est un tableur-base de données open source.</p>
+            <div className="fr-table fr-table--bordered fr-table--layout-fixed">
+              <table>
+                <caption>Informations de sécurité et d'hébergement</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Point de sécurité</th>
+                    <th scope="col">Réponse</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">Hébergement</th>
+                    <td>SecNumCloud - Outscale (qualification ANSSI)</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Homologation</th>
+                    <td>
+                      Instance <a href="https://grist.numerique.gouv.fr/" target="_blank" rel="noopener">grist.numerique.gouv.fr</a> homologuée RGS en janvier 2026 pour une durée de 12 mois
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Cotation DICT</th>
+                    <td>2333</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Bug Bounty</th>
+                    <td>Programme actif : des failles ont déjà été remontées et corrigées rapidement.</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Code source</th>
+                    <td>
+                      <a href="https://github.com/gristlabs/grist-core/" target="_blank" rel="noopener">Open source Apache 2.0</a>, auditable, pas de boîte noire
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Données</th>
+                    <td>Aucune transmission à des tiers, aucune exploitation à des fins commerciales.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section id="accessibilite" className="fr-mb-6w">
             <h2 className="fr-h3">Accessibilité</h2>
             <p>
-              Nous nous engageons à rendre notre service numérique accessible conformément au décret n°&nbsp;2019-768.
-              L’accessibilité du site fait l’objet d’une démarche d’amélioration continue.
-            </p>
-            <p>
-              Déclaration d’accessibilité : <a href="#" onClick={(e)=>e.preventDefault()}>[lien / état de conformité]</a>
+              La conformité aux normes d'accessibilité numérique est un objectif ultérieur mais nous tâchons de rendre cette plateforme accessible à toutes et à tous.
             </p>
           </section>
 
-          <section id="propriete" className="fr-mb-6w">
-            <h2 className="fr-h3">Propriété intellectuelle</h2>
+          <section id="en-savoir-plus" className="fr-mb-6w">
+            <h2 className="fr-h3">En savoir plus</h2>
             <p>
-              Sauf mention contraire, les contenus de ce site sont proposés sous
-              {' '}<a href="https://github.com/etalab/licence-ouverte/blob/master/LO.md" target="_blank" rel="noopener">licence Ouverte&nbsp;2.0 (Etalab)</a>.
-              Les marques et logos cités restent la propriété de leurs titulaires respectifs.
-            </p>
-          </section>
-
-          <section id="donnees" className="fr-mb-6w">
-            <h2 className="fr-h3">Données personnelles</h2>
-            <p>
-              Les traitements de données réalisés dans le cadre de ce service respectent le Règlement (UE) 2016/679 (RGPD) et la loi Informatique et Libertés.
-              Vous disposez de droits d’accès, de rectification, d’opposition, d’effacement et de limitation.
-              Pour les exercer, contactez&nbsp;: <a href="mailto:dpo@example.org">dpo@example.org</a>.
-            </p>
-            <p>
-              Finalités, base légale, durées de conservation et destinataires sont détaillés dans notre politique de confidentialité :
-              {' '}<a href="#" onClick={(e)=>e.preventDefault()}>[lien vers la politique]</a>.
-            </p>
-          </section>
-
-          <section id="cookies" className="fr-mb-6w">
-            <h2 className="fr-h3">Cookies</h2>
-            <p>
-              Ce site utilise uniquement des cookies strictement nécessaires à son fonctionnement et, le cas échéant, des cookies de mesure d’audience
-              exemptés de consentement conformément aux recommandations de la CNIL.
-            </p>
-            <p>
-              Pour en savoir plus : <a href="#" onClick={(e)=>e.preventDefault()}>[lien vers la page cookies]</a>.
-            </p>
-          </section>
-
-          <section id="responsabilite" className="fr-mb-6w">
-            <h2 className="fr-h3">Responsabilité</h2>
-            <p>
-              Nous mettons tout en œuvre pour assurer l’exactitude des informations publiées. Toutefois, celles-ci sont fournies à titre indicatif
-              et ne sauraient engager notre responsabilité en cas d’erreur ou d’omission.
-              Les liens externes n’engagent pas la responsabilité de l’éditeur.
-            </p>
-          </section>
-
-          <section id="droit" className="fr-mb-6w">
-            <h2 className="fr-h3">Droit applicable</h2>
-            <p>
-              Les présentes mentions légales sont régies par le droit français. En cas de litige, et à défaut d’accord amiable,
-              les tribunaux compétents seront ceux du ressort de [Ville].
+              Pour en savoir plus sur la politique d'accessibilité numérique de l'État :{' '}
+              <a href="https://accessibilite.numerique.gouv.fr/" target="_blank" rel="noopener">
+                accessibilite.numerique.gouv.fr
+              </a>
             </p>
           </section>
 
           <section id="signalement" className="fr-mb-6w">
-            <h2 className="fr-h3">Signalement de contenus</h2>
+            <h2 className="fr-h3">Signaler un dysfonctionnement</h2>
             <p>
-              Vous pouvez signaler tout contenu illicite ou inapproprié à l’adresse :
-              {' '}<a href="mailto:signalement@example.org">signalement@example.org</a>.
+              Si vous rencontrez un défaut d'accessibilité vous empêchant d'accéder à un contenu ou une fonctionnalité de la plateforme, merci de nous en faire part :{' '}
+              <a href="mailto:contact@eclauses.beta.gouv.fr">contact@eclauses.beta.gouv.fr</a>
+            </p>
+            <p>
+              Si vous n'obtenez pas de réponse rapide de notre part, vous êtes en droit de faire parvenir vos doléances ou une demande de saisine au Défenseur des droits.
             </p>
           </section>
 
           <div className="fr-mt-6w">
-            <a className="fr-link fr-icon-arrow-up-s-line fr-link--icon-left" href="#top"
-               onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+            <a
+              className="fr-link fr-icon-arrow-up-s-line fr-link--icon-left"
+              href="#top"
+              onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            >
               Haut de page
             </a>
           </div>

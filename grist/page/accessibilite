@@ -1,17 +1,9 @@
 const Component = () => {
-  const lastUpdate = new Date().toLocaleDateString('fr-FR');
-
   const toc = [
-    { id: 'intro', label: 'Mention d’information (art. 14 RGPD)' },
-    { id: 'finalite', label: 'Finalité du traitement' },
-    { id: 'base-legale', label: 'Base légale' },
-    { id: 'categories', label: 'Catégories de données' },
-    { id: 'destinataires', label: 'Destinataires' },
-    { id: 'origine', label: 'Origine des données' },
-    { id: 'duree', label: 'Durée de conservation' },
-    { id: 'droits', label: 'Vos droits' },
-    { id: 'contact', label: 'Contact DPO' },
-    { id: 'cnil', label: 'Réclamation CNIL' },
+    { id: 'conformite', label: 'État de conformité' },
+    { id: 'contenus-non-accessibles', label: 'Contenus non accessibles' },
+    { id: 'amelioration-contact', label: 'Amélioration et contact' },
+    { id: 'recours', label: 'Voie de recours' },
   ];
 
   return (
@@ -19,8 +11,8 @@ const Component = () => {
       <header className="fr-mb-4w">
         <div className="fr-grid-row fr-grid-row--middle fr-grid-row--gutters">
           <div className="fr-col">
-            <h1 className="fr-h2">Données personnelles</h1>
-            <p className="fr-text--sm fr-text-mention--grey">Dernière mise à jour : {lastUpdate}</p>
+            <h1 className="fr-h2">Déclaration d'accessibilité</h1>
+            <p className="fr-text--sm fr-text-mention--grey">Établie le 15 juillet 2026</p>
           </div>
           <div className="fr-col-auto">
             <button className="fr-btn fr-btn--secondary" onClick={() => window.print()}>
@@ -31,12 +23,11 @@ const Component = () => {
       </header>
 
       <div className="fr-grid-row fr-grid-row--gutters">
-        {/* Sommaire */}
         <aside className="fr-col-12 fr-col-md-4">
-          <nav className="fr-sidemenu fr-sidemenu--sticky-full-height" aria-label="Sommaire Données personnelles">
+          <nav className="fr-sidemenu fr-sidemenu--sticky-full-height" aria-label="Sommaire Accessibilité">
             <div className="fr-sidemenu__inner">
-              <button className="fr-sidemenu__btn" aria-controls="dp-menu">Sommaire</button>
-              <div className="fr-collapse" id="dp-menu">
+              <button className="fr-sidemenu__btn" aria-controls="accessibilite-menu">Sommaire</button>
+              <div className="fr-collapse" id="accessibilite-menu">
                 <ul className="fr-sidemenu__list">
                   {toc.map((it) => (
                     <li key={it.id} className="fr-sidemenu__item">
@@ -49,94 +40,80 @@ const Component = () => {
           </nav>
         </aside>
 
-        {/* Contenu */}
         <div className="fr-col-12 fr-col-md-8">
-          <section id="intro" className="fr-mb-6w">
-            <h2 className="fr-h3">Mention d’information RGPD (article 14) — Eclauses</h2>
+          <section className="fr-mb-6w">
             <p>
-              Nous vous informons que vos données (prénom, nom, courriel, numéro de téléphone professionnel et les informations
-              relatives à votre formation et votre profession) ont été collectées par le ministère de la Culture, par le biais de la
-              mission ministérielle des achats (MMA) sur la base de sa mission d’intérêt public conformément à l’article 6-1 e) du RGPD.
+              Le Ministère de la Culture s'engage à rendre son service accessible, conformément à l'article 47 de la loi n° 2005-102 du 11 février 2005.
+            </p>
+            <p>
+                À cette fin, nous mettons en œuvre la stratégie et les actions indiquées dans un{' '}
+                <a href="https://www.culture.gouv.fr/fr/accessibilite-partiellement-conforme/schema-pluriannuel-d-accessibilite-numerique">schéma pluriannuel d’accessibilité</a>.
+            </p>
+            <p>
+              Cette déclaration d'accessibilité s'applique au site Eclauses{' '}
+              <a href="https://eclauses.beta.gouv.fr/" target="_blank" rel="noopener">
+                https://eclauses.beta.gouv.fr/
+              </a>.
             </p>
           </section>
 
-          <section id="finalite" className="fr-mb-6w">
-            <h2 className="fr-h3">Finalité du traitement</h2>
+          <section id="conformite" className="fr-mb-6w">
+            <h2 className="fr-h3">État de conformité</h2>
             <p>
-              L’objectif de cette collecte est d’accompagner les jeunes diplômés en conservation-restauration d'œuvres d’art dans leur
-              insertion professionnelle, notamment en constituant un annuaire partagé à la suite de la mise à jour de votre fiche annuaire.
+              Eclauses est non conforme avec le RGAA. Le site n'a encore pas été audité.
             </p>
           </section>
 
-          <section id="base-legale" className="fr-mb-6w">
-            <h2 className="fr-h3">Base légale</h2>
-            <p>Mission d’intérêt public (article 6-1 e) du RGPD).</p>
+          <section id="contenus-non-accessibles" className="fr-mb-6w">
+            <h2 className="fr-h3">Contenus non accessibles</h2>
+            <p>
+              La plateforme Eclauses est une intégration d'un document GRIST via une <em>iframe</em> HTML et n'est donc pas accessible.
+            </p>
           </section>
 
-          <section id="categories" className="fr-mb-6w">
-            <h2 className="fr-h3">Catégories de données traitées</h2>
+          <section id="amelioration-contact" className="fr-mb-6w">
+            <h2 className="fr-h3">Amélioration et contact</h2>
+            <p>
+              Si vous n'arrivez pas à accéder à un contenu ou à un service, vous pouvez contacter le responsable de Eclauses pour être orienté vers une alternative accessible ou obtenir le contenu sous une autre forme.
+            </p>
             <ul className="fr-list">
-              <li>Prénom et nom</li>
-              <li>Courriel</li>
-              <li>Numéro de téléphone professionnel</li>
-              <li>Informations relatives à la formation et à la profession</li>
+              <li>
+                E-mail :{' '}
+                <a href="mailto:contact@eclauses.beta.gouv.fr">
+                  contact@eclauses.beta.gouv.fr
+                </a>
+              </li>
             </ul>
           </section>
 
-          <section id="destinataires" className="fr-mb-6w">
-            <h2 className="fr-h3">Destinataires des données</h2>
+          <section id="recours" className="fr-mb-6w">
+            <h2 className="fr-h3">Voie de recours</h2>
             <p>
-              Vos données sont seulement accessibles aux professionnels de la conservation-restauration qui souhaitent répondre
-              à des marchés publics et aux agents du ministère de la Culture.
+              Cette procédure est à utiliser dans le cas suivant : vous avez signalé au responsable du site internet un défaut d'accessibilité qui vous empêche d'accéder à un contenu ou à un des services du portail et vous n'avez pas obtenu de réponse satisfaisante.
             </p>
-          </section>
-
-          <section id="origine" className="fr-mb-6w">
-            <h2 className="fr-h3">Origine des données</h2>
-            <p>
-              Elles nous ont été transmises par les formations publiques en conservation-restauration d'œuvres d’art.
-            </p>
-          </section>
-
-          <section id="duree" className="fr-mb-6w">
-            <h2 className="fr-h3">Durée de conservation</h2>
-            <p>Vos données sont conservées pendant la durée de votre carrière professionnelle.</p>
-          </section>
-
-          <section id="droits" className="fr-mb-6w">
-            <h2 className="fr-h3">Vos droits</h2>
-            <p>
-              Vous disposez d’un droit d’information, d’accès, de rectification, d’opposition et de limitation du traitement.
-              Vous pouvez exercer vos droits, notamment d’opposition, en contactant le délégué à la protection des données
-              du ministère de la Culture.
-            </p>
-          </section>
-
-          <section id="contact" className="fr-mb-6w">
-            <h2 className="fr-h3">Contact DPO</h2>
-            <p>
-              Adresse de contact :{' '}
-              <a href="mailto:delegue-protection-donnees@culture.gouv.fr">
-                delegue-protection-donnees@culture.gouv.fr
-              </a>
-            </p>
-          </section>
-
-          <section id="cnil" className="fr-mb-6w">
-            <h2 className="fr-h3">Réclamation auprès de la CNIL</h2>
-            <p>
-              Si vous estimez que vos droits ne sont pas respectés, vous pouvez à tout moment introduire une réclamation auprès de la CNIL.
-              <br />
-              Site de la CNIL :{' '}
-              <a href="https://www.cnil.fr" target="_blank" rel="noopener">
-                www.cnil.fr
-              </a>
-            </p>
+            <p>Vous pouvez :</p>
+            <ul className="fr-list">
+              <li>
+                Écrire un message au{' '}
+                <a href="https://formulaire.defenseurdesdroits.fr/" target="_blank" rel="noopener">
+                  Défenseur des droits
+                </a>.
+              </li>
+              <li>
+                Contacter{' '}
+                <a href="https://www.defenseurdesdroits.fr/saisir/delegues" target="_blank" rel="noopener">
+                  le délégué du Défenseur des droits dans votre région
+                </a>.
+              </li>
+              <li>Envoyer un courrier par la poste (gratuit, ne pas mettre de timbre) :</li>
+              <li>Défenseur des droits</li>
+              <li>Libre réponse 71120 75342 Paris CEDEX 07</li>
+            </ul>
           </section>
 
           <div className="fr-callout fr-mt-6w">
             <p className="fr-callout__text">
-              Cette page reprend la mention d’information transmise par le ministère de la Culture dans le cadre du service Eclauses.
+              Cette déclaration d'accessibilité a été créée le 15 juillet 2026.
             </p>
           </div>
 
