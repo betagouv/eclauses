@@ -85,6 +85,6 @@ Point d'attention : plusieurs modifications existent actuellement en DEV et ne s
 
 ## Documentation existante à reprendre
 
-Un début de documentation existe dans [grist-dsfr-react-app/docs](../grist-dsfr-react-app/docs). Elle doit être reprise, actualisée et déplacée progressivement dans ce dossier racine afin de documenter le système complet, pas uniquement le moteur de widget.
+La documentation du widget est maintenue dans son dépôt : [grist-dsfr-react-app](https://github.com/Thibaud-DT/grist-dsfr-react-app), [index de la documentation](https://github.com/Thibaud-DT/grist-dsfr-react-app/blob/main/docs/00-index.md). Elle doit être reprise, actualisée et déplacée progressivement dans ce dossier racine afin de documenter le système complet, pas uniquement le moteur de widget.
 
 > La documentation de la réécriture (Next.js, PostgreSQL) se trouve sur la branche `rewrite-postgres`, dossier `docs/80-reecriture/`.

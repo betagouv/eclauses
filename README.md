@@ -24,7 +24,7 @@ Cette branche (`main`) correspond à la version en production :
 |---|---|---|
 | `index.html` | Page publique qui encapsule l'iframe Grist | Fichier statique, AlwaysData |
 | Grist | Base de données, règles d'accès, pages | Instance Grist de la DINUM |
-| `grist-dsfr-react-app/` | Widget React + [DSFR](https://www.systeme-de-design.gouv.fr/) qui charge les pages | Dans Grist |
+| [`grist-dsfr-react-app`](https://github.com/Thibaud-DT/grist-dsfr-react-app) | Widget React + [DSFR](https://www.systeme-de-design.gouv.fr/) qui charge les pages (dépôt séparé) | Dans Grist |
 | `grist/page/`, `grist/composants/` | Pages et composants React, stockés dans la table `Application_Composants` | Dans Grist |
 | n8n | Courriers transactionnels, authentification, relances | Instance de l'ANCT |
 | Scaleway | Envoi des courriers | Relais SMTP |
@@ -35,7 +35,8 @@ Une réécriture (Next.js, TypeScript, PostgreSQL) est développée sur la branc
 
 ## Documentation
 
-La documentation technique est dans [`docs/`](docs/README.md) : vue d'ensemble, front, widget, modèle Grist, application, automatisations n8n, déploiement et maintenance.
+- Documentation de l'application : [`docs/`](docs/README.md) (vue d'ensemble, front, widget, modèle Grist, application, automatisations n8n, déploiement et maintenance).
+- Documentation technique du widget Grist DSFR : [grist-dsfr-react-app / docs](https://github.com/Thibaud-DT/grist-dsfr-react-app/blob/main/docs/00-index.md) (dépôt séparé).
 
 ## Développement
 
