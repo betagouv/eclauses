@@ -10,3 +10,4 @@ plan-local.md
 AGENTS.md
 deploiement/
 .gristkey
+infra/dev-sandbox/deploy.env
